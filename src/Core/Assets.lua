@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Core/Assets
+	Bali UI · Core/Assets
 	Materialises the embedded PNG assets (icon atlas, glow, shadow, grain) via the executor
 	file API + getcustomasset, verifies they load, and exposes graceful fallbacks.
 ]]
@@ -12,7 +12,7 @@ local Assets = {
 	Loaded = false,
 	Available = false, -- true when the custom image pipeline works on this executor
 	Images = {},
-	Folder = "Lumina/Assets",
+	Folder = "Bali/Assets",
 }
 
 -- Fallbacks hosted on Roblox (used when custom assets are unavailable)

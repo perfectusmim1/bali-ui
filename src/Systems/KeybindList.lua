@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Systems/KeybindList
+	Bali UI · Systems/KeybindList
 	Draggable obsidian glass HUD displaying active or all registered keybinds
 	with AutomaticSize.Y rows and zero text overlap.
 ]]
@@ -214,11 +214,11 @@ local function ensureBuilt()
 	end
 
 	panel = Create.New("Frame", {
-		Name = "LuminaKeybindList",
+		Name = "BaliKeybindList",
 		Parent = layer,
 		Visible = visible,
 		Active = true,
-		Position = UDim2.fromOffset(16, 68),
+		Position = UDim2.fromOffset(16, 112),
 		Size = UDim2.fromOffset(PANEL_WIDTH, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Corner = 12,
@@ -248,7 +248,7 @@ local function ensureBuilt()
 					return math.min(t.GlowTransparency + 0.05, 0.94)
 				end,
 			},
-			ZIndex = 340,
+			ZIndex = 339,
 		})
 	end
 
@@ -265,7 +265,7 @@ local function ensureBuilt()
 				ImageColor3 = "Stroke",
 				ImageTransparency = "NoiseTransparency",
 			},
-			ZIndex = 340,
+			ZIndex = 339,
 		})
 	end
 

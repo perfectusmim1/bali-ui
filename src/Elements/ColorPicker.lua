@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/ColorPicker
+	Bali UI · Elements/ColorPicker
 	Apple-premium dark glass color picker with swatch pill, 2D SV gradient canvas,
 	7-stop Hue spectrum, optional Transparency slider, live #HEX & RGB inputs,
 	Rainbow mode, and quick preset swatches inside PopupLayer.
@@ -508,9 +508,10 @@ function ColorPicker.new(parent, opts, ctx)
 	local presetsList = type(opts.Presets) == "table" and #opts.Presets > 0 and opts.Presets or DEFAULT_PRESETS
 	local presetWrap = Create.New("Frame", {
 		Name = "Presets",
-		Size = UDim2.new(1, 0, 0, 20),
+		Size = UDim2.new(1, 0, 0, 24),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
+		Padding = { 2, 2, 2, 2 },
 		LayoutOrder = 5,
 		ZIndex = 112,
 		Parent = body,
@@ -621,8 +622,11 @@ function ColorPicker.new(parent, opts, ctx)
 		local col = parseColorInput(entry, Theme.Current.Accent)
 		local sw = Create.New("TextButton", {
 			Name = "Preset_" .. idx,
-			Size = UDim2.fromOffset(30, 20),
+			Size = UDim2.fromOffset(28, 20),
 			LayoutOrder = idx,
+			Text = "",
+			AutoButtonColor = false,
+			BackgroundTransparency = 0,
 			BackgroundColor3 = col,
 			Corner = 5,
 			ZIndex = 113,

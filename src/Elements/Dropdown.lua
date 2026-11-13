@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Dropdown
+	Bali UI · Elements/Dropdown
 	Single & multi-select glass dropdown with optional search, item icons/descriptions,
 	and floating PopupLayer menu with smart flip & smooth mount/unmount animations.
 ]]
@@ -290,7 +290,7 @@ function Dropdown.new(parent, opts, ctx)
 		Theme = { ScrollBarImageColor3 = "Muted" },
 		Parent = popupInner,
 	})
-	Create.Padding(scroll, { 0, 4, 0, 0 })
+	Create.Padding(scroll, { 3, 7, 3, 3 })
 	local scrollLayout = Create.List(scroll, { Gap = 4 })
 
 	local emptyLabel = Create.Text({
@@ -394,7 +394,7 @@ function Dropdown.new(parent, opts, ctx)
 	end
 
 	local function resizePopup(preserveFlip)
-		local searchH = searchable and 36 or 0
+		local searchH = searchable and 38 or 0
 		local visibleCount = 0
 		local hasDesc = false
 		for _, entry in ipairs(optionRows) do
@@ -406,22 +406,25 @@ function Dropdown.new(parent, opts, ctx)
 			end
 		end
 
+		local padV = 6
 		local contentH = scrollLayout.AbsoluteContentSize.Y
 		local estPerRow = hasDesc and 44 or 32
-		local maxListH = maxVisible * estPerRow + math.max(0, maxVisible - 1) * 4
+		local maxListH = maxVisible * estPerRow + math.max(0, maxVisible - 1) * 4 + padV
 		local listH
 		if visibleCount == 0 then
-			listH = 30
+			listH = 36
 		elseif contentH > 0 then
-			listH = math.min(contentH, maxListH)
+			listH = math.min(contentH + padV, maxListH)
 		else
 			local shown = math.min(visibleCount, maxVisible)
-			listH = shown * estPerRow + math.max(0, shown - 1) * 4
+			listH = shown * estPerRow + math.max(0, shown - 1) * 4 + padV
 		end
 
+		local layerH = (ctx.PopupLayer and ctx.PopupLayer.AbsoluteSize.Y > 0) and ctx.PopupLayer.AbsoluteSize.Y or 680
 		local anchorW = (trigger.AbsoluteSize.X > 0) and trigger.AbsoluteSize.X or 136
-		local width = Util.Clamp(anchorW + 56, 192, 268)
-		local totalH = 16 + searchH + listH
+		local width = Util.Clamp(anchorW + 64, 198, 276)
+		local totalH = math.min(16 + searchH + listH, math.max(120, layerH - 16))
+		listH = math.max(36, totalH - 16 - searchH)
 
 		local prevBottom = popup.AbsolutePosition.Y + popup.AbsoluteSize.Y
 		local anchorTop = trigger.AbsolutePosition.Y
@@ -436,6 +439,12 @@ function Dropdown.new(parent, opts, ctx)
 			popup.Position = UDim2.fromOffset(popup.Position.X.Offset, math.max(8, newY))
 		end
 	end
+
+	self.Maid:Give(scrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		if isOpen then
+			resizePopup(true)
+		end
+	end))
 
 	local function applyFilter(preserveFlip)
 		local anyVisible = false

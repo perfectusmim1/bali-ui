@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Entry Point
+	Bali UI · Entry Point
 	Obsidian glassmorphic UI suite for Roblox & Luau.
 ]]
 
@@ -27,15 +27,17 @@ local Dialog = require("Window/Dialog")
 local Loader = require("Window/Loader")
 local Window = require("Window/Window")
 
--- Clean up any previously loaded Lumina instance on script re-execution
-local previousInstance = Util.Global("_LuminaInstance")
-if type(previousInstance) == "table" and type(previousInstance.Destroy) == "function" then
-	pcall(function()
-		previousInstance:Destroy()
-	end)
+-- Clean up any previously loaded Bali (or legacy Lumina) instance on script re-execution
+for _, key in ipairs({ "_BaliInstance", "_LuminaInstance" }) do
+	local previousInstance = Util.Global(key)
+	if type(previousInstance) == "table" and type(previousInstance.Destroy) == "function" then
+		pcall(function()
+			previousInstance:Destroy()
+		end)
+	end
 end
 
-local Lumina = {
+local Bali = {
 	Version = "1.0.0",
 
 	-- Core modules
@@ -100,7 +102,7 @@ local Lumina = {
 }
 
 if type(Util.Env) == "table" then
-	Util.Env._LuminaInstance = Lumina
+	Util.Env._BaliInstance = Bali
 end
 
 -- ─── Error Boundary & Safe Layer Helpers ─────────────────────────────────────
@@ -110,7 +112,7 @@ local lastErrorText = nil
 local lastErrorAt = 0
 
 local function handleRuntimeError(err)
-	if handlingError or Lumina._destroyed then
+	if handlingError or Bali._destroyed then
 		return
 	end
 	handlingError = true
@@ -125,7 +127,7 @@ local function handleRuntimeError(err)
 	lastErrorAt = now
 
 	pcall(function()
-		Lumina:Notify({
+		Bali:Notify({
 			Type = "Error",
 			Title = "Callback Error",
 			Content = message,
@@ -138,11 +140,20 @@ end
 
 Util.ErrorHandler = handleRuntimeError
 
-local function getSafeGuiParent()
+local function getGuiContainers()
+	local containers = {}
+	local seen = {}
+	local function pushContainer(inst)
+		if typeof(inst) == "Instance" and not seen[inst] then
+			seen[inst] = true
+			table.insert(containers, inst)
+		end
+	end
+
 	if typeof(gethui) == "function" then
 		local ok, hui = pcall(gethui)
-		if ok and typeof(hui) == "Instance" then
-			return hui
+		if ok then
+			pushContainer(hui)
 		end
 	end
 
@@ -152,12 +163,12 @@ local function getSafeGuiParent()
 	if okCore and typeof(coreGui) == "Instance" then
 		local canParent = pcall(function()
 			local probe = Instance.new("Folder")
-			probe.Name = "_LuminaProbe"
+			probe.Name = "_BaliProbe"
 			probe.Parent = coreGui
 			probe:Destroy()
 		end)
 		if canParent then
-			return coreGui
+			pushContainer(coreGui)
 		end
 	end
 
@@ -166,24 +177,57 @@ local function getSafeGuiParent()
 	end)
 	if okPlayer and localPlayer then
 		local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui") or localPlayer:WaitForChild("PlayerGui", 5)
-		if playerGui then
-			return playerGui
-		end
+		pushContainer(playerGui)
 	end
 
-	return nil
+	return containers
 end
 
-function Lumina:_ensureScreenGui()
+local function getSafeGuiParent()
+	local containers = getGuiContainers()
+	return containers[1]
+end
+
+local function cleanupOrphanGuis(excludeGui)
+	for _, container in ipairs(getGuiContainers()) do
+		pcall(function()
+			for _, child in ipairs(container:GetChildren()) do
+				if child ~= excludeGui and child:IsA("LayerCollector") then
+					if child.Name == "BaliUI" or child.Name == "LuminaUI" then
+						child:Destroy()
+					end
+				end
+			end
+		end)
+	end
+
+	pcall(function()
+		local lighting = Services.Lighting
+		if lighting then
+			for _, name in ipairs({ "BaliBlur", "LuminaBlur" }) do
+				local fx = lighting:FindFirstChild(name)
+				if fx then
+					fx:Destroy()
+				end
+			end
+		end
+	end)
+end
+
+cleanupOrphanGuis(nil)
+
+function Bali:_ensureScreenGui()
 	if self._screenGui and self._screenGui.Parent then
 		return self._screenGui
 	end
 
+	cleanupOrphanGuis(nil)
+
 	local parent = getSafeGuiParent()
-	assert(typeof(parent) == "Instance", "[Lumina] Unable to locate gethui, CoreGui, or PlayerGui")
+	assert(typeof(parent) == "Instance", "[Bali] Unable to locate gethui, CoreGui, or PlayerGui")
 
 	local gui = Instance.new("ScreenGui")
-	gui.Name = "LuminaUI"
+	gui.Name = "BaliUI"
 	gui.IgnoreGuiInset = true
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -207,7 +251,7 @@ function Lumina:_ensureScreenGui()
 	return gui
 end
 
-function Lumina:_pruneLoaders()
+function Bali:_pruneLoaders()
 	for index = #self._loaders, 1, -1 do
 		local ctrl = self._loaders[index]
 		if type(ctrl) ~= "table" or (ctrl.Frame ~= nil and not ctrl.Frame.Parent) then
@@ -216,7 +260,7 @@ function Lumina:_pruneLoaders()
 	end
 end
 
-function Lumina:_destroyNotifyLayer()
+function Bali:_destroyNotifyLayer()
 	if self._notifyLayer then
 		pcall(function()
 			self._notifyLayer:Destroy()
@@ -225,17 +269,17 @@ function Lumina:_destroyNotifyLayer()
 	end
 end
 
-function Lumina:_rearmState()
+function Bali:_rearmState()
 	self._destroyed = false
 	Util.ErrorHandler = handleRuntimeError
 	if type(Util.Env) == "table" then
-		Util.Env._LuminaInstance = self
+		Util.Env._BaliInstance = self
 	end
 end
 
 -- ─── Public API ──────────────────────────────────────────────────────────────
 
-function Lumina:CreateWindow(opts)
+function Bali:CreateWindow(opts)
 	self:_rearmState()
 
 	local options = {}
@@ -290,13 +334,13 @@ function Lumina:CreateWindow(opts)
 	table.insert(self._windows, createdWindow)
 	self._notifyReady = true
 
-	-- Use Lumina's debounced, recursion-safe ErrorHandler on top of the active Window
+	-- Use Bali's debounced, recursion-safe ErrorHandler on top of the active Window
 	Util.ErrorHandler = handleRuntimeError
 
 	return createdWindow
 end
 
-function Lumina:Notify(opts)
+function Bali:Notify(opts)
 	if self._destroyed then
 		return nil
 	end
@@ -304,7 +348,7 @@ function Lumina:Notify(opts)
 	if #self._windows == 0 and not self._notifyReady then
 		local screenGui = self:_ensureScreenGui()
 		local layer = Create.New("Frame", {
-			Name = "LuminaNotifyHostLayer",
+			Name = "BaliNotifyHostLayer",
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
 			ZIndex = 300,
@@ -318,7 +362,7 @@ function Lumina:Notify(opts)
 	return Notification.Notify(opts)
 end
 
-function Lumina:KeySystem(opts)
+function Bali:KeySystem(opts)
 	self:_rearmState()
 	pcall(Assets.Load)
 	Input.Init()
@@ -331,7 +375,7 @@ function Lumina:KeySystem(opts)
 	return r1, r2
 end
 
-function Lumina:LoadingScreen(opts)
+function Bali:LoadingScreen(opts)
 	self:_rearmState()
 	pcall(Assets.Load)
 
@@ -343,23 +387,23 @@ function Lumina:LoadingScreen(opts)
 	return ctrl
 end
 
-function Lumina:SetTheme(name, animate)
+function Bali:SetTheme(name, animate)
 	return Theme.Set(name, animate)
 end
 
-function Lumina:AddTheme(name, tbl)
+function Bali:AddTheme(name, tbl)
 	return Theme.Add(name, tbl)
 end
 
-function Lumina:SetAccent(color, animate)
+function Bali:SetAccent(color, animate)
 	return Theme.SetAccent(color, animate)
 end
 
-function Lumina:SetFont(family)
+function Bali:SetFont(family)
 	return Theme.SetFont(family)
 end
 
-function Lumina:Destroy()
+function Bali:Destroy()
 	if self._destroying then
 		return
 	end
@@ -403,21 +447,22 @@ function Lumina:Destroy()
 		end)
 	end
 	self._screenGui = nil
+	cleanupOrphanGuis(nil)
 
 	self._maid:Clean()
 
 	if Util.ErrorHandler == handleRuntimeError then
 		Util.ErrorHandler = nil
 	end
-	if type(Util.Env) == "table" and Util.Env._LuminaInstance == self then
-		Util.Env._LuminaInstance = nil
+	if type(Util.Env) == "table" and Util.Env._BaliInstance == self then
+		Util.Env._BaliInstance = nil
 	end
 
 	self._destroying = false
 end
 
-function Lumina:Unload()
+function Bali:Unload()
 	return self:Destroy()
 end
 
-return Lumina
+return Bali

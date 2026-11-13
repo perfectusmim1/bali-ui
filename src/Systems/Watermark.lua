@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Systems/Watermark
+	Bali UI · Systems/Watermark
 	Draggable Dynamic-Island style obsidian glass HUD pill with live pulse status dot,
 	viewport clamping, and optional live FPS/Ping/Time/Players telemetry.
 ]]
@@ -28,7 +28,7 @@ local dragHandle = nil
 local renderConn = nil
 
 local visible = false
-local titleText = "Lumina"
+local titleText = "Bali"
 local customText = nil
 local statsConfig = {
 	FPS = true,
@@ -170,11 +170,11 @@ local function ensureBuilt()
 	end
 
 	pill = Create.New("Frame", {
-		Name = "LuminaWatermark",
+		Name = "BaliWatermark",
 		Parent = layer,
 		Visible = visible,
 		Active = true,
-		Position = UDim2.fromOffset(16, 16),
+		Position = UDim2.fromOffset(16, 68),
 		Size = UDim2.fromOffset(0, 34),
 		AutomaticSize = Enum.AutomaticSize.X,
 		Corner = UDim.new(1, 0),
@@ -204,7 +204,7 @@ local function ensureBuilt()
 					return math.min(t.GlowTransparency + 0.06, 0.94)
 				end,
 			},
-			ZIndex = 350,
+			ZIndex = 349,
 		})
 	end
 
@@ -221,7 +221,7 @@ local function ensureBuilt()
 				ImageColor3 = "Stroke",
 				ImageTransparency = "NoiseTransparency",
 			},
-			ZIndex = 350,
+			ZIndex = 349,
 		})
 	end
 

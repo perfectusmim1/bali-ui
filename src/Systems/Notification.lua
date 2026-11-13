@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Systems/Notification
+	Bali UI · Systems/Notification
 	Apple-inspired obsidian glass toast stack with radial glow, AutomaticSize.Y wrapping,
 	hover-to-pause linear progress bar, action pills, and unread history tracking.
 ]]
@@ -96,7 +96,7 @@ local function ensureContainer()
 	end
 
 	container = Create.New("Frame", {
-		Name = "LuminaNotificationStack",
+		Name = "BaliNotificationStack",
 		Parent = layer,
 		BackgroundTransparency = 1,
 		ZIndex = 400,
@@ -286,16 +286,7 @@ function Notification.Notify(opts)
 		})
 	end
 
-	local accentBar = Create.New("Frame", {
-		Name = "AccentBar",
-		Parent = card,
-		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.fromScale(0, 0.5),
-		Size = UDim2.new(0, 3, 0.72, 0),
-		Corner = 2,
-		Theme = { BackgroundColor3 = typeMeta.ColorKey },
-		ZIndex = 404,
-	})
+	-- Left vertical accent bar removed in favor of modern icon-badge silhouette
 
 	local body = Create.New("Frame", {
 		Name = "Body",
@@ -461,9 +452,11 @@ function Notification.Notify(opts)
 	local progressTrack = Create.New("Frame", {
 		Name = "ProgressTrack",
 		Parent = card,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.new(1, 0, 0, 2),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -4),
+		Size = UDim2.new(1, -24, 0, 2),
+		Corner = 999,
+		ClipsDescendants = true,
 		BackgroundTransparency = 0.85,
 		Theme = { BackgroundColor3 = "Stroke" },
 		ZIndex = 405,
@@ -616,7 +609,7 @@ function Notification.Notify(opts)
 			noteType = newOpts.Type
 			typeMeta = getTypeMeta(noteType)
 			historyEntry.Type = noteType
-			Theme.Bind(accentBar, { BackgroundColor3 = typeMeta.ColorKey })
+			-- Accent styling updated via iconBadge/icon/progressBar below
 			Theme.Bind(iconBadge, { BackgroundColor3 = typeMeta.ColorKey })
 			Theme.Bind(progressFill, { BackgroundColor3 = typeMeta.ColorKey })
 			Icons.SetColor(iconObj, typeMeta.ColorKey)

@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Window/Tab
+	Bali UI · Window/Tab
 	Sidebar category headers, grouped tab buttons with animated active pill &
 	collapse rail support, Apple segmented SubTab bar, and responsive 2-col -> 1-col layout.
 ]]
@@ -387,8 +387,8 @@ function Tab.new(window, options)
 
 	local subTabIndicator = Create.New("Frame", {
 		Name = "ActivePill",
-		Position = UDim2.fromOffset(0, 0),
-		Size = UDim2.new(0, 0, 1, 0),
+		Position = UDim2.fromOffset(0, 2),
+		Size = UDim2.new(0, 0, 1, -4),
 		Corner = 8,
 		Theme = { BackgroundColor3 = "Card" },
 		Visible = false,
@@ -416,6 +416,7 @@ function Tab.new(window, options)
 		Position = UDim2.fromOffset(0, 0),
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
+		ClipsDescendants = true,
 		Parent = page,
 	})
 
@@ -590,13 +591,19 @@ function Tab:_syncSubTabIndicator(instant)
 			return
 		end
 		self._subTabIndicator.Visible = true
-		local targetPos = UDim2.fromOffset(x, 0)
-		local targetSize = UDim2.new(0, w, 1, 0)
+		local targetPos = UDim2.fromOffset(x, 2)
+		local targetSize = UDim2.new(0, w, 1, -4)
 		if instant then
 			self._subTabIndicator.Position = targetPos
 			self._subTabIndicator.Size = targetSize
 		else
-			Tween.Spring(self._subTabIndicator, { Position = targetPos, Size = targetSize }, Tween.Normal)
+			Tween.Play(
+				self._subTabIndicator,
+				{ Position = targetPos, Size = targetSize },
+				Tween.Normal,
+				Enum.EasingStyle.Exponential,
+				Enum.EasingDirection.Out
+			)
 		end
 	end
 	applyPill()
@@ -632,6 +639,17 @@ function Tab:SelectSubTab(subTab)
 		return
 	end
 
+	local oldIdx, newIdx = 1, 1
+	for idx, candidate in ipairs(self.SubTabs) do
+		if candidate == self.ActiveSubTab then
+			oldIdx = idx
+		end
+		if candidate == subTab then
+			newIdx = idx
+		end
+	end
+	local dir = (newIdx >= oldIdx) and 1 or -1
+
 	for _, candidate in ipairs(self.SubTabs) do
 		local isCurrent = (candidate == subTab)
 		candidate.Scroll.Visible = isCurrent
@@ -645,7 +663,7 @@ function Tab:SelectSubTab(subTab)
 	end
 
 	self.ActiveSubTab = subTab
-	Transition.SlideFade(subTab.Scroll, 6)
+	Transition.SlideFade(subTab.Scroll, 0, dir * 16)
 	self:_syncSubTabIndicator(false)
 
 	if self.Window and self.Window.ActiveTab == self then
@@ -740,7 +758,28 @@ function Tab:AddSubTab(options)
 
 	Container.Attach(subTab, flow.Scroll, self, nil, self.Window, subTab)
 
+	Theme.Bind(subBtn, { BackgroundColor3 = "Tile" })
+	local subHovered = false
+	self.Maid:Give(subBtn.MouseEnter:Connect(function()
+		if self.ActiveSubTab == subTab or Util.IsTouchDevice() then
+			return
+		end
+		subHovered = true
+		Tween.Play(subBtn, { BackgroundTransparency = 0.52 }, Tween.Fast, Enum.EasingStyle.Exponential)
+		Tween.Play(subLabel, { TextColor3 = Theme.Current.Text }, Tween.Fast, Enum.EasingStyle.Exponential)
+	end))
+	self.Maid:Give(subBtn.MouseLeave:Connect(function()
+		subHovered = false
+		Tween.Play(subBtn, { BackgroundTransparency = 1 }, Tween.Fast, Enum.EasingStyle.Exponential)
+		if self.ActiveSubTab ~= subTab then
+			Tween.Play(subLabel, { TextColor3 = Theme.Current.SubText }, Tween.Fast, Enum.EasingStyle.Exponential)
+		end
+	end))
+
 	self.Maid:Give(subBtn.Activated:Connect(function()
+		if subHovered then
+			subBtn.BackgroundTransparency = 1
+		end
 		self:SelectSubTab(subTab)
 	end))
 

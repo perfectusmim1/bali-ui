@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Core/Services
+	Bali UI · Core/Services
 	Lazy, cached service access. Uses cloneref when the executor provides it.
 ]]
 

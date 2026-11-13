@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Core/Theme
+	Bali UI · Core/Theme
 	Theme presets, live re-theming through property bindings, accent overrides and typography.
 
 	Binding values:
@@ -23,8 +23,8 @@ Theme.Fonts = {
 	Nunito = "rbxasset://fonts/families/Nunito.json",
 	Mono = "rbxasset://fonts/families/RobotoMono.json",
 }
-Theme.FontOrder = { "Gotham", "Builder", "Montserrat", "Ubuntu", "Nunito" }
-Theme.FontFamily = "Gotham"
+Theme.FontOrder = { "Builder", "Gotham", "Montserrat", "Ubuntu", "Nunito" }
+Theme.FontFamily = "Builder"
 
 -- Base (dark) palette every preset inherits from
 local Base = {
@@ -47,13 +47,13 @@ local Base = {
 	FieldHover = rgb(22, 22, 28),
 
 	Stroke = rgb(255, 255, 255),
-	StrokeTransparency = 0.9,
+	StrokeTransparency = 0.89,
 	Divider = rgb(255, 255, 255),
-	DividerTransparency = 0.93,
+	DividerTransparency = 0.92,
 
-	Text = rgb(244, 244, 248),
-	SubText = rgb(160, 160, 176),
-	Muted = rgb(108, 108, 124),
+	Text = rgb(246, 246, 250),
+	SubText = rgb(184, 188, 206),
+	Muted = rgb(140, 144, 162),
 
 	ToggleOff = rgb(54, 54, 64),
 	Knob = rgb(255, 255, 255),
@@ -65,10 +65,10 @@ local Base = {
 
 	Shadow = rgb(0, 0, 0),
 	ShadowTransparency = 0.3,
-	GlowTransparency = 0.8,
+	GlowTransparency = 0.84,
 	Overlay = rgb(0, 0, 0),
-	OverlayTransparency = 0.45,
-	NoiseTransparency = 0.93,
+	OverlayTransparency = 0.56,
+	NoiseTransparency = 0.965,
 }
 
 local function preset(overrides)
@@ -91,8 +91,8 @@ Theme.Presets = {
 		Field = rgb(12, 15, 26),
 		FieldHover = rgb(18, 23, 38),
 		Text = rgb(240, 244, 252),
-		SubText = rgb(148, 160, 188),
-		Muted = rgb(94, 105, 132),
+		SubText = rgb(176, 188, 216),
+		Muted = rgb(134, 144, 172),
 		ToggleOff = rgb(44, 52, 74),
 	}),
 	Graphite = preset({
@@ -105,8 +105,8 @@ Theme.Presets = {
 		Field = rgb(21, 21, 23),
 		FieldHover = rgb(28, 28, 31),
 		Text = rgb(250, 250, 252),
-		SubText = rgb(152, 152, 159),
-		Muted = rgb(99, 99, 104),
+		SubText = rgb(180, 182, 192),
+		Muted = rgb(138, 140, 150),
 		ToggleOff = rgb(58, 58, 62),
 	}),
 	Aurora = preset({
@@ -119,8 +119,8 @@ Theme.Presets = {
 		Field = rgb(10, 17, 18),
 		FieldHover = rgb(15, 24, 26),
 		Text = rgb(236, 250, 248),
-		SubText = rgb(146, 176, 174),
-		Muted = rgb(90, 118, 117),
+		SubText = rgb(170, 200, 198),
+		Muted = rgb(128, 156, 154),
 		ToggleOff = rgb(38, 54, 57),
 	}),
 	Sunset = preset({
@@ -133,8 +133,8 @@ Theme.Presets = {
 		Field = rgb(18, 13, 15),
 		FieldHover = rgb(26, 19, 21),
 		Text = rgb(252, 242, 244),
-		SubText = rgb(182, 156, 162),
-		Muted = rgb(124, 102, 108),
+		SubText = rgb(198, 174, 180),
+		Muted = rgb(150, 130, 136),
 		ToggleOff = rgb(60, 45, 49),
 	}),
 	Emerald = preset({
@@ -147,8 +147,8 @@ Theme.Presets = {
 		Field = rgb(11, 16, 14),
 		FieldHover = rgb(16, 23, 20),
 		Text = rgb(238, 250, 244),
-		SubText = rgb(146, 172, 160),
-		Muted = rgb(92, 114, 104),
+		SubText = rgb(168, 194, 182),
+		Muted = rgb(126, 150, 140),
 		ToggleOff = rgb(40, 54, 48),
 	}),
 	Light = preset({
@@ -261,7 +261,7 @@ function Theme.Bind(instance, map)
 	end
 	local ok, err = pcall(apply, instance, map, false)
 	if not ok then
-		warn("[Lumina] Theme bind failed: " .. tostring(err))
+		warn("[Bali] Theme bind failed: " .. tostring(err))
 	end
 	return instance
 end
@@ -297,7 +297,7 @@ end
 function Theme.Set(name, animate)
 	local source = Theme.Presets[name]
 	if not source then
-		warn("[Lumina] Unknown theme: " .. tostring(name))
+		warn("[Bali] Unknown theme: " .. tostring(name))
 		return false
 	end
 	Theme.Name = name

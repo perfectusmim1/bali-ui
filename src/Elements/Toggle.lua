@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Toggle
+	Bali UI · Elements/Toggle
 	Apple pill Toggle switch (with optional inline Keybind sub-chip) and Checkbox.
 ]]
 
@@ -402,13 +402,9 @@ function Checkbox.new(parent, opts, ctx)
 		Parent = box,
 	})
 
-	local checkScale = Instance.new("UIScale")
-	checkScale.Scale = state and 1 or 0.4
-	checkScale.Parent = checkIcon
-
 	local function applyVisual(animate)
 		local targetAlpha = state and 0 or 1
-		local targetScale = state and 1 or 0.4
+		local targetSize = state and UDim2.fromOffset(13, 13) or UDim2.fromOffset(6, 6)
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
 		local targetStrokeTrans = state and 0.25 or Theme.Current.StrokeTransparency
 		local iconTransProp = checkIcon and Icons.TransparencyProperty(checkIcon) or "ImageTransparency"
@@ -416,9 +412,8 @@ function Checkbox.new(parent, opts, ctx)
 		if animate then
 			Tween.Play(accentFill, { BackgroundTransparency = targetAlpha }, Tween.Fast, Enum.EasingStyle.Quad)
 			if checkIcon then
-				Tween.Play(checkIcon, { [iconTransProp] = targetAlpha }, Tween.Fast, Enum.EasingStyle.Quad)
+				Tween.Play(checkIcon, { [iconTransProp] = targetAlpha, Size = targetSize }, Tween.Fast, Enum.EasingStyle.Exponential)
 			end
-			Tween.Spring(checkScale, { Scale = targetScale }, Tween.Fast + 0.06)
 			Tween.Play(boxStroke, {
 				Color = targetStrokeColor,
 				Transparency = targetStrokeTrans,
@@ -427,8 +422,8 @@ function Checkbox.new(parent, opts, ctx)
 			accentFill.BackgroundTransparency = targetAlpha
 			if checkIcon then
 				checkIcon[iconTransProp] = targetAlpha
+				checkIcon.Size = targetSize
 			end
-			checkScale.Scale = targetScale
 			boxStroke.Color = targetStrokeColor
 			boxStroke.Transparency = targetStrokeTrans
 		end

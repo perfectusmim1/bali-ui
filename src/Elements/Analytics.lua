@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Analytics
+	Bali UI · Elements/Analytics
 	Data visualization & dashboard elements inspired by SEDA, MEXC, and TradingView:
 	StatCard, Chart (Line/Area & Bar with hover crosshair), ProgressBar, Table, CardGrid.
 ]]
@@ -1404,7 +1404,11 @@ function Table.new(parent, opts, ctx)
 	local autoCount = 0
 	for _, col in ipairs(columns) do
 		if type(col.Width) == "number" then
-			fixedPx += col.Width
+			if col.Width > 0 and col.Width <= 1 then
+				fixedScale += col.Width
+			else
+				fixedPx += col.Width
+			end
 		elseif typeof(col.Width) == "UDim" then
 			fixedScale += col.Width.Scale
 			fixedPx += col.Width.Offset
@@ -1416,12 +1420,15 @@ function Table.new(parent, opts, ctx)
 
 	local function colUDim(col)
 		if type(col.Width) == "number" then
+			if col.Width > 0 and col.Width <= 1 then
+				return UDim.new(col.Width, -math.ceil(totalGap * col.Width + 0.5))
+			end
 			return UDim.new(0, col.Width)
 		elseif typeof(col.Width) == "UDim" then
 			return col.Width
 		end
-		local s = (1 - fixedScale) / math.max(1, autoCount)
-		local o = -(fixedPx + totalGap) / math.max(1, autoCount)
+		local s = math.max(0.05, (1 - fixedScale) / math.max(1, autoCount))
+		local o = -math.ceil((fixedPx + totalGap) / math.max(1, autoCount))
 		return UDim.new(s, o)
 	end
 
@@ -1480,7 +1487,7 @@ function Table.new(parent, opts, ctx)
 		Theme = { ScrollBarImageColor3 = "Muted" },
 		Parent = content,
 	})
-	Create.Padding(scroll, { 0, 4, 0, 0 })
+	Create.Padding(scroll, { 3, 6, 3, 3 })
 	local scrollLayout = Create.List(scroll, { Gap = 4 })
 
 	local emptyLabel = Create.Text({
@@ -1728,6 +1735,9 @@ function Table.new(parent, opts, ctx)
 					Size = UDim2.fromOffset(72, 24),
 					Position = UDim2.new(1, 0, 0.5, 0),
 					AnchorPoint = Vector2.new(1, 0.5),
+					Text = "",
+					AutoButtonColor = false,
+					BackgroundTransparency = 0,
 					Corner = 6,
 					Padding = { 0, 6, 0, 6 },
 					Theme = { BackgroundColor3 = "Field" },

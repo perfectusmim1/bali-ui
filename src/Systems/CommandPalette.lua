@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Systems/CommandPalette
+	Bali UI · Systems/CommandPalette
 	Apple Spotlight / Raycast style glass modal with live fuzzy search across tabs,
 	elements, and themes, full keyboard navigation, and click/touch execution.
 ]]
@@ -546,7 +546,7 @@ local function ensureBuilt()
 	end
 
 	backdrop = Create.New("TextButton", {
-		Name = "LuminaCommandPaletteBackdrop",
+		Name = "BaliCommandPaletteBackdrop",
 		Parent = layer,
 		Visible = false,
 		Size = UDim2.fromScale(1, 1),
@@ -817,7 +817,7 @@ function CommandPalette.Open()
 	if isOpen then
 		return
 	end
-	if not ensureBuilt() then
+	if not ensureBuilt() or not searchBox then
 		return
 	end
 

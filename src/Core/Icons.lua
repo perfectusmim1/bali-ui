@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Core/Icons
+	Bali UI · Core/Icons
 	Icon resolution: embedded Lucide atlas names, Roblox asset ids, or glyph fallbacks.
 ]]
 

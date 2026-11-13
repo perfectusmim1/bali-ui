@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Systems/Config
+	Bali UI · Systems/Config
 	JSON profile manager with HttpService + pure-Lua JSON fallback, Color3 hex+alpha
 	and Enum serialization, autoload support, and optional Theme/Accent/Font/Blur/Watermark sync.
 ]]
@@ -14,7 +14,7 @@ local KeybindList = require("Systems/KeybindList")
 
 local Config = {}
 
-local DEFAULT_FOLDER = "Lumina/Configs"
+local DEFAULT_FOLDER = "Bali/Configs"
 local AUTOLOAD_FILE = "_autoload.txt"
 
 local folder = DEFAULT_FOLDER

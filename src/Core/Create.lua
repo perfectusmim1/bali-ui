@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Core/Create
+	Bali UI · Core/Create
 	Declarative instance factory with theme bindings and layout shorthands.
 
 	New("Frame", {
@@ -44,10 +44,9 @@ local function applyDefaults(instance, className)
 		instance.TextXAlignment = Enum.TextXAlignment.Left
 		instance.TextColor3 = Theme.Current.Text
 		instance.FontFace = Theme.Font("Regular")
-		if className ~= "TextLabel" then
+		if className == "TextButton" then
 			instance.AutoButtonColor = false
-		end
-		if className == "TextBox" then
+		elseif className == "TextBox" then
 			instance.ClearTextOnFocus = false
 		end
 	elseif IMAGE_CLASSES[className] then
@@ -142,6 +141,13 @@ function Create.New(className, props)
 	for key, value in pairs(props) do
 		if not SPECIAL[key] then
 			instance[key] = value
+		end
+	end
+
+	-- Ensure colored TextButtons default to opaque unless caller overrides transparency
+	if className == "TextButton" and props.BackgroundTransparency == nil and (not props.Theme or props.Theme.BackgroundTransparency == nil) then
+		if props.BackgroundColor3 ~= nil or (props.Theme and props.Theme.BackgroundColor3 ~= nil) then
+			instance.BackgroundTransparency = 0
 		end
 	end
 

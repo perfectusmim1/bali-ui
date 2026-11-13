@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Window/Section
+	Bali UI · Window/Section
 	Obsidian glass card container inside a Tab/SubTab page with optional icon,
 	subtitle, collapsible header, and attached element factory methods.
 ]]

@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Window/Dialog
+	Bali UI · Window/Dialog
 	Centered obsidian glass modal dialog over a dimmed backdrop with spring mount,
 	optional icon badge, text input field, action buttons, and Escape support.
 ]]
@@ -51,7 +51,7 @@ local function applyButtonStyle(button, stroke, label, variant)
 end
 
 function Dialog.Show(dialogLayer, options)
-	assert(typeof(dialogLayer) == "Instance", "[Lumina] Dialog.Show expects a dialogLayer Instance")
+	assert(typeof(dialogLayer) == "Instance", "[Bali] Dialog.Show expects a dialogLayer Instance")
 	options = Util.Options(options, {
 		Title = "Confirm",
 		Content = nil,

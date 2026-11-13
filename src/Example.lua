@@ -1,16 +1,16 @@
 --[[
-	Lumina UI · Full Feature Showcase
+	Bali UI · Full Feature Showcase
 	Demonstrates every Core system, Window capability, and UI element in a cohesive
 	obsidian analytics workspace inspired by modern telemetry dashboards.
 ]]
 
-local Lumina = require("Lumina")
+local Bali = require("Bali")
 
 -- Safely inspect LocalPlayer for avatar + welcome profile banner
 local playerName = "Architect"
 local playerUserId = 1
 pcall(function()
-	local lp = Lumina.Services.Players.LocalPlayer
+	local lp = Bali.Services.Players.LocalPlayer
 	if lp then
 		playerName = (lp.DisplayName ~= "" and lp.DisplayName) or lp.Name
 		playerUserId = lp.UserId
@@ -18,23 +18,23 @@ pcall(function()
 end)
 
 -- Pre-window boot toast (automatically migrates once CreateWindow mounts)
-Lumina:Notify({
-	Title = "Initializing Lumina",
+Bali:Notify({
+	Title = "Initializing Bali",
 	Content = "Mounting obsidian glass workspace...",
 	Type = "Accent",
 	Duration = 2.5,
 })
 
-local window = Lumina:CreateWindow({
-	Title = "Lumina Suite",
-	Subtitle = "v" .. Lumina.Version,
+local window = Bali:CreateWindow({
+	Title = "Bali Suite",
+	Subtitle = "v" .. Bali.Version,
 	Icon = "sparkles",
 	ShowUser = true,
 	Size = UDim2.fromOffset(860, 570),
 	ToggleKey = Enum.KeyCode.RightShift,
 	Watermark = {
 		Enabled = true,
-		Title = "Lumina Suite",
+		Title = "Bali Suite",
 		Text = "Analytics Workspace",
 	},
 	KeybindList = {
@@ -43,11 +43,11 @@ local window = Lumina:CreateWindow({
 	},
 	Blur = true,
 	BlurIntensity = 12,
-	ConfigFolder = "LuminaShowcase",
+	ConfigFolder = "BaliShowcase",
 })
 
 window:Notify({
-	Title = "Lumina Suite Ready",
+	Title = "Bali Suite Ready",
 	Content = "Press RightShift to toggle UI, or Ctrl+K to open Command Palette.",
 	Type = "Success",
 	Duration = 4.5,
@@ -232,8 +232,8 @@ end
 
 profileCard = heroSection:AddProfileCard({
 	UserId = playerUserId,
-	Title = playerName .. " · Lumina Workspace",
-	Subtitle = "SEDA Analytics Cluster · Build v" .. Lumina.Version,
+	Title = playerName .. " · Bali Workspace",
+	Subtitle = "SEDA Analytics Cluster · Build v" .. Bali.Version,
 	Status = "Snapshot: Wednesday",
 	StatusColor = "Success",
 	Button = {
@@ -632,7 +632,7 @@ switchesSection:AddToggle({
 	Flag = "Controls_SmartAutomation",
 	Tooltip = "Click the hotkey badge on the right to rebind.",
 	Callback = function(state)
-		Lumina.Watermark.SetText(state and "Automation On" or "Automation Idle")
+		Bali.Watermark.SetText(state and "Automation On" or "Automation Idle")
 	end,
 })
 
@@ -882,7 +882,7 @@ inputSection:AddInput({
 	Description = "Password-masked input with reveal eye toggle.",
 	BoxIcon = "key",
 	Placeholder = "Paste secret token...",
-	Default = "lumina_live_9821a",
+	Default = "bali_live_9821a",
 	Mask = true,
 	Flag = "Pickers_Token",
 })
@@ -920,12 +920,12 @@ editorialSection:AddHeader({
 
 editorialSection:AddLabel({
 	Title = "Runtime Signature",
-	Value = "Lumina Core v" .. Lumina.Version,
+	Value = "Bali Core v" .. Bali.Version,
 	Icon = "cpu",
 	Badge = "Verified",
 	BadgeColor = "Success",
 	Copyable = true,
-	CopyValue = "Lumina-Core-v" .. Lumina.Version,
+	CopyValue = "Bali-Core-v" .. Bali.Version,
 })
 
 editorialSection:AddParagraph({
@@ -988,10 +988,10 @@ local mediaSection = layoutSub:AddSection({
 
 mediaSection:AddCodeBlock({
 	Title = "Luau Quickstart",
-	Code = [[local Lumina = require("Lumina")
+	Code = [[local Bali = require("Bali")
 
-local win = Lumina:CreateWindow({
-	Title = "Lumina Suite",
+local win = Bali:CreateWindow({
+	Title = "Bali Suite",
 	Theme = "Midnight",
 	Blur = true,
 })
@@ -1006,7 +1006,7 @@ sec:AddToggle({ Title = "Enabled", Default = true })]],
 mediaSection:AddImage({
 	Title = "Bundled Icon Atlas",
 	Caption = "832x572 Lucide SDF/PNG sprite sheet loaded at runtime",
-	Image = Lumina.Assets.Get("Atlas") or "rbxassetid://0",
+	Image = Bali.Assets.Get("Atlas") or "rbxassetid://0",
 	Height = 148,
 	ScaleType = Enum.ScaleType.Fit,
 })
@@ -1032,7 +1032,7 @@ toastsSection:AddButton({
 	Title = "Info Notification",
 	Icon = "info",
 	Callback = function()
-		Lumina:Notify({
+		Bali:Notify({
 			Title = "Workspace Notice",
 			Content = "Background metrics synchronized with local cluster.",
 			Type = "Info",
@@ -1045,7 +1045,7 @@ toastsSection:AddButton({
 	Title = "Success Notification",
 	Icon = "circle-check",
 	Callback = function()
-		Lumina:Notify({
+		Bali:Notify({
 			Title = "Build Validated",
 			Content = "All modules passed luau-compile verification.",
 			Type = "Success",
@@ -1058,7 +1058,7 @@ toastsSection:AddButton({
 	Title = "Warning Notification",
 	Icon = "triangle-alert",
 	Callback = function()
-		Lumina:Notify({
+		Bali:Notify({
 			Title = "Memory Threshold",
 			Content = "Ring buffer utilization exceeded 80% ceiling.",
 			Type = "Warning",
@@ -1071,7 +1071,7 @@ toastsSection:AddButton({
 	Title = "Error Notification",
 	Icon = "circle-x",
 	Callback = function()
-		Lumina:Notify({
+		Bali:Notify({
 			Title = "Socket Interrupted",
 			Content = "Secondary relay timed out after 3000ms.",
 			Type = "Error",
@@ -1085,9 +1085,9 @@ toastsSection:AddButton({
 	Icon = "sparkles",
 	Variant = "Primary",
 	Callback = function()
-		Lumina:Notify({
+		Bali:Notify({
 			Title = "Update Package Ready",
-			Content = "Lumina Suite v1.0.1 includes improved blur transitions.",
+			Content = "Bali Suite v1.0.1 includes improved blur transitions.",
 			Type = "Accent",
 			Duration = 8,
 			Actions = {
@@ -1095,7 +1095,7 @@ toastsSection:AddButton({
 					Title = "Apply Now",
 					Primary = true,
 					Callback = function()
-						Lumina:Notify({
+						Bali:Notify({
 							Title = "Updated",
 							Content = "Applied update cleanly without restart.",
 							Type = "Success",
@@ -1118,8 +1118,8 @@ toastsSection:AddButton({
 	Icon = "bug",
 	Variant = "Danger",
 	Callback = function()
-		Lumina.Util.SafeCall(function()
-			error("Simulated callback exception caught by Lumina ErrorHandler")
+		Bali.Util.SafeCall(function()
+			error("Simulated callback exception caught by Bali ErrorHandler")
 		end)
 	end,
 })
@@ -1178,9 +1178,9 @@ modalsSection:AddButton({
 					Title = "Apply Name",
 					Variant = "Primary",
 					Callback = function(value)
-						local clean = Lumina.Util.Trim(value or "")
+						local clean = Bali.Util.Trim(value or "")
 						if clean ~= "" then
-							Lumina.Watermark.SetText(clean)
+							Bali.Watermark.SetText(clean)
 							window:Notify({
 								Title = "Watermark Updated",
 								Content = "Cluster label set to '" .. clean .. "'.",
@@ -1198,8 +1198,8 @@ modalsSection:AddButton({
 	Title = "Preview Loading Screen",
 	Icon = "loader",
 	Callback = function()
-		Lumina:LoadingScreen({
-			Title = "Lumina Suite",
+		Bali:LoadingScreen({
+			Title = "Bali Suite",
 			Subtitle = "Synchronizing glassmorphic telemetry...",
 			Icon = "sparkles",
 			Duration = 2.0,
@@ -1225,11 +1225,11 @@ modalsSection:AddButton({
 	Title = "Preview Key System",
 	Icon = "key",
 	Callback = function()
-		Lumina:KeySystem({
-			Title = "Lumina Access Gate",
-			Subtitle = "Demo verification key: LUMINA-DEMO",
+		Bali:KeySystem({
+			Title = "Bali Access Gate",
+			Subtitle = "Demo verification key: BALI-DEMO",
 			Icon = "key",
-			Key = "LUMINA-DEMO",
+			Key = "BALI-DEMO",
 			Closable = true,
 			OnSuccess = function(acceptedKey)
 				window:Notify({
@@ -1249,7 +1249,7 @@ modalsSection:AddButton({
 	Variant = "Primary",
 	Tooltip = "Press Ctrl+K anywhere inside the workspace",
 	Callback = function()
-		Lumina.CommandPalette.Open()
+		Bali.CommandPalette.Open()
 	end,
 })
 

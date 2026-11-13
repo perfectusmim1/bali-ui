@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Keybind
+	Bali UI · Elements/Keybind
 	Interactive keybind row with key capture pulse state, Mode pill & PopupLayer mode menu,
 	Systems/Input integration, and Systems/KeybindList live synchronization.
 ]]

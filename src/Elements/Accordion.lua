@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Accordion
+	Bali UI · Elements/Accordion
 	Collapsible glass sub-container inside a Section with smooth expand/collapse animation
 	and full Container attachment so all library elements can be nested cleanly.
 ]]

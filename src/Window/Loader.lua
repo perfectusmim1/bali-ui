@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Window/Loader
+	Bali UI · Window/Loader
 	Glassmorphic LoadingScreen splash and KeySystem verification modal with
 	Get Key clipboard copy, Check Key verification, error shake, and saved key support.
 ]]
@@ -78,7 +78,9 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = "CardTransparency",
+			BackgroundTransparency = function(t)
+				return math.min(t.CardTransparency, 0.03)
+			end,
 		},
 		Corner = 14,
 		ClipsDescendants = true,
@@ -150,13 +152,13 @@ end
 -- ─── LoadingScreen ───────────────────────────────────────────────────────────
 
 function Loader.LoadingScreen(parentGui, options)
-	assert(typeof(parentGui) == "Instance", "[Lumina] Loader.LoadingScreen expects a parentGui Instance")
+	assert(typeof(parentGui) == "Instance", "[Bali] Loader.LoadingScreen expects a parentGui Instance")
 	if not Assets.Loaded then
 		pcall(Assets.Load)
 	end
 
 	options = Util.Options(options, {
-		Title = "Lumina",
+		Title = "Bali",
 		Subtitle = "Preparing workspace...",
 		Icon = "sparkles",
 		Duration = 1.6,
@@ -223,7 +225,7 @@ function Loader.LoadingScreen(parentGui, options)
 	Create.List(titleCol, { Gap = 2 })
 
 	Create.Text({
-		Text = tostring(options.Title or "Lumina"),
+		Text = tostring(options.Title or "Bali"),
 		Font = "Bold",
 		TextSize = 17,
 		Color = "Text",
@@ -409,7 +411,7 @@ local function checkSavedKey(options, verifyFn)
 	if not options.SaveKey or not Util.FS.Supported() then
 		return nil
 	end
-	local folder = options.Folder or "Lumina"
+	local folder = options.Folder or "Bali"
 	local path = options.SavePath or (folder .. "/" .. tostring(options.FileName or "key.txt"))
 	if not Util.FS.IsFile(path) then
 		return nil
@@ -426,14 +428,14 @@ local function writeSavedKey(options, key)
 	if not options.SaveKey or not Util.FS.Supported() then
 		return
 	end
-	local folder = options.Folder or "Lumina"
+	local folder = options.Folder or "Bali"
 	Util.FS.MakeFolder(folder)
 	local path = options.SavePath or (folder .. "/" .. tostring(options.FileName or "key.txt"))
 	Util.FS.Write(path, tostring(key))
 end
 
 function Loader.KeySystem(parentGui, options)
-	assert(typeof(parentGui) == "Instance", "[Lumina] Loader.KeySystem expects a parentGui Instance")
+	assert(typeof(parentGui) == "Instance", "[Bali] Loader.KeySystem expects a parentGui Instance")
 	if not Assets.Loaded then
 		pcall(Assets.Load)
 	end
@@ -454,7 +456,7 @@ function Loader.KeySystem(parentGui, options)
 		KeyLink = nil,
 		OnGetKey = nil,
 		SaveKey = false,
-		Folder = "Lumina",
+		Folder = "Bali",
 		FileName = "key.txt",
 		SavePath = nil,
 		Closable = true,
@@ -805,6 +807,7 @@ function Loader.KeySystem(parentGui, options)
 		Size = hasGetKey and UDim2.new(0.5, -4, 1, 0) or UDim2.fromScale(1, 1),
 		Text = "",
 		AutoButtonColor = false,
+		BackgroundTransparency = 0,
 		ClipsDescendants = true,
 		Corner = 9,
 		Theme = { BackgroundColor3 = "Accent" },

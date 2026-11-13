@@ -1,4 +1,4 @@
-// Lumina UI asset generator
+// Bali UI asset generator
 // Renders a Lucide icon atlas plus procedural glass assets (glow, shadow, grain)
 // and emits src/Generated/AssetData.lua with base64 PNG payloads.
 import fs from "node:fs";

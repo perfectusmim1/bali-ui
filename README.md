@@ -1,23 +1,130 @@
-# Lumina UI
+# Bali UI
 
-Obsidian glassmorphic UI library for Roblox and Luau featuring live theme switching, radial glass accents, a bundled 164-icon Lucide sprite atlas, spring-driven motion, analytics visualization widgets, desktop and touch ergonomics, and zero-`loadstring` single-file distribution bundles.
+**Bali** is an obsidian glassmorphic UI library for Roblox and Luau featuring smooth `Exponential Out` deceleration motion, crisp `BuilderSans` typography, radial glass strokes, a bundled 164-icon Lucide sprite atlas, live theme switching, real-time analytics widgets, desktop & mobile ergonomics, and zero-`loadstring` single-file distribution bundles.
 
-## Features
+![Bali Suite Showcase](docs/assets/promo-hero.png)
 
-- **Obsidian Glass Engine**: Layered depth (`Main`, `HUD`, `Popup`, `Dialog`, `Notification`), directional hairline `UIStroke` highlights, ambient radial blooms, and subtle noise grain.
-- **7 Built-in Themes & Live Customization**: `Midnight`, `Ocean`, `Graphite`, `Aurora`, `Sunset`, `Emerald`, and `Light`, plus runtime accent color overrides, custom theme registration (`AddTheme`), and font family switching (`SetFont`).
-- **164 Bundled Lucide Icons**: Self-contained sprite atlas (`src/Generated/AssetData.lua`) synced cleanly into asset storage with crisp glyph fallbacks when file APIs are restricted.
-- **Rich Control Suite**: `Toggle` (with inline keybinds), `Checkbox`, `Button` (variants + double-click `Confirm`), `ButtonGroup`, `Slider`, `RangeSlider`, `Stepper`, `Input` (numeric/integer/password mask), `Segmented`, `Dropdown` (single, multi, searchable), `Keybind` (`Toggle`, `Hold`, `Always`, mouse support), `ColorPicker` (HSV wheel, alpha, hex, presets, rainbow), and nested `Accordion` containers.
-- **Analytics & Data Widgets**: `StatCard` (animated numbers, deltas, sparklines), `Chart` (`Line` and `Bar` modes with live `:Push()`), `ProgressBar` (gradients and status badges), `Table` (search, multi-select checkboxes, badges, row click/action buttons), and `CardGrid`.
-- **System HUD & Modals**: Stacking `Notification` toasts with actions & unread history popover, `CommandPalette` (`Ctrl+K`), draggable `Watermark`, live `KeybindList`, lighting `Blur`, `Tooltip`, centered `Dialog` modals (with optional input field), `LoadingScreen` splash, and `KeySystem` verification gate.
-- **Persistence & Safety**: JSON `Config` save/load/auto-load/import/export via executor file APIs, automatic re-execution cleanup (`_LuminaInstance`), element `:Lock()`/`:Unlock()`, and a recursion-guarded `Util.ErrorHandler` surfacing callback failures as Error toasts.
-- **Zero-`loadstring` Distribution**: `tools/bundle.mjs` produces single-file Luau bundles (`dist/Lumina.lua` and `dist/LuminaExample.lua`) compatible with both Roblox executors and Roblox Studio `ModuleScript` workflows.
+---
+
+## Highlights
+
+- **Obsidian Glass Architecture**: Layered depth (`Main`, `HUD`, `Popup`, `Dialog`, `Notify`), directional hairline `UIStroke` highlights, ambient radial blooms, and zero `UIScale` layout jitter on hover or expansion.
+- **7 Curated Themes & Live Overrides**: `Midnight`, `Ocean`, `Graphite`, `Aurora`, `Sunset`, `Emerald`, and `Light`, plus runtime `SetAccent`, `AddTheme`, and `SetFont` (`Builder`, `Gotham`, `Montserrat`, `Ubuntu`, `Nunito`).
+- **164 Bundled Lucide Icons**: Self-contained `832x572` Lucide atlas (`src/Generated/AssetData.lua`) hydrated cleanly via `getcustomasset` / `getsynasset` with monochrome glyph fallbacks in Roblox Studio.
+- **Complete Interactive Suite**: `Button` (with `Confirm` & variants), `ButtonGroup`, `Toggle` (with inline keybinds), `Checkbox`, `Slider`, `RangeSlider`, `Stepper`, `Input` (numeric, integer, password mask, clearable), `Segmented`, `Dropdown` (single, multi, searchable), `Keybind` (`Toggle`, `Hold`, `Always`, mouse binds), `ColorPicker` (HSV square, alpha slider, hex/RGB, presets, rainbow), and nested `Accordion`.
+- **Analytics & Data Widgets**: `StatCard` (animated counters, deltas, sparklines), `Chart` (`Line` / `Bar` with live `:Push()`), `ProgressBar`, `Table` (live filter, selectable checkboxes, badges, inline row actions), `CardGrid`, plus rich typography (`Label`, `Paragraph`, `Divider`, `Header`, `CodeBlock`, `Image`, `ProfileCard`).
+- **System HUD & Lifecycle Safety**: Stackable `Notification` toasts + unread history bell popover, draggable `Watermark`, live `KeybindList`, `CommandPalette` (`Ctrl+K`), `Lighting` `Blur`, viewport-clamped `Tooltip`, `Dialog` modals, `LoadingScreen`, `KeySystem`, JSON `Config` persistence, automatic `_BaliInstance` orphan cleanup on re-execute, and global error boundary (`Util.ErrorHandler`).
+
+---
+
+## Showcase
+
+| Telemetry & Cluster Matrix | Multi-Theme Engine |
+| :---: | :---: |
+| ![Bali Analytics Showcase](docs/assets/promo-analytics.png) | ![Bali Dual Theme Showcase](docs/assets/promo-themes.png) |
+
+<details>
+<summary>More Live In-Engine Screenshots</summary>
+
+| Feature | Preview |
+| :--- | :---: |
+| **Color Picker & Presets** | ![Color Picker](docs/assets/screenshots/color-picker.png) |
+| **Notification History Popover** | ![Notifications Popover](docs/assets/screenshots/notifications.png) |
+| **Interactive Controls** | ![Interactive Controls](docs/assets/screenshots/interactive-controls.png) |
+| **Key Verification Modal** | ![Key System](docs/assets/screenshots/key-system.png) |
+| **Command Palette (`Ctrl+K`)** | ![Command Palette](docs/assets/screenshots/command-palette.png) |
+
+</details>
+
+---
+
+## Quickstart
+
+### Run Complete Showcase (`dist/BaliExample.lua`)
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/perfectusmim1/bali-ui/master/dist/BaliExample.lua"))()
+```
+
+### Build With Bali (`dist/Bali.lua`)
+
+```lua
+local Bali = loadstring(game:HttpGet("https://raw.githubusercontent.com/perfectusmim1/bali-ui/master/dist/Bali.lua"))()
+
+local window = Bali:CreateWindow({
+	Title = "Bali Suite",
+	Subtitle = "v1.0.0",
+	Icon = "sparkles",
+	Theme = "Midnight",
+	Blur = true,
+	Watermark = true,
+	KeybindList = true,
+	ConfigFolder = "BaliSuite",
+})
+
+local tab = window:AddTab({
+	Title = "Overview",
+	Icon = "layout-dashboard",
+	Category = "Main",
+	Badge = "Live",
+})
+
+local section = tab:AddSection({
+	Title = "Automation",
+	Icon = "zap",
+	Side = "Left",
+})
+
+section:AddToggle({
+	Title = "Auto Sync",
+	Default = true,
+	Keybind = Enum.KeyCode.F,
+	Flag = "AutoSync",
+	Callback = function(enabled)
+		print("Auto Sync:", enabled)
+	end,
+})
+
+window:BuildSettingsTab({
+	Category = "System",
+	Icon = "settings",
+})
+```
+
+### Roblox Studio Usage
+
+Paste the contents of [`dist/Bali.lua`](dist/Bali.lua) into a `ModuleScript` (e.g. `ReplicatedStorage.Bali`) and require it from any `LocalScript`:
+
+```lua
+local Bali = require(game:GetService("ReplicatedStorage"):WaitForChild("Bali"))
+local window = Bali:CreateWindow({ Title = "Studio Demo" })
+```
+
+`ScreenGui` parenting automatically resolves `gethui()` -> `CoreGui` -> `LocalPlayer.PlayerGui` with `IgnoreGuiInset = true`, `ResetOnSpawn = false`, and `ZIndexBehavior = Enum.ZIndexBehavior.Sibling`.
+
+---
+
+## Documentation
+
+Full GitBook-ready documentation lives inside [`docs/`](docs/SUMMARY.md):
+
+- [Getting Started](docs/getting-started.md) — Executor quickstart, Studio setup & duplicate window cleanup
+- [Architecture & Motion](docs/architecture.md) — Modular hierarchy, `ZIndex` layers, tweens & Lucide atlas
+- [Window & Navigation](docs/window-and-navigation.md) — `CreateWindow`, tabs, sub-tabs, sections & `Ctrl+K` palette
+- [Interactive Controls](docs/interactive-controls.md) — Buttons, toggles, sliders, inputs, dropdowns, keybinds & color picker
+- [Analytics & Rich Content](docs/analytics-and-data.md) — `StatCard`, `Chart`, `ProgressBar`, `Table`, `CardGrid` & static widgets
+- [HUD, Notifications & Modals](docs/hud-and-systems.md) — Toasts, bell feed, watermark, keybind list, dialogs & blur
+- [Themes & Config Persistence](docs/themes-and-config.md) — Presets, custom themes, JSON export/import & Settings builder
+- [Loader & Key System](docs/key-system-and-loader.md) — Splash preloader & license verification gate
+- [Troubleshooting & Building](docs/troubleshooting.md) — Re-bundling `dist/Bali.lua` & offline Luau checks
+
+---
 
 ## Architecture
 
 ```text
 src/
-├── Lumina.lua                 # Main library entry point, safe ScreenGui host, error boundary
+├── Bali.lua                 # Main library entry point, safe ScreenGui host, error boundary
 ├── Example.lua                # Full-feature interactive showcase
 ├── Generated/
 │   └── AssetData.lua          # Embedded 832x572 Lucide sprite atlas & textures
@@ -29,7 +136,7 @@ src/
 │   ├── Services.lua           # Lazy cloneref Roblox service accessor
 │   ├── Signal.lua             # Lightweight event signal class
 │   ├── Theme.lua              # Presets, accent gradients, font presets, live theme bindings
-│   ├── Transition.lua         # Mount/unmount scale fades, ripples, hover states, pulses
+│   ├── Transition.lua         # Mount/unmount glides, ripples, hover states, pulses
 │   ├── Tween.lua              # Centralized easing curves, speed multiplier, reduce-motion flag
 │   └── Util.lua               # Math, color, SafeCall, FS helpers, device detection, globals
 ├── Systems/
@@ -67,134 +174,26 @@ src/
 tools/
 └── bundle.mjs                 # Pure Node ESM single-file Luau bundler -> dist/
 dist/
-├── Lumina.lua                 # Standalone library bundle (returns Lumina)
-└── LuminaExample.lua          # Standalone interactive showcase bundle
+├── Bali.lua                   # Standalone library bundle (returns Bali)
+└── BaliExample.lua            # Standalone interactive showcase bundle
 ```
 
-## Quickstart
-
-### Load Complete Showcase (`dist/LuminaExample.lua`)
-
-```lua
-loadstring(game:HttpGet("https://your-host/dist/LuminaExample.lua"))()
-```
-
-### Load Library & Build Your Own UI (`dist/Lumina.lua`)
-
-```lua
-local Lumina = loadstring(game:HttpGet("https://your-host/dist/Lumina.lua"))()
-
-local window = Lumina:CreateWindow({
-	Title = "My Workspace",
-	Subtitle = "v1.0.0",
-	Icon = "sparkles",
-	Theme = "Midnight",
-	Blur = true,
-	Watermark = true,
-	KeybindList = true,
-	ConfigFolder = "MyWorkspace",
-})
-
-local tab = window:AddTab({
-	Title = "Overview",
-	Icon = "dashboard",
-	Category = "Main",
-})
-
-local section = tab:AddSection({
-	Title = "Automation",
-	Icon = "zap",
-	Side = "Left",
-})
-
-section:AddToggle({
-	Title = "Auto Sync",
-	Default = true,
-	Keybind = Enum.KeyCode.F,
-	Flag = "AutoSync",
-	Callback = function(enabled)
-		print("Auto Sync:", enabled)
-	end,
-})
-
-window:BuildSettingsTab({
-	Category = "System",
-	Icon = "settings",
-})
-```
-
-### Roblox Studio Usage
-
-Paste the contents of `dist/Lumina.lua` directly into a `ModuleScript` (e.g., `ReplicatedStorage.Lumina`), then require it from a `LocalScript`:
-
-```lua
-local Lumina = require(game.ReplicatedStorage:WaitForChild("Lumina"))
-local window = Lumina:CreateWindow({ Title = "Studio Demo" })
-```
-
-`ScreenGui` parenting automatically resolves `gethui()` -> `CoreGui` -> `LocalPlayer.PlayerGui` with `IgnoreGuiInset = true`, `ResetOnSpawn = false`, and `ZIndexBehavior = Enum.ZIndexBehavior.Sibling`.
-
-## API Reference
-
-### `Lumina` Entry Point
-
-- `Lumina.Version`: `"1.0.0"`
-- `Lumina.Services`, `Lumina.Util`, `Lumina.Signal`, `Lumina.Maid`, `Lumina.Tween`, `Lumina.Transition`, `Lumina.Theme`, `Lumina.Create`, `Lumina.Assets`, `Lumina.Icons` (also grouped under `Lumina.Core`)
-- `Lumina.Input`, `Lumina.Tooltip`, `Lumina.Notification`, `Lumina.Blur`, `Lumina.Watermark`, `Lumina.KeybindList`, `Lumina.CommandPalette`, `Lumina.Config` (also grouped under `Lumina.Systems`)
-- `Lumina:CreateWindow(opts)` -> loads assets, initializes input, creates and returns a `Window`
-- `Lumina:Notify(opts)` -> sends a toast notification (`Title`, `Content`, `Type`: `"Info"|"Success"|"Warning"|"Error"|"Accent"`, `Duration`, `Icon`, `Actions`)
-- `Lumina:KeySystem(opts)` -> mounts verification modal (`Title`, `Subtitle`, `Key`, `Keys`, `Verify`, `KeyUrl`, `SaveKey`, `Folder`, `FileName`, `Closable`, `Yield`, `OnSuccess`, `OnCancel`)
-- `Lumina:LoadingScreen(opts)` -> mounts glassmorphic preloader (`Title`, `Subtitle`, `Icon`, `Duration`, `Steps`, `AutoClose`, `Backdrop`, `Yield`, `OnComplete`)
-- `Lumina:SetTheme(name, animate?)` / `Lumina:AddTheme(name, overrides)` / `Lumina:SetAccent(color, animate?)` / `Lumina:SetFont(family)`
-- `Lumina:Destroy()` / `Lumina:Unload()` -> cleanly destroys active windows, loaders, systems, hooks, and owned `ScreenGui`
-
-### `Window`
-
-- `window:AddCategory(name)`
-- `window:AddTab({ Title, Icon?, Category?, Badge? })` -> `Tab`
-- `window:SelectTab(tabOrTitleOrIndex, instant?)`
-- `window:AddSection(...)` (available on `Tab` and `SubTab`)
-- `window:BuildSettingsTab({ Title?, Icon?, Category? })`
-- `window:Dialog({ Title, Content, Icon?, Input?, Buttons, Dismissible?, OnClose? })`
-- `window:Notify(opts)`
-- `window:Toggle()` / `window:SetVisible(bool)` / `window:IsVisible()`
-- `window:SetToggleKey(keyCode)` / `window:GetToggleKey()`
-- `window:ToggleSidebar(collapsed?)` / `window:SetMobileButtonEnabled(bool)`
-- `window:SetTitle(text)` / `window:SetSubtitle(text)`
-- `window:Destroy()`
-- `window.Flags` -> flag registry indexed by element `Flag`
-
-### Navigation & Containers (`Tab`, `SubTab`, `Section`, `Accordion`)
-
-- `tab:AddSubTab({ Title, Icon? })` -> `SubTab`
-- `tab:AddSection({ Title, Subtitle?, Icon?, Side = "Auto"|"Left"|"Right"|"Full", Collapsible?, Collapsed? })` -> `Section`
-- Sections, Accordions, Tabs, and SubTabs expose element factories (`AddToggle`, `AddSlider`, `AddDropdown`, `AddTable`, etc., plus shorthand aliases like `Toggle`, `Slider`, etc.).
-
-### Elements & Methods
-
-Every element supports base methods: `:SetTitle(text)`, `:SetDesc(text)`, `:SetVisible(bool)`, `:SetDisabled(bool)`, `:Lock(reason?)`, `:Unlock()`, `:Flash()`, `:OnChanged(fn)`, `:Destroy()`.
-
-| Category | Factories | Key Options & Methods |
-| :--- | :--- | :--- |
-| **Static & Media** | `AddLabel`, `AddParagraph`, `AddDivider`, `AddHeader`, `AddCodeBlock`, `AddImage`, `AddProfileCard` | `Copyable`, `Badge`, `AccentBar`, `Tags`, `LineNumbers`, `UserId`, `Status`, `:SetValue()`, `:SetContent()`, `:SetCode()`, `:SetStatus()` |
-| **Actions** | `AddButton`, `AddButtonGroup` | `Variant` (`"Default"\|"Primary"\|"Danger"\|"Ghost"`), `Confirm`, `ShowArrow`, `Badge`, `:Fire()` |
-| **Boolean** | `AddToggle`, `AddCheckbox` | `Default`, `Keybind`, `Flag`, `Callback`, `:Set(val, silent?)`, `:Get()`, `:Toggle()` |
-| **Numeric** | `AddSlider`, `AddRangeSlider`, `AddStepper` | `Min`, `Max`, `Step`, `MinGap`, `Prefix`, `Suffix`, `Default`, `Flag`, `:Set()`, `:Get()`, `:Step(delta)` |
-| **Text & Selection** | `AddInput`, `AddSegmented`, `AddDropdown`, `AddKeybind`, `AddColorPicker` | `Numeric`, `Integer`, `Mask`, `Multi`, `Searchable`, `AllowMouse`, `Mode`, `Transparency`, `Presets`, `:Set()`, `:Get()`, `:SetValues()` |
-| **Analytics** | `AddStatCard`, `AddChart`, `AddProgressBar`, `AddTable`, `AddCardGrid` | `Delta`, `Points`, `Mode` (`"Line"\|"Bar"`), `Badge`, `Gradient`, `Columns`, `Rows`, `Selectable`, `Action`, `:SetValue()`, `:SetPoints()`, `:Push()`, `:SetRows()`, `:GetSelected()`, `:SetActive()` |
-| **Grouping** | `AddAccordion` | `Expanded`, `Flag`, `:Expand()`, `:Collapse()`, `:Toggle()`, child element factories |
+---
 
 ## Building & Verification
 
-Requires Node.js (v18+ ESM) and optionally `luau-compile` from Luau CLI tools:
+Requires Node.js v18+ (`tools/bundle.mjs`) and optionally `luau-compile` / `zune` for static bytecode checks and headless mock tests:
 
 ```bash
-# Generate dist/Lumina.lua and dist/LuminaExample.lua
+# Regenerate dist/Bali.lua and dist/BaliExample.lua
 node tools/bundle.mjs
 
 # Verify Luau syntax & bytecode compilation across source and dist bundles
-luau-compile src/Lumina.lua
+luau-compile src/Bali.lua
 luau-compile src/Example.lua
-luau-compile dist/Lumina.lua
-luau-compile dist/LuminaExample.lua
+luau-compile dist/Bali.lua
+luau-compile dist/BaliExample.lua
+
+# Run headless mock-Roblox behavioral regression suite
+zune run tests/mock_roblox_verify.luau
 ```

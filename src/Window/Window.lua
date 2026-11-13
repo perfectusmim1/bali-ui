@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Window/Window
+	Bali UI · Window/Window
 	Main obsidian glassmorphic desktop/mobile window with collapsible sidebar,
 	spotlight search pill, top breadcrumb & quick-action bar, popup manager,
 	dialog & notification layers, and full system integration.
@@ -94,13 +94,13 @@ local function createActionButton(parent, iconName, tooltipText, layoutOrder, ma
 end
 
 function Window.new(screenGui, options)
-	assert(typeof(screenGui) == "Instance", "[Lumina] Window.new expects a ScreenGui or LayerCollector")
+	assert(typeof(screenGui) == "Instance", "[Bali] Window.new expects a ScreenGui or LayerCollector")
 	if not Assets.Loaded then
 		pcall(Assets.Load)
 	end
 
 	options = Util.Options(options, {
-		Title = "Lumina",
+		Title = "Bali",
 		Subtitle = nil,
 		Version = nil,
 		Icon = "sparkles",
@@ -146,35 +146,35 @@ function Window.new(screenGui, options)
 
 	-- Root ZIndex-isolated layers
 	local mainLayer = Create.New("Frame", {
-		Name = "LuminaMainLayer",
+		Name = "BaliMainLayer",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		ZIndex = 1,
 		Parent = screenGui,
 	})
 	local hudLayer = Create.New("Frame", {
-		Name = "LuminaHUDLayer",
+		Name = "BaliHUDLayer",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		ZIndex = 20,
 		Parent = screenGui,
 	})
 	local popupLayer = Create.New("Frame", {
-		Name = "LuminaPopupLayer",
+		Name = "BaliPopupLayer",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		ZIndex = 100,
 		Parent = screenGui,
 	})
 	local dialogLayer = Create.New("Frame", {
-		Name = "LuminaDialogLayer",
+		Name = "BaliDialogLayer",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		ZIndex = 200,
 		Parent = screenGui,
 	})
 	local notificationLayer = Create.New("Frame", {
-		Name = "LuminaNotificationLayer",
+		Name = "BaliNotificationLayer",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		ZIndex = 300,
@@ -216,7 +216,7 @@ function Window.new(screenGui, options)
 
 	-- Wrapper holds Shadow + clipped Main frame so Shadow tracks Drag/Resize/Mount seamlessly
 	local mainWrapper = Create.New("Frame", {
-		Name = "LuminaWindowWrapper",
+		Name = "BaliWindowWrapper",
 		Position = UDim2.fromOffset(startX, startY),
 		Size = UDim2.fromOffset(initW, initH),
 		BackgroundTransparency = 1,
@@ -402,7 +402,7 @@ function Window.new(screenGui, options)
 
 	local brandTitleLabel = Create.Text({
 		Name = "Title",
-		Text = tostring(options.Title or "Lumina"),
+		Text = tostring(options.Title or "Bali"),
 		Font = "Bold",
 		TextSize = 14,
 		Color = "Text",
@@ -777,7 +777,7 @@ function Window.new(screenGui, options)
 
 	local breadcrumbLabel = Create.Text({
 		Name = "Trail",
-		Text = tostring(options.Title or "Lumina"),
+		Text = tostring(options.Title or "Bali"),
 		Font = "Medium",
 		TextSize = 12,
 		Color = "SubText",
@@ -820,7 +820,7 @@ function Window.new(screenGui, options)
 	-- ─── Window Instance Table ───────────────────────────────────────────────
 	local registry = {}
 	local self = setmetatable({
-		Title = tostring(options.Title or "Lumina"),
+		Title = tostring(options.Title or "Bali"),
 		Subtitle = subtitleText and tostring(subtitleText) or "",
 		Icon = options.Icon or "sparkles",
 		ScreenGui = screenGui,
@@ -853,7 +853,7 @@ function Window.new(screenGui, options)
 		_layoutChanged = Signal.new(),
 		_configLoaded = Signal.new(),
 		_lastDarkTheme = Theme.Current.Dark and Theme.Name or "Midnight",
-		_configFolder = options.ConfigFolder or options.Folder or "Lumina",
+		_configFolder = options.ConfigFolder or options.Folder or "Bali",
 		_notificationPosition = options.NotificationPosition or "BottomRight",
 		_keybindListMode = (type(options.KeybindList) == "table" and options.KeybindList.Mode) or "ActiveOnly",
 		_toggleKey = Util.ResolveKey(options.ToggleKey) or Enum.KeyCode.RightShift,
@@ -1049,7 +1049,7 @@ function Window.new(screenGui, options)
 		end
 	end))
 
-	self._toggleKeybind = Input.RegisterKeybind("LuminaToggleUI_" .. windowId, self._toggleKey, function()
+	self._toggleKeybind = Input.RegisterKeybind("BaliToggleUI_" .. windowId, self._toggleKey, function()
 		self:Toggle()
 	end, "Toggle")
 	maid:Give(self._toggleKeybind)
@@ -1279,11 +1279,12 @@ function Window:_openNotificationHistory(anchorBtn)
 		Name = "NotificationPopover",
 		Size = UDim2.fromOffset(300, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
+		ClipsDescendants = true,
 		Corner = 12,
 		Theme = {
 			BackgroundColor3 = "Card",
 			BackgroundTransparency = function(t)
-				return math.min(t.CardTransparency, 0.05)
+				return math.min(t.CardTransparency, 0.02)
 			end,
 		},
 		Padding = 12,
@@ -1333,10 +1334,10 @@ function Window:_openNotificationHistory(anchorBtn)
 	})
 
 	local listScroll = Create.New("ScrollingFrame", {
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 48),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
+		ClipsDescendants = true,
 		ScrollBarThickness = 2,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
@@ -1344,10 +1345,15 @@ function Window:_openNotificationHistory(anchorBtn)
 		LayoutOrder = 3,
 		Parent = pop,
 	})
-	local maxConstraint = Instance.new("UISizeConstraint")
-	maxConstraint.MaxSize = Vector2.new(300, 260)
-	maxConstraint.Parent = listScroll
-	Create.List(listScroll, { Gap = 6 })
+	Create.Padding(listScroll, { 2, 5, 2, 2 })
+	local listLayout = Create.List(listScroll, { Gap = 6 })
+	local function syncListHeight()
+		if listScroll.Parent then
+			local h = math.clamp(listLayout.AbsoluteContentSize.Y + 4, 48, 250)
+			listScroll.Size = UDim2.new(1, 0, 0, h)
+		end
+	end
+	popMaid:Give(listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(syncListHeight))
 
 	local TYPE_COLORS = {
 		Info = "Info",
@@ -1355,6 +1361,13 @@ function Window:_openNotificationHistory(anchorBtn)
 		Warning = "Warning",
 		Error = "Error",
 		Accent = "Accent",
+	}
+	local TYPE_ICONS = {
+		Info = "info",
+		Success = "circle-check",
+		Warning = "triangle-alert",
+		Error = "circle-x",
+		Accent = "sparkles",
 	}
 
 	local function rebuildList()
@@ -1370,10 +1383,12 @@ function Window:_openNotificationHistory(anchorBtn)
 				Font = "Regular",
 				TextSize = 12,
 				Color = "Muted",
-				Size = UDim2.new(1, 0, 0, 48),
+				Size = UDim2.new(1, 0, 0, 44),
 				TextXAlignment = Enum.TextXAlignment.Center,
 				Parent = listScroll,
 			})
+			syncListHeight()
+			task.defer(syncListHeight)
 			return
 		end
 
@@ -1387,7 +1402,7 @@ function Window:_openNotificationHistory(anchorBtn)
 				LayoutOrder = index,
 				Parent = listScroll,
 			})
-			Create.List(item, { Gap = 3 })
+			Create.List(item, { Gap = 4 })
 
 			local topLine = Create.New("Frame", {
 				Size = UDim2.new(1, 0, 0, 16),
@@ -1395,22 +1410,20 @@ function Window:_openNotificationHistory(anchorBtn)
 				LayoutOrder = 1,
 				Parent = item,
 			})
-			local dot = Create.New("Frame", {
+			Icons.Create(TYPE_ICONS[entry.Type] or "info", {
+				Size = UDim2.fromOffset(13, 13),
 				AnchorPoint = Vector2.new(0, 0.5),
 				Position = UDim2.new(0, 0, 0.5, 0),
-				Size = UDim2.fromOffset(6, 6),
-				Corner = 999,
-				Theme = { BackgroundColor3 = TYPE_COLORS[entry.Type] or "Info" },
+				Color = TYPE_COLORS[entry.Type] or "Info",
 				Parent = topLine,
 			})
-			local _ = dot
 			Create.Text({
 				Text = tostring(entry.Title or "Notification"),
 				Font = "SemiBold",
 				TextSize = 12,
 				Color = "Text",
-				Position = UDim2.fromOffset(12, 0),
-				Size = UDim2.new(1, -54, 1, 0),
+				Position = UDim2.fromOffset(19, 0),
+				Size = UDim2.new(1, -64, 1, 0),
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				Parent = topLine,
 			})
@@ -1421,7 +1434,7 @@ function Window:_openNotificationHistory(anchorBtn)
 				Color = "Muted",
 				AnchorPoint = Vector2.new(1, 0),
 				Position = UDim2.fromScale(1, 0),
-				Size = UDim2.new(0, 40, 1, 0),
+				Size = UDim2.new(0, 42, 1, 0),
 				TextXAlignment = Enum.TextXAlignment.Right,
 				Parent = topLine,
 			})
@@ -1440,6 +1453,8 @@ function Window:_openNotificationHistory(anchorBtn)
 				})
 			end
 		end
+		syncListHeight()
+		task.defer(syncListHeight)
 	end
 
 	rebuildList()
@@ -1663,7 +1678,7 @@ function Window:GetToggleKey()
 end
 
 function Window:SetTitle(title)
-	self.Title = tostring(title or "Lumina")
+	self.Title = tostring(title or "Bali")
 	self._brandTitleLabel.Text = self.Title
 end
 

@@ -1,7 +1,7 @@
 --!nolint
 --[[
-	Lumina UI · Runtime & Layout Verification Harness
-	Executes dist/LuminaExample.lua (Pass 1: Executor) and dist/Lumina.lua (Pass 2: Studio)
+	Bali UI · Runtime & Layout Verification Harness
+	Executes dist/BaliExample.lua (Pass 1: Executor) and dist/Bali.lua (Pass 2: Studio)
 	inside a realistic Mock Roblox Engine and checks runtime errors, warnings, APIs,
 	interactive state, config serialization, layout overlap, re-execution, and cleanup.
 ]]
@@ -2103,46 +2103,46 @@ local function fireKeyPress(services, keyCode, ctrlHeld)
 end
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- PASS 1: EXECUTOR ENVIRONMENT (dist/LuminaExample.lua)
+-- PASS 1: EXECUTOR ENVIRONMENT (dist/BaliExample.lua)
 -- ══════════════════════════════════════════════════════════════════════════════
 
-log("=== PASS 1: EXECUTOR ENVIRONMENT (dist/LuminaExample.lua) ===")
+log("=== PASS 1: EXECUTOR ENVIRONMENT (dist/BaliExample.lua) ===")
 local env1, game1, services1, playerGui1, coreGui1 = installEnvironment("executor")
 
 local okEx, exErr = xpcall(function()
-	runBundleFile("dist/LuminaExample.lua", env1, "@dist/LuminaExample.lua")
+	runBundleFile("dist/BaliExample.lua", env1, "@dist/BaliExample.lua")
 end, debug.traceback)
 
-assertTrue(okEx, "dist/LuminaExample.lua executed without error: " .. tostring(exErr))
+assertTrue(okEx, "dist/BaliExample.lua executed without error: " .. tostring(exErr))
 stepClock(0.2, true)
 
-local Lumina = mockGenv._LuminaInstance
-assertTrue(type(Lumina) == "table", "Lumina instance registered in getgenv()._LuminaInstance")
-assertTrue(#Lumina._windows == 1, "One active Window mounted")
+local Bali = mockGenv._BaliInstance
+assertTrue(type(Bali) == "table", "Bali instance registered in getgenv()._BaliInstance")
+assertTrue(#Bali._windows == 1, "One active Window mounted")
 
-local window = Lumina._windows[1]
+local window = Bali._windows[1]
 assertTrue(window ~= nil, "Window object exists")
-assertTrue(Lumina._screenGui ~= nil and Lumina._screenGui:IsA("ScreenGui"), "ScreenGui exists and is ScreenGui")
-assertEq(Lumina._screenGui.Parent, hiddenUI, "ScreenGui parented under gethui() HiddenUI")
+assertTrue(Bali._screenGui ~= nil and Bali._screenGui:IsA("ScreenGui"), "ScreenGui exists and is ScreenGui")
+assertEq(Bali._screenGui.Parent, hiddenUI, "ScreenGui parented under gethui() HiddenUI")
 
 -- Verify GUI tree structure
-local screenGui = Lumina._screenGui
-assertTrue(screenGui:FindFirstChild("LuminaMainLayer") ~= nil, "LuminaMainLayer exists")
-assertTrue(screenGui:FindFirstChild("LuminaHUDLayer") ~= nil, "LuminaHUDLayer exists")
-assertTrue(screenGui:FindFirstChild("LuminaPopupLayer") ~= nil, "LuminaPopupLayer exists")
-assertTrue(screenGui:FindFirstChild("LuminaDialogLayer") ~= nil, "LuminaDialogLayer exists")
-assertTrue(screenGui:FindFirstChild("LuminaNotificationLayer") ~= nil, "LuminaNotificationLayer exists")
+local screenGui = Bali._screenGui
+assertTrue(screenGui:FindFirstChild("BaliMainLayer") ~= nil, "BaliMainLayer exists")
+assertTrue(screenGui:FindFirstChild("BaliHUDLayer") ~= nil, "BaliHUDLayer exists")
+assertTrue(screenGui:FindFirstChild("BaliPopupLayer") ~= nil, "BaliPopupLayer exists")
+assertTrue(screenGui:FindFirstChild("BaliDialogLayer") ~= nil, "BaliDialogLayer exists")
+assertTrue(screenGui:FindFirstChild("BaliNotificationLayer") ~= nil, "BaliNotificationLayer exists")
 assertTrue(window.Sidebar ~= nil, "Sidebar exists")
 assertTrue(window.BodyArea ~= nil, "BodyArea exists")
 assertTrue(#window.Tabs >= 4, "Tabs populated (" .. tostring(#window.Tabs) .. ")")
 
 -- Verify CreateWindow dictionary options survived option cloning
-assertEq(window.Title, "Lumina Suite", "Window.Title preserved from CreateWindow opts")
+assertEq(window.Title, "Bali Suite", "Window.Title preserved from CreateWindow opts")
 assertEq(window.Subtitle, "v1.0.0", "Window.Subtitle preserved from CreateWindow opts")
-assertEq(window._configFolder, "LuminaShowcase", "Window._configFolder preserved from CreateWindow opts")
-assertEq(Lumina.Blur.IsEnabled(), true, "Blur auto-enabled from CreateWindow opts")
-assertEq(Lumina.Blur.GetIntensity(), 12, "BlurIntensity=12 preserved from CreateWindow opts")
-assertEq(Lumina.Watermark.IsVisible(), true, "Watermark auto-enabled from CreateWindow opts")
+assertEq(window._configFolder, "BaliShowcase", "Window._configFolder preserved from CreateWindow opts")
+assertEq(Bali.Blur.IsEnabled(), true, "Blur auto-enabled from CreateWindow opts")
+assertEq(Bali.Blur.GetIntensity(), 12, "BlurIntensity=12 preserved from CreateWindow opts")
+assertEq(Bali.Watermark.IsVisible(), true, "Watermark auto-enabled from CreateWindow opts")
 
 -- Sidebar collapse / expand cycle
 window:ToggleSidebar(true)
@@ -2186,8 +2186,8 @@ window:SelectTab(window.Tabs[1], true)
 stepClock(0.05, true)
 
 -- LoadingScreen lifecycle
-local loaderCtrl = Lumina:LoadingScreen({
-	Title = "Lumina Boot",
+local loaderCtrl = Bali:LoadingScreen({
+	Title = "Bali Boot",
 	Subtitle = "Preparing modules...",
 	Duration = 0.2,
 	AutoClose = false,
@@ -2203,10 +2203,10 @@ loaderCtrl:Destroy()
 
 -- KeySystem lifecycle (reject invalid key, verify valid demo key, invoke OnSuccess)
 local verifiedKeyValue = nil
-local keyCtrl = Lumina:KeySystem({
+local keyCtrl = Bali:KeySystem({
 	Title = "License Check",
 	Subtitle = "Enter access key",
-	Key = "LUMINA-DEMO",
+	Key = "BALI-DEMO",
 	SaveKey = false,
 	OnSuccess = function(entered)
 		verifiedKeyValue = entered
@@ -2214,6 +2214,13 @@ local keyCtrl = Lumina:KeySystem({
 })
 stepClock(0.1, true)
 assertTrue(keyCtrl ~= nil and keyCtrl.Frame ~= nil, "KeySystem returns controller with Frame")
+local checkKeyBtn = nil
+for _, desc in ipairs(keyCtrl.Frame:GetDescendants()) do
+	if desc:IsA("TextButton") and desc.BackgroundTransparency == 0 then
+		checkKeyBtn = desc
+	end
+end
+assertTrue(checkKeyBtn ~= nil, "KeySystem action button renders opaque BackgroundTransparency == 0")
 local keyBox = keyCtrl.Frame:FindFirstChildWhichIsA("TextBox", true)
 assertTrue(keyBox ~= nil, "KeySystem TextBox found")
 keyBox:CaptureFocus()
@@ -2222,11 +2229,11 @@ keyBox:ReleaseFocus(true)
 stepClock(0.2, true)
 assertEq(keyCtrl.Verified, false, "KeySystem rejects invalid key")
 keyBox:CaptureFocus()
-keyBox.Text = "LUMINA-DEMO"
+keyBox.Text = "BALI-DEMO"
 keyBox:ReleaseFocus(true)
 stepClock(0.6, true)
-assertEq(keyCtrl.Verified, true, "KeySystem verifies LUMINA-DEMO")
-assertEq(verifiedKeyValue, "LUMINA-DEMO", "KeySystem triggers OnSuccess with verified key")
+assertEq(keyCtrl.Verified, true, "KeySystem verifies BALI-DEMO")
+assertEq(verifiedKeyValue, "BALI-DEMO", "KeySystem triggers OnSuccess with verified key")
 keyCtrl:Destroy()
 stepClock(0.1, true)
 
@@ -2364,11 +2371,11 @@ stepClock(0.1, true)
 
 -- 3. CommandPalette, Dialog, Notify, Theme, Watermark, KeybindList, Blur
 log("--- Exercising Systems (CommandPalette, Dialog, Notify, Theme, HUD) ---")
-Lumina.CommandPalette.Open()
+Bali.CommandPalette.Open()
 stepClock(0.05, true)
-assertEq(Lumina.CommandPalette.IsOpen(), true, "CommandPalette:Open()")
+assertEq(Bali.CommandPalette.IsOpen(), true, "CommandPalette:Open()")
 -- Search via searchBox if present
-local paletteBackdrop = screenGui:FindFirstChild("LuminaPopupLayer"):FindFirstChild("CommandPaletteBackdrop")
+local paletteBackdrop = screenGui:FindFirstChild("BaliPopupLayer"):FindFirstChild("CommandPaletteBackdrop")
 if paletteBackdrop then
 	local modal = paletteBackdrop:FindFirstChild("CommandPaletteModal")
 	local searchBox = modal and modal:FindFirstChild("SearchBar", true)
@@ -2377,9 +2384,9 @@ if paletteBackdrop then
 		stepClock(0.05, true)
 	end
 end
-Lumina.CommandPalette.Close()
+Bali.CommandPalette.Close()
 stepClock(0.05, true)
-assertEq(Lumina.CommandPalette.IsOpen(), false, "CommandPalette:Close()")
+assertEq(Bali.CommandPalette.IsOpen(), false, "CommandPalette:Close()")
 
 local dlg = window:Dialog({
 	Title = "Verification Dialog",
@@ -2396,7 +2403,7 @@ end
 stepClock(0.05, true)
 
 local actionClicked = false
-local toast = Lumina:Notify({
+local toast = Bali:Notify({
 	Title = "Action Toast",
 	Content = "Verify action callback and update.",
 	Type = "Accent",
@@ -2416,7 +2423,7 @@ if toast and toast.Update then
 	toast:Update({ Title = "Action Toast Updated", Content = "Updated body" })
 end
 -- Trigger notification action button
-local notifLayer = screenGui:FindFirstChild("LuminaNotificationLayer")
+local notifLayer = screenGui:FindFirstChild("BaliNotificationLayer")
 if notifLayer then
 	for _, desc in ipairs(notifLayer:GetDescendants()) do
 		if desc:IsA("TextButton") and desc.Text == "Run Action" then
@@ -2432,35 +2439,37 @@ if toast and toast.Dismiss then
 end
 
 -- Themes & Fonts
-assertTrue(Lumina.Theme.Set("Ocean", true), "Theme.Set('Ocean')")
+assertTrue(Bali.Theme.Set("Ocean", true), "Theme.Set('Ocean')")
 stepClock(0.05, true)
-assertTrue(Lumina.Theme.Set("Light", true), "Theme.Set('Light')")
+assertTrue(Bali.Theme.Set("Light", true), "Theme.Set('Light')")
 stepClock(0.05, true)
-assertTrue(Lumina.Theme.Set("Midnight", true), "Theme.Set('Midnight')")
+assertTrue(Bali.Theme.Set("Midnight", true), "Theme.Set('Midnight')")
 stepClock(0.05, true)
-Lumina.Theme.SetAccent(Color3.fromRGB(59, 130, 246), true)
-assertTrue(Lumina.Theme.SetFont("Ubuntu"), "Theme.SetFont('Ubuntu')")
-assertTrue(Lumina.Theme.SetFont("Gotham"), "Theme.SetFont('Gotham')")
+Bali.Theme.SetAccent(Color3.fromRGB(59, 130, 246), true)
+assertTrue(Bali.Theme.SetFont("Ubuntu"), "Theme.SetFont('Ubuntu')")
+assertTrue(Bali.Theme.SetFont("Builder"), "Theme.SetFont('Builder')")
 
-Lumina.Watermark.SetVisible(true)
-Lumina.Watermark.SetTitle("Lumina Verify")
-Lumina.Watermark.SetText("Running Tests")
-Lumina.Watermark.SetStats({ FPS = true, Ping = true, Time = true, Players = true })
+Bali.Watermark.SetVisible(true)
+Bali.Watermark.SetTitle("Bali Verify")
+Bali.Watermark.SetText("Running Tests")
+Bali.Watermark.SetStats({ FPS = true, Ping = true, Time = true, Players = true })
 stepClock(0.2, true)
-assertEq(Lumina.Watermark.IsVisible(), true, "Watermark visible")
+assertEq(Bali.Watermark.IsVisible(), true, "Watermark visible")
+local wmFrame = screenGui:FindFirstChild("BaliHUDLayer") and screenGui:FindFirstChild("BaliHUDLayer"):FindFirstChild("BaliWatermark")
+assertTrue(wmFrame ~= nil and wmFrame.Position.Y.Offset >= 60, "Watermark clears Roblox TopBar (>= 60px Y)")
 
-Lumina.KeybindList.SetVisible(true)
-Lumina.KeybindList.SetMode("All")
-assertEq(Lumina.KeybindList.IsVisible(), true, "KeybindList visible")
+Bali.KeybindList.SetVisible(true)
+Bali.KeybindList.SetMode("All")
+assertEq(Bali.KeybindList.IsVisible(), true, "KeybindList visible")
 
-Lumina.Blur.SetEnabled(true)
-Lumina.Blur.SetIntensity(16)
-assertEq(Lumina.Blur.IsEnabled(), true, "Blur enabled")
-assertEq(Lumina.Blur.GetIntensity(), 16, "Blur intensity=16")
+Bali.Blur.SetEnabled(true)
+Bali.Blur.SetIntensity(16)
+assertEq(Bali.Blur.IsEnabled(), true, "Blur enabled")
+assertEq(Bali.Blur.GetIntensity(), 16, "Blur intensity=16")
 
 -- 4. Config Save / Mutate / Load / Assert / Export / Import / Delete
 log("--- Exercising Config System ---")
-assertTrue(Lumina.Config.Save("test_profile"), "Config.Save('test_profile')")
+assertTrue(Bali.Config.Save("test_profile"), "Config.Save('test_profile')")
 
 flags["Controls_PollingHz"]:Set(45)
 flags["Controls_SmartAutomation"]:Set(false)
@@ -2468,18 +2477,18 @@ flags["Pickers_Strategy"]:Set("Eco Saver")
 flags["Pickers_Alias"]:Set("Mutated")
 assertEq(flags["Controls_PollingHz"]:Get(), 45, "Mutated PollingHz to 45")
 
-assertTrue(Lumina.Config.Load("test_profile"), "Config.Load('test_profile')")
+assertTrue(Bali.Config.Load("test_profile"), "Config.Load('test_profile')")
 assertEq(flags["Controls_PollingHz"]:Get(), 180, "Restored PollingHz=180")
 assertEq(flags["Controls_SmartAutomation"]:Get(), true, "Restored SmartAutomation=true")
 assertEq(flags["Pickers_Strategy"]:Get(), "High Throughput", "Restored Strategy='High Throughput'")
 assertEq(flags["Pickers_Alias"]:Get(), "Staging-Beta", "Restored Alias='Staging-Beta'")
 
-local exportedJson = Lumina.Config.Export()
+local exportedJson = Bali.Config.Export()
 assertTrue(type(exportedJson) == "string" and #exportedJson > 20, "Config.Export() returned JSON")
 flags["Controls_PollingHz"]:Set(60)
-assertTrue(Lumina.Config.Import(exportedJson), "Config.Import(json) succeeded")
+assertTrue(Bali.Config.Import(exportedJson), "Config.Import(json) succeeded")
 assertEq(flags["Controls_PollingHz"]:Get(), 180, "Config.Import restored PollingHz=180")
-assertTrue(Lumina.Config.Delete("test_profile"), "Config.Delete('test_profile') succeeded")
+assertTrue(Bali.Config.Delete("test_profile"), "Config.Delete('test_profile') succeeded")
 
 -- 5. Simulated InputBegan key presses
 log("--- Exercising Simulated InputBegan Key Presses ---")
@@ -2505,9 +2514,9 @@ assertEq(flags["Pickers_CaptureKey"]:GetState(), not hBefore, "Keybind H toggled
 
 -- Ctrl+K -> Command Palette + Escape close
 fireKeyPress(services1, Enum.KeyCode.K, true)
-assertEq(Lumina.CommandPalette.IsOpen(), true, "Ctrl+K opened CommandPalette")
+assertEq(Bali.CommandPalette.IsOpen(), true, "Ctrl+K opened CommandPalette")
 fireKeyPress(services1, Enum.KeyCode.Escape, false)
-assertEq(Lumina.CommandPalette.IsOpen(), false, "Escape closed CommandPalette")
+assertEq(Bali.CommandPalette.IsOpen(), false, "Escape closed CommandPalette")
 
 -- 6. Layout Sanity Check across entire ScreenGui tree
 log("--- Running Layout Sanity Checks ---")
@@ -2566,47 +2575,84 @@ assertEq(#autoScaleBad, 0, "Zero AutomaticSize.Y objects with Size.Y.Scale ~= 0"
 assertEq(#negativeHeights, 0, "Zero negative computed heights" .. (#negativeHeights > 0 and (" -> " .. negativeHeights[1]) or ""))
 assertEq(#overlapIssues, 0, "Zero vertical UIListLayout sibling overlaps" .. (#overlapIssues > 0 and (" -> " .. overlapIssues[1]) or ""))
 
--- 7. Re-execution safety: run dist/LuminaExample.lua a SECOND time without destroying the first
+-- Regression checks for Bali visual & layout fixes
+local uiScaleCount = 0
+for _, desc in ipairs(screenGui:GetDescendants()) do
+	if desc:IsA("UIScale") then
+		uiScaleCount += 1
+	end
+end
+assertEq(uiScaleCount, 0, "Zero UIScale instances anywhere in UI tree")
+
+regFlags["Pickers_Swatch"]:Open()
+stepClock(0.15, true)
+local popupLayer = screenGui:FindFirstChild("BaliPopupLayer")
+local presetsFrame = popupLayer and popupLayer:FindFirstChild("Presets", true)
+assertTrue(presetsFrame ~= nil and presetsFrame.Visible, "ColorPicker Presets frame opened in BaliPopupLayer")
+if presetsFrame then
+	local opaquePresets = 0
+	for _, desc in ipairs(presetsFrame:GetDescendants()) do
+		if desc:IsA("TextButton") and desc.BackgroundTransparency == 0 then
+			opaquePresets += 1
+		end
+	end
+	assertTrue(opaquePresets >= 6, "All 6 ColorPicker preset swatches have BackgroundTransparency == 0 (got " .. tostring(opaquePresets) .. ")")
+end
+regFlags["Pickers_Swatch"]:Close()
+stepClock(0.15, true)
+
+regFlags["Pickers_Clusters"]:Open()
+stepClock(0.15, true)
+local optionsScroll = popupLayer and popupLayer:FindFirstChild("OptionsScroll", true)
+local scrollListLayout = optionsScroll and optionsScroll:FindFirstChildOfClass("UIListLayout")
+assertTrue(
+	optionsScroll ~= nil and scrollListLayout ~= nil and optionsScroll.Size.Y.Offset >= scrollListLayout.AbsoluteContentSize.Y + 6,
+	"Edge Clusters Dropdown fits full content without clipping (size=" .. tostring(optionsScroll and optionsScroll.Size.Y.Offset) .. ", content=" .. tostring(scrollListLayout and scrollListLayout.AbsoluteContentSize.Y) .. ")"
+)
+regFlags["Pickers_Clusters"]:Close()
+stepClock(0.15, true)
+
+-- 7. Re-execution safety: run dist/BaliExample.lua a SECOND time without destroying the first
 log("--- Testing Re-execution Safety ---")
-local firstLumina = Lumina
+local firstBali = Bali
 local firstScreenGui = screenGui
 local okRe, reErr = xpcall(function()
-	runBundleFile("dist/LuminaExample.lua", env1, "@dist/LuminaExample_rerun.lua")
+	runBundleFile("dist/BaliExample.lua", env1, "@dist/BaliExample_rerun.lua")
 end, debug.traceback)
-assertTrue(okRe, "dist/LuminaExample.lua re-executed cleanly without error: " .. tostring(reErr))
+assertTrue(okRe, "dist/BaliExample.lua re-executed cleanly without error: " .. tostring(reErr))
 stepClock(0.15, true)
-local LuminaRerun = mockGenv._LuminaInstance
-assertTrue(type(LuminaRerun) == "table" and LuminaRerun ~= firstLumina, "Re-execution replaced _LuminaInstance")
+local BaliRerun = mockGenv._BaliInstance
+assertTrue(type(BaliRerun) == "table" and BaliRerun ~= firstBali, "Re-execution replaced _BaliInstance")
 assertTrue(firstScreenGui._destroyed or firstScreenGui.Parent == nil, "Previous ScreenGui destroyed on re-execution")
-assertEq(#LuminaRerun._windows, 1, "Re-executed instance has 1 active window")
+assertEq(#BaliRerun._windows, 1, "Re-executed instance has 1 active window")
 
-local rerunScreenGui = LuminaRerun._screenGui
-LuminaRerun:Destroy()
+local rerunScreenGui = BaliRerun._screenGui
+BaliRerun:Destroy()
 stepClock(0.1, true)
-assertEq(#LuminaRerun._windows, 0, "Zero active windows after Lumina:Destroy()")
-assertTrue(rerunScreenGui._destroyed or rerunScreenGui.Parent == nil, "ScreenGui destroyed after Lumina:Destroy()")
+assertEq(#BaliRerun._windows, 0, "Zero active windows after Bali:Destroy()")
+assertTrue(rerunScreenGui._destroyed or rerunScreenGui.Parent == nil, "ScreenGui destroyed after Bali:Destroy()")
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- PASS 2: ROBLOX STUDIO MODE (no executor globals)
 -- ══════════════════════════════════════════════════════════════════════════════
 
-log("=== PASS 2: ROBLOX STUDIO MODE (dist/Lumina.lua) ===")
+log("=== PASS 2: ROBLOX STUDIO MODE (dist/Bali.lua) ===")
 local env2, game2, services2, playerGui2, coreGui2 = installEnvironment("studio")
 
-local okLib, Lumina2 = xpcall(function()
-	return runBundleFile("dist/Lumina.lua", env2, "@dist/Lumina.lua")
+local okLib, Bali2 = xpcall(function()
+	return runBundleFile("dist/Bali.lua", env2, "@dist/Bali.lua")
 end, debug.traceback)
-assertTrue(okLib and type(Lumina2) == "table", "dist/Lumina.lua loaded in Studio mode: " .. tostring(Lumina2))
+assertTrue(okLib and type(Bali2) == "table", "dist/Bali.lua loaded in Studio mode: " .. tostring(Bali2))
 
-if okLib and type(Lumina2) == "table" then
-	local win2 = Lumina2:CreateWindow({
+if okLib and type(Bali2) == "table" then
+	local win2 = Bali2:CreateWindow({
 		Title = "Studio Fallback Test",
 		Subtitle = "No Executor Globals",
 		ToggleKey = Enum.KeyCode.RightShift,
 		ConfigFolder = "StudioTest",
 	})
 	assertTrue(win2 ~= nil, "Studio Window created")
-	assertEq(Lumina2._screenGui.Parent, playerGui2, "Studio ScreenGui fell back cleanly to PlayerGui")
+	assertEq(Bali2._screenGui.Parent, playerGui2, "Studio ScreenGui fell back cleanly to PlayerGui")
 
 	local tab = win2:AddTab({ Title = "All Elements", Icon = "layers" })
 	local sub = tab:AddSubTab({ Title = "Core", Icon = "sliders" })
@@ -2634,11 +2680,18 @@ if okLib and type(Lumina2) == "table" then
 	sec:AddStatCard({ Title = "Stat", Value = 42, Points = { 1, 2, 3 } })
 	sec:AddChart({ Title = "Chart", Mode = "Line", Points = { 1, 2, 3 } })
 	sec:AddProgressBar({ Title = "Prog", Value = 50, Max = 100 })
-	sec:AddTable({
+	local tbl2 = sec:AddTable({
 		Title = "Tbl",
 		Columns = { { Key = "A", Title = "A", Width = 0.5 }, { Key = "B", Title = "B", Width = 0.5 } },
 		Rows = { { A = "1", B = "2" } },
 	})
+	local foundColScale = false
+	for _, desc in ipairs(tbl2.Frame:GetDescendants()) do
+		if desc:IsA("TextLabel") and desc.Text == "A" and desc.Size.X.Scale > 0.4 then
+			foundColScale = true
+		end
+	end
+	assertTrue(foundColScale, "Analytics Table fractional column Width uses Scale > 0.4")
 	sec:AddCardGrid({
 		Cards = { { Id = "c1", Title = "Card 1" } },
 		Default = "c1",
@@ -2656,13 +2709,13 @@ if okLib and type(Lumina2) == "table" then
 	end
 
 	-- Config fallback in Studio mode (in-memory)
-	assertTrue(Lumina2.Config.Save("studio_mem"), "Studio Config.Save in-memory fallback works")
+	assertTrue(Bali2.Config.Save("studio_mem"), "Studio Config.Save in-memory fallback works")
 	win2.Flags["S_Sld"]:Set(9)
-	assertTrue(Lumina2.Config.Load("studio_mem"), "Studio Config.Load in-memory fallback works")
+	assertTrue(Bali2.Config.Load("studio_mem"), "Studio Config.Load in-memory fallback works")
 	assertEq(win2.Flags["S_Sld"]:Get(), 5, "Studio Config restored S_Sld=5")
 
-	-- Re-execution test in Studio mode (Create second Lumina / Window without destroying first? Destroy win2 via Lumina2:Destroy)
-	local sg2 = Lumina2._screenGui
+	-- Re-execution test in Studio mode
+	local sg2 = Bali2._screenGui
 	win2:Destroy()
 	stepClock(0.1, true)
 	assertTrue(sg2._destroyed or sg2.Parent == nil, "Studio ScreenGui destroyed cleanly on win2:Destroy()")
@@ -2672,7 +2725,7 @@ end
 -- Final Report
 -- ══════════════════════════════════════════════════════════════════════════════
 
-assertEq(#capturedWarnings, 0, "Zero warnings captured from Lumina")
+assertEq(#capturedWarnings, 0, "Zero warnings captured from Bali")
 log(string.format("\n=== VERIFICATION SUMMARY: %d passed, %d failed, %d warnings ===", testPasses, #testFailures, #capturedWarnings))
 if #capturedWarnings > 0 then
 	for i, w in ipairs(capturedWarnings) do

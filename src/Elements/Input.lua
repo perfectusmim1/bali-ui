@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Input
+	Bali UI · Elements/Input
 	Obsidian glass text input with focus accent glow, numeric filtering,
 	password mask toggle (eye/eye-off), clear button, and Live/Finished modes.
 ]]

@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Static
+	Bali UI · Elements/Static
 	Display elements: Label, Paragraph, Divider, Header, CodeBlock, Image, ProfileCard.
 ]]
 
@@ -47,10 +47,14 @@ function Label.new(parent, opts, ctx)
 		Color = opts.ValueColor or "SubText",
 		Size = UDim2.fromOffset(0, 0),
 		AutomaticSize = Enum.AutomaticSize.XY,
+		TextTruncate = Enum.TextTruncate.AtEnd,
 		LayoutOrder = 1,
 		Visible = valueText ~= "",
 		Parent = row.Right,
 	})
+	local valueConstraint = Instance.new("UISizeConstraint")
+	valueConstraint.MaxSize = Vector2.new(140, 60)
+	valueConstraint.Parent = valueLabel
 
 	local badgeObj = nil
 	if opts.Badge then
@@ -769,6 +773,7 @@ function Image.new(parent, opts, ctx)
 		Corner = opts.Corner or 10,
 	})
 	card.Frame.ClipsDescendants = true
+	Create.List(card.Frame, { Gap = 0 })
 
 	local defaultHeight = opts.Height or 150
 	local imgLabel = Create.New("ImageLabel", {
@@ -776,6 +781,7 @@ function Image.new(parent, opts, ctx)
 		Size = UDim2.new(1, 0, 0, defaultHeight),
 		BackgroundTransparency = 1,
 		ScaleType = opts.ScaleType or Enum.ScaleType.Crop,
+		LayoutOrder = 1,
 		Parent = card.Frame,
 	})
 
@@ -831,26 +837,16 @@ function Image.new(parent, opts, ctx)
 
 	local scrim = Create.New("Frame", {
 		Name = "CaptionOverlay",
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = Color3.new(0, 0, 0),
+		Theme = { BackgroundColor3 = "Tile" },
 		BackgroundTransparency = 0.25,
-		Padding = { 22, 12, 10, 12 },
+		Padding = { 10, 12, 10, 12 },
 		Visible = (titleText ~= "" or captionText ~= ""),
+		LayoutOrder = 2,
 		ZIndex = 3,
-		Parent = imgLabel,
+		Parent = card.Frame,
 	})
-
-	local scrimGrad = Instance.new("UIGradient")
-	scrimGrad.Rotation = 90
-	scrimGrad.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.4, 0.35),
-		NumberSequenceKeypoint.new(1, 0.08),
-	})
-	scrimGrad.Parent = scrim
 
 	Create.List(scrim, {
 		Direction = Enum.FillDirection.Vertical,
@@ -862,8 +858,7 @@ function Image.new(parent, opts, ctx)
 		Text = titleText,
 		Font = "SemiBold",
 		TextSize = 13,
-		TextColor3 = Color3.fromRGB(250, 250, 255),
-		Theme = {},
+		Color = "Text",
 		TextWrapped = true,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
@@ -877,9 +872,8 @@ function Image.new(parent, opts, ctx)
 		Name = "Caption",
 		Text = captionText,
 		Font = "Regular",
-		TextSize = 11,
-		TextColor3 = Color3.fromRGB(210, 210, 222),
-		Theme = {},
+		TextSize = 12,
+		Color = "SubText",
 		TextWrapped = true,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,

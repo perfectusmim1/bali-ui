@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Systems/Input
+	Bali UI · Systems/Input
 	Centralised input dispatcher: keybinds (Toggle/Hold/Always), key capture,
 	viewport-clamped dragging, and smooth resizing for mouse and touch.
 ]]

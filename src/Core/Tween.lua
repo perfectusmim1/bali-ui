@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Core/Tween
+	Bali UI · Core/Tween
 	Centralised tweening with cached TweenInfo, global speed and Reduce Motion support.
 ]]
 
@@ -9,12 +9,12 @@ local Tween = {
 	Speed = 1, -- global multiplier (Settings -> Animation Speed)
 	Reduced = false, -- Reduce Motion: near-instant transitions
 
-	-- Durations
-	Instant = 0.08,
-	Fast = 0.16,
-	Normal = 0.26,
-	Smooth = 0.38,
-	Slow = 0.55,
+	-- Durations (snappy 120Hz Apple-style deceleration timings)
+	Instant = 0.07,
+	Fast = 0.14,
+	Normal = 0.22,
+	Smooth = 0.32,
+	Slow = 0.45,
 }
 
 local infoCache = {}
@@ -47,9 +47,9 @@ function Tween.Play(instance, properties, duration, style, direction, delayTime)
 	return tween
 end
 
--- Springy overshoot used for knobs, popovers and confirmations
+-- Crisp Apple-style fluid deceleration used for knobs, popovers, pills and panels (no overshoot)
 function Tween.Spring(instance, properties, duration)
-	return Tween.Play(instance, properties, duration or Tween.Smooth, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	return Tween.Play(instance, properties, duration or Tween.Normal, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 end
 
 function Tween.Linear(instance, properties, duration)

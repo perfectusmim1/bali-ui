@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Systems/Tooltip
+	Bali UI · Systems/Tooltip
 	Delayed obsidian glass tooltips with AutomaticSize.Y wrapping, smart viewport clamping,
 	and cursor-avoidance positioning.
 ]]
@@ -197,7 +197,7 @@ local function ensureBuilt()
 
 	local shadowInfo = Assets.Shadow()
 	shadow = Create.New("ImageLabel", {
-		Name = "LuminaTooltipShadow",
+		Name = "BaliTooltipShadow",
 		Parent = layer,
 		Visible = false,
 		Image = shadowInfo.Image,
@@ -209,7 +209,7 @@ local function ensureBuilt()
 	})
 
 	card = Create.New("Frame", {
-		Name = "LuminaTooltip",
+		Name = "BaliTooltip",
 		Parent = layer,
 		Visible = false,
 		Size = UDim2.fromOffset(120, 0),

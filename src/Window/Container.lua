@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Window/Container
+	Bali UI · Window/Container
 	Attaches all element factory methods and common aliases onto any container
 	(Section, Accordion, Tab, SubTab), providing unified ctx wiring.
 ]]
@@ -30,7 +30,7 @@ local function resolveCtor(module, exportKey)
 	elseif type(module) == "function" then
 		return module
 	end
-	error("[Lumina] Missing element constructor for " .. tostring(exportKey))
+	error("[Bali] Missing element constructor for " .. tostring(exportKey))
 end
 
 local FACTORIES = {
@@ -75,8 +75,8 @@ local function normalizeOptions(options, extra)
 end
 
 function Container.Attach(target, parentFrame, tab, section, window, subTab)
-	assert(type(target) == "table", "[Lumina] Container.Attach expects a target table")
-	assert(typeof(parentFrame) == "Instance", "[Lumina] Container.Attach expects a parent Instance")
+	assert(type(target) == "table", "[Bali] Container.Attach expects a target table")
+	assert(typeof(parentFrame) == "Instance", "[Bali] Container.Attach expects a parent Instance")
 
 	local ctx = {
 		Window = window,

@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Button
+	Bali UI · Elements/Button
 	Interactive action buttons (with 2-step confirmation) and equal-width ButtonGroup rows.
 ]]
 
@@ -155,11 +155,6 @@ function Button.new(parent, opts, ctx)
 		})
 	end
 
-	local uiScale = Instance.new("UIScale")
-	uiScale.Name = "_LuminaScale"
-	uiScale.Scale = 1
-	uiScale.Parent = row.Frame
-
 	local hitBtn = Create.New("TextButton", {
 		Name = "HitButton",
 		Size = UDim2.fromScale(1, 1),
@@ -171,13 +166,17 @@ function Button.new(parent, opts, ctx)
 		Parent = row.Frame,
 	})
 
+	row.Left.ZIndex = 2
+	row.Right.ZIndex = 2
+
 	local hovered = false
+	local pressed = false
 	local confirming = false
 	local confirmToken = 0
 	local baseTitle = element.Title
 
 	local function refreshVisual(animate)
-		applyButtonVariant(row.Frame, row.Stroke, row.TitleLabel, row.IconObj, grad, variant, confirming, hovered)
+		applyButtonVariant(row.Frame, row.Stroke, row.TitleLabel, row.IconObj, grad, variant, confirming, hovered or pressed)
 
 		if row.DescLabel then
 			if confirming then
@@ -194,9 +193,31 @@ function Button.new(parent, opts, ctx)
 		if rightIcon then
 			Icons.SetColor(rightIcon, confirming and "Error" or (variant == "Primary" and "AccentText" or "Muted"))
 		end
-		if animate and variant == "Default" and not confirming then
-			local targetBg = hovered and Theme.Current.TileHover or Theme.Current.Tile
-			Tween.Play(row.Frame, { BackgroundColor3 = targetBg }, Tween.Fast, Enum.EasingStyle.Quad)
+
+		local theme = Theme.Current
+		local targetBg = row.Frame.BackgroundColor3
+		local targetTrans = row.Frame.BackgroundTransparency
+		local targetStrokeTrans = row.Stroke.Transparency
+
+		if not confirming and variant == "Default" then
+			targetBg = pressed and Util.LerpColor(theme.TileHover, theme.Accent, 0.08)
+				or (hovered and theme.TileHover or theme.Tile)
+			targetTrans = pressed and math.max(0.06, theme.TileTransparency - 0.14)
+				or (hovered and math.max(0.12, theme.TileTransparency - 0.08) or theme.TileTransparency)
+			targetStrokeTrans = pressed and 0.42 or (hovered and 0.56 or theme.StrokeTransparency)
+		elseif variant == "Primary" and not confirming then
+			targetBg = pressed and Util.LerpColor(theme.AccentHover, Color3.new(1, 1, 1), 0.08)
+				or (hovered and theme.AccentHover or theme.Accent)
+			targetTrans = pressed and 0.02 or (hovered and 0.06 or 0.14)
+		end
+
+		if animate then
+			Tween.Play(row.Frame, { BackgroundColor3 = targetBg, BackgroundTransparency = targetTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
+			Tween.Play(row.Stroke, { Transparency = targetStrokeTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
+		else
+			row.Frame.BackgroundColor3 = targetBg
+			row.Frame.BackgroundTransparency = targetTrans
+			row.Stroke.Transparency = targetStrokeTrans
 		end
 	end
 
@@ -211,7 +232,7 @@ function Button.new(parent, opts, ctx)
 		hitBtn.Visible = not disabled
 		if disabled then
 			hovered = false
-			Tween.Play(uiScale, { Scale = 1 }, Tween.Instant)
+			pressed = false
 		end
 		refreshVisual(false)
 	end
@@ -226,7 +247,7 @@ function Button.new(parent, opts, ctx)
 
 	element.Maid:Give(hitBtn.MouseLeave:Connect(function()
 		hovered = false
-		Tween.Play(uiScale, { Scale = 1 }, Tween.Instant)
+		pressed = false
 		refreshVisual(true)
 	end))
 
@@ -237,13 +258,15 @@ function Button.new(parent, opts, ctx)
 		end
 		if Util.IsPointer(input) then
 			lastPointerPos = Vector2.new(input.Position.X, input.Position.Y)
-			Tween.Play(uiScale, { Scale = 0.985 }, Tween.Instant, Enum.EasingStyle.Quad)
+			pressed = true
+			refreshVisual(true)
 		end
 	end))
 
 	element.Maid:Give(hitBtn.InputEnded:Connect(function(input)
 		if Util.IsPointer(input) then
-			Tween.Play(uiScale, { Scale = 1 }, Tween.Fast, Enum.EasingStyle.Quad)
+			pressed = false
+			refreshVisual(true)
 		end
 	end))
 
@@ -431,11 +454,6 @@ function ButtonGroup.new(parent, opts, ctx)
 		grad.Enabled = false
 		grad.Parent = btn
 
-		local uiScale = Instance.new("UIScale")
-		uiScale.Name = "_LuminaScale"
-		uiScale.Scale = 1
-		uiScale.Parent = btn
-
 		local content = Create.New("Frame", {
 			Name = "Content",
 			Size = UDim2.fromScale(1, 1),
@@ -476,21 +494,46 @@ function ButtonGroup.new(parent, opts, ctx)
 		})
 
 		local isHovered = false
+		local isPressed = false
 		local itemDisabled = (bOpts.Disabled == true)
 
-		local function refreshBtn()
-			applyButtonVariant(btn, stroke, lbl, iconObj, grad, bVariant, false, isHovered)
+		local function refreshBtn(animate)
+			applyButtonVariant(btn, stroke, lbl, iconObj, grad, bVariant, false, isHovered or isPressed)
 			local dim = (element.Disabled or itemDisabled) and 0.48 or 0
 			lbl.TextTransparency = dim
 			if iconObj then
 				iconObj[Icons.TransparencyProperty(iconObj)] = dim
 			end
+
+			local theme = Theme.Current
+			local targetBg = btn.BackgroundColor3
+			local targetTrans = btn.BackgroundTransparency
+			local targetStroke = stroke.Transparency
+			if bVariant == "Default" then
+				targetBg = isPressed and Util.LerpColor(theme.TileHover, theme.Accent, 0.08)
+					or (isHovered and theme.TileHover or theme.Tile)
+				targetTrans = isPressed and math.max(0.06, theme.TileTransparency - 0.14)
+					or (isHovered and math.max(0.12, theme.TileTransparency - 0.08) or theme.TileTransparency)
+				targetStroke = isPressed and 0.42 or (isHovered and 0.56 or theme.StrokeTransparency)
+			elseif bVariant == "Primary" then
+				targetBg = isPressed and Util.LerpColor(theme.AccentHover, Color3.new(1, 1, 1), 0.08)
+					or (isHovered and theme.AccentHover or theme.Accent)
+				targetTrans = isPressed and 0.02 or (isHovered and 0.06 or 0.14)
+			end
+			if animate then
+				Tween.Play(btn, { BackgroundColor3 = targetBg, BackgroundTransparency = targetTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
+				Tween.Play(stroke, { Transparency = targetStroke }, Tween.Fast, Enum.EasingStyle.Exponential)
+			else
+				btn.BackgroundColor3 = targetBg
+				btn.BackgroundTransparency = targetTrans
+				stroke.Transparency = targetStroke
+			end
 		end
 
-		refreshBtn()
+		refreshBtn(false)
 		element.Maid:Give(Theme.Changed:Connect(function()
 			if not element._destroyed then
-				refreshBtn()
+				refreshBtn(false)
 			end
 		end))
 
@@ -503,13 +546,13 @@ function ButtonGroup.new(parent, opts, ctx)
 				return
 			end
 			isHovered = true
-			refreshBtn()
+			refreshBtn(true)
 		end))
 
 		element.Maid:Give(btn.MouseLeave:Connect(function()
 			isHovered = false
-			Tween.Play(uiScale, { Scale = 1 }, Tween.Instant)
-			refreshBtn()
+			isPressed = false
+			refreshBtn(true)
 		end))
 
 		local lastPos = nil
@@ -519,13 +562,15 @@ function ButtonGroup.new(parent, opts, ctx)
 			end
 			if Util.IsPointer(input) then
 				lastPos = Vector2.new(input.Position.X, input.Position.Y)
-				Tween.Play(uiScale, { Scale = 0.97 }, Tween.Instant, Enum.EasingStyle.Quad)
+				isPressed = true
+				refreshBtn(true)
 			end
 		end))
 
 		element.Maid:Give(btn.InputEnded:Connect(function(input)
 			if Util.IsPointer(input) then
-				Tween.Play(uiScale, { Scale = 1 }, Tween.Fast, Enum.EasingStyle.Quad)
+				isPressed = false
+				refreshBtn(true)
 			end
 		end))
 

@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Core/Util
+	Bali UI · Core/Util
 	Pure helpers: math, formatting, colors, safe calls, key names, executor shims.
 ]]
 
@@ -165,7 +165,7 @@ function Util.SafeCall(fn, ...)
 	end
 	local ok, result = pcall(fn, ...)
 	if not ok then
-		warn("[Lumina] Callback error: " .. tostring(result))
+		warn("[Bali] Callback error: " .. tostring(result))
 		if Util.ErrorHandler then
 			pcall(Util.ErrorHandler, result)
 		end

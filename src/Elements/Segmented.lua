@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Segmented
+	Bali UI · Elements/Segmented
 	Apple-style sliding pill segmented control with optional icons and smooth indicator glide.
 ]]
 

@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Window/MobileButton
+	Bali UI · Window/MobileButton
 	Draggable glass floating pill button for mobile/touch users and minimized windows.
 	Uses a pointer drag-distance threshold so dragging never accidentally toggles the UI.
 ]]
@@ -19,9 +19,9 @@ MobileButton.__index = MobileButton
 local DRAG_THRESHOLD = 6
 
 function MobileButton.new(parentLayer, window, options)
-	assert(typeof(parentLayer) == "Instance", "[Lumina] MobileButton expects a parentLayer Instance")
+	assert(typeof(parentLayer) == "Instance", "[Bali] MobileButton expects a parentLayer Instance")
 	options = Util.Options(options, {
-		Title = "Lumina",
+		Title = "Bali",
 		Icon = "sparkles",
 		Enabled = true,
 		AlwaysShow = false,
@@ -31,7 +31,7 @@ function MobileButton.new(parentLayer, window, options)
 	local maid = Maid.new()
 
 	local wrapper = Create.New("Frame", {
-		Name = "LuminaMobileButton",
+		Name = "BaliMobileButton",
 		Position = options.Position or UDim2.fromOffset(18, 18),
 		Size = UDim2.fromOffset(0, 38),
 		AutomaticSize = Enum.AutomaticSize.X,
@@ -114,7 +114,7 @@ function MobileButton.new(parentLayer, window, options)
 	})
 
 	local titleLabel = Create.Text({
-		Text = tostring(options.Title or "Lumina"),
+		Text = tostring(options.Title or "Bali"),
 		Font = "SemiBold",
 		TextSize = 12,
 		Color = "Text",
@@ -206,7 +206,7 @@ function MobileButton.new(parentLayer, window, options)
 end
 
 function MobileButton:SetTitle(text)
-	self._titleLabel.Text = tostring(text or "Lumina")
+	self._titleLabel.Text = tostring(text or "Bali")
 end
 
 function MobileButton:SetEnabled(enabled)

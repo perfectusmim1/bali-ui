@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Systems/Blur
+	Bali UI · Systems/Blur
 	Safely manages a dedicated Lighting BlurEffect synchronized with UI open state.
 ]]
 
@@ -31,7 +31,13 @@ local function ensureEffect()
 	if not lighting then
 		return nil
 	end
-	local existing = lighting:FindFirstChild("LuminaBlur")
+	local legacy = lighting:FindFirstChild("LuminaBlur")
+	if legacy and legacy:IsA("BlurEffect") then
+		pcall(function()
+			legacy:Destroy()
+		end)
+	end
+	local existing = lighting:FindFirstChild("BaliBlur")
 	if existing and existing:IsA("BlurEffect") then
 		blurEffect = existing
 		return blurEffect
@@ -39,7 +45,7 @@ local function ensureEffect()
 	local created
 	pcall(function()
 		created = Instance.new("BlurEffect")
-		created.Name = "LuminaBlur"
+		created.Name = "BaliBlur"
 		created.Size = 0
 		created.Enabled = false
 		created.Parent = lighting

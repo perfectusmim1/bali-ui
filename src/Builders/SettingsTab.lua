@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Builders/SettingsTab
+	Bali UI · Builders/SettingsTab
 	Builds a comprehensive "Settings" tab (Category "System") covering Appearance,
 	Interface & HUD, Config Manager, and Session & Diagnostics.
 ]]
@@ -17,7 +17,7 @@ local Watermark = require("Systems/Watermark")
 local SettingsTab = {}
 
 function SettingsTab.Build(window, options)
-	assert(type(window) == "table", "[Lumina] SettingsTab.Build expects a Window")
+	assert(type(window) == "table", "[Bali] SettingsTab.Build expects a Window")
 	options = Util.Options(options, {
 		Title = "Settings",
 		Icon = "settings",
@@ -252,7 +252,7 @@ function SettingsTab.Build(window, options)
 		Side = "Right",
 	})
 
-	local folderName = window._configFolder or "Lumina"
+	local folderName = window._configFolder or "Bali"
 	configSection:AddLabel({
 		Title = "Config Folder",
 		Value = folderName,
@@ -493,7 +493,7 @@ function SettingsTab.Build(window, options)
 	local deviceKind = Util.IsTouchDevice() and "Touch / Mobile" or "Desktop"
 
 	local diagLabel = session:AddParagraph({
-		Title = "Lumina Runtime",
+		Title = "Bali Runtime",
 		Content = string.format(
 			"Library %s  •  Assets: %s\nFile System: %s  •  Input: %s\nRegistered Elements: %d  •  Flags: %d",
 			versionText,
@@ -531,7 +531,7 @@ function SettingsTab.Build(window, options)
 				Variant = "Danger",
 				Callback = function()
 					window:Dialog({
-						Title = "Unload Lumina UI?",
+						Title = "Unload Bali UI?",
 						Content = "This permanently destroys all windows, keybinds, HUD elements, and lighting blur.",
 						Icon = "power",
 						Buttons = {

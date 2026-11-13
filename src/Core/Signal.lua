@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Core/Signal
+	Bali UI · Core/Signal
 	Lightweight synchronous signal with safe handler execution.
 ]]
 
@@ -45,7 +45,7 @@ function Signal:Fire(...)
 		if handler.Connected then
 			local ok, err = pcall(handler.Fn, ...)
 			if not ok then
-				warn("[Lumina] Signal handler error: " .. tostring(err))
+				warn("[Bali] Signal handler error: " .. tostring(err))
 			end
 		end
 	end

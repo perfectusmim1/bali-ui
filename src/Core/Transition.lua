@@ -1,6 +1,7 @@
 --[[
-	Lumina UI · Core/Transition
+	Bali UI · Core/Transition
 	Reusable micro-interactions and mount/unmount animations respecting Tween.Speed and Tween.Reduced.
+	Uses crisp layout-safe fades and slides without UIScale bitmap text blurring.
 ]]
 
 local Services = require("Core/Services")
@@ -10,89 +11,130 @@ local Util = require("Core/Util")
 
 local Transition = {}
 
-local function getOrCreateScale(frame)
-	local scale = frame:FindFirstChild("_LuminaScale")
-	if scale and scale:IsA("UIScale") then
-		return scale
-	end
-	local existing = frame:FindFirstChildOfClass("UIScale")
-	if existing then
-		return existing
-	end
-	scale = Instance.new("UIScale")
-	scale.Name = "_LuminaScale"
-	scale.Scale = 1
-	scale.Parent = frame
-	return scale
-end
-
 local function bumpAnimId(frame)
-	local nextId = (frame:GetAttribute("_LuminaAnimId") or 0) + 1
-	frame:SetAttribute("_LuminaAnimId", nextId)
+	local nextId = (frame:GetAttribute("_BaliAnimId") or 0) + 1
+	frame:SetAttribute("_BaliAnimId", nextId)
 	return nextId
 end
 
 local function captureTransparency(frame)
 	if frame:IsA("CanvasGroup") then
-		local saved = frame:GetAttribute("_LuminaRestGroupTrans")
-		if saved == nil or not frame:GetAttribute("_LuminaUnmounted") then
+		local saved = frame:GetAttribute("_BaliRestGroupTrans")
+		if saved == nil or not frame:GetAttribute("_BaliUnmounted") then
 			saved = frame.GroupTransparency
-			if saved >= 0.99 and frame:GetAttribute("_LuminaRestGroupTrans") ~= nil then
-				saved = frame:GetAttribute("_LuminaRestGroupTrans")
+			if saved >= 0.99 and frame:GetAttribute("_BaliRestGroupTrans") ~= nil then
+				saved = frame:GetAttribute("_BaliRestGroupTrans")
 			elseif saved >= 0.99 then
 				saved = 0
 			end
-			frame:SetAttribute("_LuminaRestGroupTrans", saved)
+			frame:SetAttribute("_BaliRestGroupTrans", saved)
 		end
 		return "GroupTransparency", saved
 	elseif frame:IsA("GuiObject") then
-		local saved = frame:GetAttribute("_LuminaRestBgTrans")
-		if saved == nil or not frame:GetAttribute("_LuminaUnmounted") then
+		local saved = frame:GetAttribute("_BaliRestBgTrans")
+		if saved == nil or not frame:GetAttribute("_BaliUnmounted") then
 			saved = frame.BackgroundTransparency
-			frame:SetAttribute("_LuminaRestBgTrans", saved)
+			frame:SetAttribute("_BaliRestBgTrans", saved)
 		end
 		return "BackgroundTransparency", saved
 	end
 	return nil, 1
 end
 
-function Transition.Mount(frame, scaleFrom)
+local function captureStrokeTransparency(frame)
+	local stroke = frame:FindFirstChildOfClass("UIStroke")
+	if not stroke then
+		return nil, 1
+	end
+	local saved = stroke:GetAttribute("_BaliRestStrokeTrans")
+	if saved == nil or not frame:GetAttribute("_BaliUnmounted") then
+		saved = stroke.Transparency
+		if saved >= 0.99 and stroke:GetAttribute("_BaliRestStrokeTrans") ~= nil then
+			saved = stroke:GetAttribute("_BaliRestStrokeTrans")
+		end
+		stroke:SetAttribute("_BaliRestStrokeTrans", saved)
+	end
+	return stroke, saved
+end
+
+local function hasLayoutSiblingController(frame)
+	local parent = frame and frame.Parent
+	if not parent then
+		return false
+	end
+	return parent:FindFirstChildOfClass("UIListLayout") ~= nil
+		or parent:FindFirstChildOfClass("UIGridLayout") ~= nil
+end
+
+function Transition.Mount(frame, _scaleFrom)
 	if not frame then
 		return nil
 	end
 
 	local animId = bumpAnimId(frame)
-	local scale = getOrCreateScale(frame)
 	local transProp, targetTrans = captureTransparency(frame)
-	frame:SetAttribute("_LuminaUnmounted", false)
+	local stroke, targetStrokeTrans = captureStrokeTransparency(frame)
+	local controlled = hasLayoutSiblingController(frame)
+
+	local targetPos = frame:GetAttribute("_BaliMountTargetPos")
+	if typeof(targetPos) ~= "UDim2" then
+		targetPos = frame.Position
+		frame:SetAttribute("_BaliMountTargetPos", targetPos)
+	end
+
+	frame:SetAttribute("_BaliUnmounted", false)
 	frame.Visible = true
 
 	if Tween.Reduced then
-		scale.Scale = 1
+		if not controlled then
+			frame.Position = targetPos
+		end
 		if transProp then
 			frame[transProp] = targetTrans
+		end
+		if stroke then
+			stroke.Transparency = targetStrokeTrans
 		end
 		return nil
 	end
 
-	scale.Scale = scaleFrom or 0.94
-	local scaleTween = Tween.Spring(scale, { Scale = 1 }, Tween.Normal)
-
-	if transProp and targetTrans < 1 then
-		frame[transProp] = 1
-		Tween.Play(frame, { [transProp] = targetTrans }, Tween.Fast, Enum.EasingStyle.Quad)
+	local mainTween = nil
+	if not controlled then
+		frame.Position = UDim2.new(
+			targetPos.X.Scale,
+			targetPos.X.Offset,
+			targetPos.Y.Scale,
+			targetPos.Y.Offset + 8
+		)
+		mainTween = Tween.Play(frame, { Position = targetPos }, Tween.Normal, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 	end
 
-	Tween.Then(scaleTween, function()
-		if frame.Parent and frame:GetAttribute("_LuminaAnimId") == animId then
-			scale.Scale = 1
-		end
-	end)
+	if transProp and targetTrans < 1 then
+		frame[transProp] = math.max(targetTrans, 0.92)
+		local fadeTween = Tween.Play(frame, { [transProp] = targetTrans }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		mainTween = mainTween or fadeTween
+	end
 
-	return scaleTween
+	if stroke and targetStrokeTrans < 1 then
+		stroke.Transparency = 1
+		local strokeTween = Tween.Play(stroke, { Transparency = targetStrokeTrans }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		mainTween = mainTween or strokeTween
+	end
+
+	if mainTween then
+		Tween.Then(mainTween, function()
+			if frame.Parent and frame:GetAttribute("_BaliAnimId") == animId then
+				frame:SetAttribute("_BaliMountTargetPos", nil)
+			end
+		end)
+	else
+		frame:SetAttribute("_BaliMountTargetPos", nil)
+	end
+
+	return mainTween
 end
 
-function Transition.Unmount(frame, scaleTo, onDone)
+function Transition.Unmount(frame, _scaleTo, onDone)
 	if not frame then
 		if onDone then
 			Util.SafeCall(onDone)
@@ -101,15 +143,29 @@ function Transition.Unmount(frame, scaleTo, onDone)
 	end
 
 	local animId = bumpAnimId(frame)
-	local scale = getOrCreateScale(frame)
 	local transProp, restTrans = captureTransparency(frame)
-	frame:SetAttribute("_LuminaUnmounted", true)
+	local stroke, restStrokeTrans = captureStrokeTransparency(frame)
+	local controlled = hasLayoutSiblingController(frame)
+
+	local targetPos = frame:GetAttribute("_BaliMountTargetPos")
+	if typeof(targetPos) ~= "UDim2" then
+		targetPos = frame.Position
+		frame:SetAttribute("_BaliMountTargetPos", targetPos)
+	end
+
+	frame:SetAttribute("_BaliUnmounted", true)
 
 	if Tween.Reduced then
-		scale.Scale = 1
+		if not controlled then
+			frame.Position = targetPos
+		end
 		if transProp and restTrans < 1 then
 			frame[transProp] = restTrans
 		end
+		if stroke and restStrokeTrans < 1 then
+			stroke.Transparency = restStrokeTrans
+		end
+		frame:SetAttribute("_BaliMountTargetPos", nil)
 		if onDone then
 			Util.SafeCall(onDone)
 		else
@@ -118,16 +174,40 @@ function Transition.Unmount(frame, scaleTo, onDone)
 		return nil
 	end
 
-	local targetScale = scaleTo or 0.94
-	local scaleTween = Tween.Play(scale, { Scale = targetScale }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-
-	if transProp and restTrans < 1 then
-		Tween.Play(frame, { [transProp] = 1 }, Tween.Fast, Enum.EasingStyle.Quad)
+	local mainTween = nil
+	if not controlled then
+		mainTween = Tween.Play(frame, {
+			Position = UDim2.new(
+				targetPos.X.Scale,
+				targetPos.X.Offset,
+				targetPos.Y.Scale,
+				targetPos.Y.Offset + 6
+			),
+		}, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	end
 
-	Tween.Then(scaleTween, function()
-		if frame:GetAttribute("_LuminaAnimId") ~= animId then
+	if transProp and restTrans < 1 then
+		local fadeTween = Tween.Play(frame, { [transProp] = 1 }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		mainTween = mainTween or fadeTween
+	end
+
+	if stroke and restStrokeTrans < 1 then
+		Tween.Play(stroke, { Transparency = 1 }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	end
+
+	Tween.Then(mainTween, function()
+		if frame:GetAttribute("_BaliAnimId") ~= animId then
 			return
+		end
+		if frame.Parent and not controlled then
+			frame.Position = targetPos
+		end
+		frame:SetAttribute("_BaliMountTargetPos", nil)
+		if transProp and restTrans < 1 and frame.Parent then
+			frame[transProp] = restTrans
+		end
+		if stroke and restStrokeTrans < 1 and stroke.Parent then
+			stroke.Transparency = restStrokeTrans
 		end
 		if onDone then
 			Util.SafeCall(onDone)
@@ -136,101 +216,67 @@ function Transition.Unmount(frame, scaleTo, onDone)
 		end
 	end)
 
-	return scaleTween
+	return mainTween
 end
 
-function Transition.Ripple(btn, inputOrPos, colorKey)
+function Transition.Ripple(btn, _inputOrPos, colorKey)
 	if not btn or Tween.Reduced then
 		return nil
 	end
 
-	local absPos = btn.AbsolutePosition
 	local absSize = btn.AbsoluteSize
 	if absSize.X <= 0 or absSize.Y <= 0 then
 		return nil
 	end
 
-	local localX, localY
-	if typeof(inputOrPos) == "Vector2" then
-		localX = inputOrPos.X - absPos.X
-		localY = inputOrPos.Y - absPos.Y
-	elseif typeof(inputOrPos) == "InputObject" then
-		localX = inputOrPos.Position.X - absPos.X
-		localY = inputOrPos.Position.Y - absPos.Y
-	else
-		localX = absSize.X * 0.5
-		localY = absSize.Y * 0.5
-	end
-
-	localX = Util.Clamp(localX, 0, absSize.X)
-	localY = Util.Clamp(localY, 0, absSize.Y)
-
-	local clip = btn:FindFirstChild("_LuminaRippleClip")
-	if not clip then
-		clip = Instance.new("Frame")
-		clip.Name = "_LuminaRippleClip"
-		clip.BackgroundTransparency = 1
-		clip.BorderSizePixel = 0
-		clip.Size = UDim2.fromScale(1, 1)
-		clip.ClipsDescendants = true
-		clip.ZIndex = btn.ZIndex + 1
-
-		local sourceCorner = btn:FindFirstChildOfClass("UICorner")
-		if sourceCorner then
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = sourceCorner.CornerRadius
-			corner.Parent = clip
-		end
-		clip.Parent = btn
+	local existing = btn:FindFirstChild("_BaliRippleWash")
+	if existing then
+		existing:Destroy()
 	end
 
 	local resolved = Theme.Resolve(colorKey or "Stroke")
 	local color = typeof(resolved) == "Color3" and resolved or Theme.Current.Text
 
-	local circle = Instance.new("Frame")
-	circle.Name = "Ripple"
-	circle.AnchorPoint = Vector2.new(0.5, 0.5)
-	circle.Position = UDim2.fromOffset(localX, localY)
-	circle.Size = UDim2.fromOffset(0, 0)
-	circle.BackgroundColor3 = color
-	circle.BackgroundTransparency = 0.78
-	circle.BorderSizePixel = 0
-	circle.ZIndex = clip.ZIndex
-	circle.Parent = clip
+	local wash = Instance.new("Frame")
+	wash.Name = "_BaliRippleWash"
+	wash.Position = UDim2.fromScale(0, 0)
+	wash.Size = UDim2.fromScale(1, 1)
+	wash.BackgroundColor3 = color
+	wash.BackgroundTransparency = 0.84
+	wash.BorderSizePixel = 0
+	wash.ZIndex = btn.ZIndex + 1
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(1, 0)
-	corner.Parent = circle
+	local sourceCorner = btn:FindFirstChildOfClass("UICorner")
+	if sourceCorner then
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = sourceCorner.CornerRadius
+		corner.Parent = wash
+	end
 
-	local maxSpan = math.max(absSize.X, absSize.Y) * 2.2
-	local diameter = math.max(maxSpan, 36)
+	local grad = Instance.new("UIGradient")
+	grad.Color = ColorSequence.new(color)
+	grad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.25),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 0.35),
+	})
+	grad.Offset = Vector2.new(-0.35, 0)
+	grad.Parent = wash
+
+	wash.Parent = btn
+
+	Tween.Play(grad, { Offset = Vector2.new(0.35, 0) }, Tween.Normal, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 	local tween = Tween.Play(
-		circle,
-		{
-			Size = UDim2.fromOffset(diameter, diameter),
-			BackgroundTransparency = 1,
-		},
-		Tween.Smooth,
+		wash,
+		{ BackgroundTransparency = 1 },
+		Tween.Normal,
 		Enum.EasingStyle.Quad,
 		Enum.EasingDirection.Out
 	)
 
 	Tween.Then(tween, function()
-		if circle.Parent then
-			circle:Destroy()
-		end
-		if clip.Parent and #clip:GetChildren() <= 1 then
-			-- keep clip if only UICorner remains? Destroy empty clip to keep instance tree clean
-			local hasRipple = false
-			for _, child in ipairs(clip:GetChildren()) do
-				if child:IsA("GuiObject") then
-					hasRipple = true
-					break
-				end
-			end
-			if not hasRipple then
-				clip:Destroy()
-			end
+		if wash.Parent then
+			wash:Destroy()
 		end
 	end)
 
@@ -347,24 +393,25 @@ function Transition.Hover(hit, surface, normalKey, hoverKey, strokeObj)
 	return cleanup
 end
 
-function Transition.SlideFade(frame, offsetY)
+function Transition.SlideFade(frame, offsetY, offsetX)
 	if not frame then
 		return nil
 	end
 
 	local animId = bumpAnimId(frame)
-	local yOffset = offsetY ~= nil and offsetY or 10
+	local yOffset = offsetY ~= nil and offsetY or 6
+	local xOffset = offsetX or 0
 	local transProp, targetTrans = captureTransparency(frame)
-	frame:SetAttribute("_LuminaUnmounted", false)
+	frame:SetAttribute("_BaliUnmounted", false)
 	frame.Visible = true
 
-	local targetPos = frame:GetAttribute("_LuminaSlideTargetPos")
+	local targetPos = frame:GetAttribute("_BaliSlideTargetPos")
 	if typeof(targetPos) ~= "UDim2" then
 		targetPos = frame.Position
-		frame:SetAttribute("_LuminaSlideTargetPos", targetPos)
+		frame:SetAttribute("_BaliSlideTargetPos", targetPos)
 	end
 
-	local parentLayout = frame.Parent and (frame.Parent:FindFirstChildOfClass("UIListLayout") or frame.Parent:FindFirstChildOfClass("UIGridLayout"))
+	local parentLayout = hasLayoutSiblingController(frame)
 	if Tween.Reduced then
 		if not parentLayout then
 			frame.Position = targetPos
@@ -372,6 +419,7 @@ function Transition.SlideFade(frame, offsetY)
 		if transProp then
 			frame[transProp] = targetTrans
 		end
+		frame:SetAttribute("_BaliSlideTargetPos", nil)
 		return nil
 	end
 
@@ -379,27 +427,28 @@ function Transition.SlideFade(frame, offsetY)
 	if not parentLayout then
 		frame.Position = UDim2.new(
 			targetPos.X.Scale,
-			targetPos.X.Offset,
+			targetPos.X.Offset + xOffset,
 			targetPos.Y.Scale,
 			targetPos.Y.Offset + yOffset
 		)
-		mainTween = Tween.Play(frame, { Position = targetPos }, Tween.Normal, Enum.EasingStyle.Quint)
-	else
-		local scale = getOrCreateScale(frame)
-		scale.Scale = 0.96
-		mainTween = Tween.Play(scale, { Scale = 1 }, Tween.Normal, Enum.EasingStyle.Quint)
+		mainTween = Tween.Play(frame, { Position = targetPos }, Tween.Normal, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 	end
 
 	if transProp and targetTrans < 1 then
-		frame[transProp] = 1
-		Tween.Play(frame, { [transProp] = targetTrans }, Tween.Fast, Enum.EasingStyle.Quad)
+		frame[transProp] = math.min(1, math.max(targetTrans + 0.12, 0.92))
+		local fadeTween = Tween.Play(frame, { [transProp] = targetTrans }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		mainTween = mainTween or fadeTween
 	end
 
-	Tween.Then(mainTween, function()
-		if frame.Parent and frame:GetAttribute("_LuminaAnimId") == animId then
-			frame:SetAttribute("_LuminaSlideTargetPos", nil)
-		end
-	end)
+	if mainTween then
+		Tween.Then(mainTween, function()
+			if frame.Parent and frame:GetAttribute("_BaliAnimId") == animId then
+				frame:SetAttribute("_BaliSlideTargetPos", nil)
+			end
+		end)
+	else
+		frame:SetAttribute("_BaliSlideTargetPos", nil)
+	end
 
 	return mainTween
 end

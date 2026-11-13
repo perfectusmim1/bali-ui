@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Base
+	Bali UI · Elements/Base
 	Shared element lifecycle, Tile rows, Glass cards, badges, lock overlays, and flash feedback.
 ]]
 
@@ -50,12 +50,12 @@ function Base.FlashFrame(frame, stroke, surfaceKey)
 	if not frame or not frame.Parent then
 		return
 	end
-	local token = (frame:GetAttribute("_LuminaFlashToken") or 0) + 1
-	frame:SetAttribute("_LuminaFlashToken", token)
+	local token = (frame:GetAttribute("_BaliFlashToken") or 0) + 1
+	frame:SetAttribute("_BaliFlashToken", token)
 
 	local targetStroke = stroke or frame:FindFirstChildOfClass("UIStroke")
 	local accent = Theme.Current.Accent
-	local baseBgKey = surfaceKey or frame:GetAttribute("_LuminaSurfaceKey") or "Tile"
+	local baseBgKey = surfaceKey or frame:GetAttribute("_BaliSurfaceKey") or "Tile"
 	local baseBg = Theme.Resolve(baseBgKey) or Theme.Current.Tile
 	local hoverBg = Theme.Current.TileHover or baseBg
 	local hasBg = frame.BackgroundTransparency < 0.95
@@ -74,7 +74,7 @@ function Base.FlashFrame(frame, stroke, surfaceKey)
 	end
 
 	task.delay(Tween.Reduced and 0.05 or 0.36, function()
-		if not frame.Parent or frame:GetAttribute("_LuminaFlashToken") ~= token then
+		if not frame.Parent or frame:GetAttribute("_BaliFlashToken") ~= token then
 			return
 		end
 		if targetStroke and targetStroke.Parent then
@@ -101,7 +101,7 @@ local function createLockOverlay(frame, cornerRadius)
 		Name = "LockOverlay",
 		Size = UDim2.fromScale(1, 1),
 		Position = UDim2.fromScale(0, 0),
-		BackgroundTransparency = 0.28,
+		BackgroundTransparency = 0.14,
 		Theme = { BackgroundColor3 = "Background" },
 		Corner = cornerRadius or 10,
 		Active = true,
@@ -117,7 +117,7 @@ local function createLockOverlay(frame, cornerRadius)
 		Size = UDim2.fromOffset(0, 0),
 		AutomaticSize = Enum.AutomaticSize.XY,
 		Theme = { BackgroundColor3 = "Card" },
-		BackgroundTransparency = 0.08,
+		BackgroundTransparency = 0.04,
 		Corner = UDim.new(1, 0),
 		Padding = { 4, 10, 4, 10 },
 		Stroke = {
@@ -279,7 +279,7 @@ function Base.Card(parent, options)
 		Corner = cornerRadius,
 		Parent = parent,
 	})
-	frame:SetAttribute("_LuminaSurfaceKey", surfaceKey)
+	frame:SetAttribute("_BaliSurfaceKey", surfaceKey)
 
 	if options.MinHeight and options.MinHeight > 0 then
 		local constraint = Instance.new("UISizeConstraint")
@@ -323,16 +323,16 @@ function Base.Card(parent, options)
 		for _, desc in ipairs(frame:GetDescendants()) do
 			if desc ~= lockOverlay and not desc:IsDescendantOf(lockOverlay) then
 				if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
-					if desc:GetAttribute("_LuminaOrigTextTrans") == nil then
-						desc:SetAttribute("_LuminaOrigTextTrans", desc.TextTransparency)
+					if desc:GetAttribute("_BaliOrigTextTrans") == nil then
+						desc:SetAttribute("_BaliOrigTextTrans", desc.TextTransparency)
 					end
-					local baseT = desc:GetAttribute("_LuminaOrigTextTrans") or 0
+					local baseT = desc:GetAttribute("_BaliOrigTextTrans") or 0
 					desc.TextTransparency = card._disabled and math.min(baseT + 0.45, 0.78) or baseT
 				elseif desc:IsA("ImageLabel") or desc:IsA("ImageButton") then
-					if desc:GetAttribute("_LuminaOrigImgTrans") == nil then
-						desc:SetAttribute("_LuminaOrigImgTrans", desc.ImageTransparency)
+					if desc:GetAttribute("_BaliOrigImgTrans") == nil then
+						desc:SetAttribute("_BaliOrigImgTrans", desc.ImageTransparency)
 					end
-					local baseT = desc:GetAttribute("_LuminaOrigImgTrans") or 0
+					local baseT = desc:GetAttribute("_BaliOrigImgTrans") or 0
 					desc.ImageTransparency = card._disabled and math.min(baseT + 0.45, 0.78) or baseT
 				end
 			end
@@ -376,7 +376,7 @@ function Base.Row(parent, options, rightWidth)
 		Corner = cornerRadius,
 		Parent = parent,
 	})
-	frame:SetAttribute("_LuminaSurfaceKey", surfaceKey)
+	frame:SetAttribute("_BaliSurfaceKey", surfaceKey)
 
 	local constraint = Instance.new("UISizeConstraint")
 	constraint.MinSize = Vector2.new(0, options.MinHeight or 42)
@@ -493,6 +493,13 @@ function Base.Row(parent, options, rightWidth)
 	})
 
 	local reservedRight = rightWidth
+	local rightConstraint = nil
+	if reservedRight <= 0 then
+		rightConstraint = Instance.new("UISizeConstraint")
+		rightConstraint.MaxSize = Vector2.new(9999, 9999)
+		rightConstraint.Parent = right
+	end
+
 	local function updateLeftInset()
 		local hasVisibleChild = false
 		if reservedRight <= 0 then
@@ -504,6 +511,11 @@ function Base.Row(parent, options, rightWidth)
 			end
 		end
 		right.Visible = (reservedRight > 0) or hasVisibleChild
+		local bodyW = math.floor(body.AbsoluteSize.X)
+		if rightConstraint and bodyW > 180 and titleText ~= "" then
+			local maxR = math.max(96, bodyW - math.max(132, math.floor(bodyW * 0.44)) - 10)
+			rightConstraint.MaxSize = Vector2.new(maxR, 9999)
+		end
 		local actualW = right.Visible and math.max(reservedRight, math.ceil(right.AbsoluteSize.X)) or 0
 		left.Size = UDim2.new(1, actualW > 0 and -(actualW + 10) or 0, 0, 0)
 	end
@@ -516,6 +528,7 @@ function Base.Row(parent, options, rightWidth)
 	end)
 
 	right:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateLeftInset)
+	body:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateLeftInset)
 
 	local lockOverlay, lockLabel = createLockOverlay(frame, cornerRadius)
 

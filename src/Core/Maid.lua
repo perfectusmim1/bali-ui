@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Core/Maid
+	Bali UI · Core/Maid
 	Tracks connections, instances, callbacks and objects for deterministic cleanup.
 ]]
 
@@ -42,7 +42,7 @@ function Maid:Clean()
 	for index = #items, 1, -1 do
 		local ok, err = pcall(cleanup, items[index])
 		if not ok then
-			warn("[Lumina] Cleanup error: " .. tostring(err))
+			warn("[Bali] Cleanup error: " .. tostring(err))
 		end
 	end
 end

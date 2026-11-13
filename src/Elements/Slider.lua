@@ -1,5 +1,5 @@
 --[[
-	Lumina UI · Elements/Slider
+	Bali UI · Elements/Slider
 	Interactive Slider (with editable numeric pill), dual-thumb RangeSlider, and Stepper.
 ]]
 
@@ -51,10 +51,6 @@ local function createThumb(track, zBase)
 		Thickness = 1.5,
 	})
 
-	local scale = Instance.new("UIScale")
-	scale.Scale = 1
-	scale.Parent = thumb
-
 	local glowAsset = Assets.Get("Glow")
 	local glow
 	if glowAsset then
@@ -85,7 +81,7 @@ local function createThumb(track, zBase)
 	end
 
 	local function setActive(active)
-		Tween.Play(scale, { Scale = active and 1.22 or 1 }, Tween.Instant, Enum.EasingStyle.Quad)
+		Tween.Play(thumb, { Size = active and UDim2.fromOffset(17, 17) or UDim2.fromOffset(14, 14) }, Tween.Instant, Enum.EasingStyle.Quad)
 		if glow:IsA("ImageLabel") then
 			Tween.Play(glow, { ImageTransparency = active and 0.42 or 0.72 }, Tween.Instant, Enum.EasingStyle.Quad)
 		else
@@ -93,7 +89,7 @@ local function createThumb(track, zBase)
 		end
 	end
 
-	return thumb, scale, stroke, setActive
+	return thumb, nil, stroke, setActive
 end
 
 -- ─── Slider ──────────────────────────────────────────────────────────────────
