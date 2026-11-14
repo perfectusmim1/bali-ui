@@ -4,8 +4,6 @@
 
 > **Documentation:** [bali-2.gitbook.io/bali-docs](https://bali-2.gitbook.io/bali-docs/)
 
-![Bali Suite Showcase](docs/assets/promo-hero.png)
-
 ---
 
 ## Highlights
@@ -16,29 +14,6 @@
 - **Complete Interactive Suite**: `Button` (with `Confirm` & variants), `ButtonGroup`, `Toggle` (with inline keybinds), `Checkbox`, `Slider`, `RangeSlider`, `Stepper`, `Input` (numeric, integer, password mask, clearable), `Segmented`, `Dropdown` (single, multi, searchable, input-isolated compact popover with per-option `Icon`, `IconColor`, `Image`/`Thumbnail`, `Color`, `Badge`, `RightText`, and `Disabled` states), `Keybind` (`Toggle`, `Hold`, `Always`, mouse binds), `ColorPicker` (HSV square, alpha slider, hex/RGB, presets, rainbow), and nested `Accordion`.
 - **Analytics & Data Widgets**: `StatCard` (animated counters, deltas, sparklines), `Chart` (`Line` / `Bar` with live `:Push()`), `ProgressBar`, `Table` (live filter, selectable checkboxes, badges, inline row actions), `CardGrid`, plus rich typography (`Label`, `Paragraph`, `Divider`, `Header`, `CodeBlock` with language-aware `RichText` highlighting, `Image` / `Banner`, `ProfileCard`).
 - **System HUD & Lifecycle Safety**: Stackable `Notification` toasts (configurable duration via `SetNotificationDuration`) + unread history bell popover, draggable `Watermark`, live `KeybindList`, window-centered `CommandPalette` (`Ctrl+K`), `Lighting` `Blur`, viewport-clamped `Tooltip`, `Dialog` modals, `LoadingScreen`, `KeySystem`, JSON `Config` & `AutoSave` persistence, animated `window:Unload()`, automatic `_BaliInstance` orphan cleanup on re-execute, and global error boundary (`Util.ErrorHandler`).
-
----
-
-## Showcase
-
-| Telemetry & Rich Controls | Multi-Theme Engine (`Midnight`, `Ocean`, `Light`) |
-| :---: | :---: |
-| ![Bali Analytics Showcase](docs/assets/promo-analytics.png) | ![Bali Multi-Theme Showcase](docs/assets/promo-themes.png) |
-
-<details>
-<summary>More Live In-Engine Screenshots</summary>
-
-| Feature | Preview |
-| :--- | :---: |
-| **Overview Dashboard (`Midnight`)** | ![Overview Dashboard](docs/assets/screenshots/overview-midnight.png) |
-| **Interactive Controls** | ![Interactive Controls](docs/assets/screenshots/controls-interactive.png) |
-| **Rich Searchable Dropdowns & Pickers** | ![Controls & Pickers](docs/assets/screenshots/controls-pickers.png) |
-| **Layout, CodeBlock & Accordion** | ![Layout & Rich](docs/assets/screenshots/controls-layout.png) |
-| **Notifications & Modals** | ![Notifications & Modals](docs/assets/screenshots/notifications-modals.png) |
-| **Light & Multi-Theme Appearance** | ![Settings & Themes](docs/assets/screenshots/settings-themes.png) |
-| **Command Palette (`Ctrl+K`)** | ![Command Palette](docs/assets/screenshots/command-palette.png) |
-
-</details>
 
 ---
 

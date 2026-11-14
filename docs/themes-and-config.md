@@ -2,8 +2,6 @@
 
 Bali supports instant live re-theming without rebuilding UI trees, alongside built-in JSON configuration serialization and auto-loading.
 
-![Bali Ocean Theme Settings](assets/screenshots/ocean-theme.png)
-
 ---
 
 ## Built-in Themes (`Theme.Presets`)

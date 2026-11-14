@@ -1648,6 +1648,9 @@ function Window:AddTab(options)
 end
 
 function Window:SelectTab(tab, instant)
+	if self._destroyed or self._unloading then
+		return nil
+	end
 	if type(tab) == "string" then
 		for _, candidate in ipairs(self.Tabs) do
 			if candidate.Title == tab then
@@ -1662,13 +1665,14 @@ function Window:SelectTab(tab, instant)
 		return nil
 	end
 
-	if self.ActiveTab == tab and not instant then
+	local effectiveInstant = instant == true or (not self._visible) or self._morphing
+	if self.ActiveTab == tab and not effectiveInstant then
 		return tab
 	end
 
 	self:ClosePopup()
 	for _, candidate in ipairs(self.Tabs) do
-		candidate:_setActiveVisual(candidate == tab, instant == true)
+		candidate:_setActiveVisual(candidate == tab, effectiveInstant)
 	end
 	self.ActiveTab = tab
 	self:_updateBreadcrumb()
@@ -1818,6 +1822,13 @@ function Window:SetVisible(visible)
 	if not visible then
 		self:ClosePopup()
 		CommandPalette.Close()
+		if self.ActiveTab then
+			Transition.RestoreCascade(self.ActiveTab.Page)
+			local activeScroll = self.ActiveTab.ActiveSubTab and self.ActiveTab.ActiveSubTab.Scroll or (self.ActiveTab._defaultFlow and self.ActiveTab._defaultFlow.Scroll)
+			if activeScroll then
+				Transition.RestoreCascade(activeScroll)
+			end
+		end
 
 		if not self._morphing then
 			self._restorePos = wrapper.Position

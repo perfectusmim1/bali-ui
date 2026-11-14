@@ -2958,6 +2958,45 @@ if okLib and type(Bali2) == "table" then
 	end
 	assertTrue(tagVisible, "Chart hoverTagLabel remains visible with steady height at idle")
 
+	-- Regression: mid-cascade minimize + tab switch while morphing/hidden must not corrupt resting transparencies
+	local regDashTab = win2:AddTab({ Title = "RegDash", Icon = "home" })
+	local regDashSec = regDashTab:AddSection({ Title = "Dash Section", Side = "Full" })
+	local regDashBtn = regDashSec:AddButton({ Title = "Dash Action", Callback = function() end })
+	local regCtrlTab = win2:AddTab({ Title = "RegCtrl", Icon = "sliders" })
+	local regCtrlSec = regCtrlTab:AddSection({ Title = "Ctrl Section", Side = "Full" })
+	local regCtrlTog = regCtrlSec:AddToggle({ Title = "Ctrl Toggle", Default = true })
+
+	regCtrlTab:Select()
+	stepClock(0.01, true)
+	win2:SetVisible(false)
+	stepClock(0.05, true)
+	regDashTab:Select()
+	stepClock(0.35, true)
+	win2:SetVisible(true)
+	stepClock(0.5, true)
+	regCtrlTab:Select()
+	stepClock(0.5, true)
+
+	local function findTitleOpacity(frame, titleText)
+		for _, d in ipairs(frame:GetDescendants()) do
+			if d:IsA("TextLabel") and d.Text == titleText then
+				return d.TextTransparency
+			end
+		end
+		return nil
+	end
+	local ctrlLblT = findTitleOpacity(regCtrlTog.Frame, "Ctrl Toggle")
+	local ctrlSecBgT = regCtrlSec.Frame.BackgroundTransparency
+	assertTrue(ctrlLblT ~= nil and ctrlLblT < 0.5, "Ctrl Toggle text restored cleanly after mid-cascade minimize + tab switch (T=" .. tostring(ctrlLblT) .. ")")
+	assertTrue(ctrlSecBgT < 0.5, "Ctrl Section card background restored cleanly (T=" .. tostring(ctrlSecBgT) .. ")")
+
+	regDashTab:Select()
+	stepClock(0.5, true)
+	local dashLblT = findTitleOpacity(regDashBtn.Frame, "Dash Action")
+	local dashSecBgT = regDashSec.Frame.BackgroundTransparency
+	assertTrue(dashLblT ~= nil and dashLblT < 0.5, "Dash Action text restored cleanly after switching during minimize (T=" .. tostring(dashLblT) .. ")")
+	assertTrue(dashSecBgT < 0.5, "Dash Section card background restored cleanly (T=" .. tostring(dashSecBgT) .. ")")
+
 	-- Re-execution test in Studio mode
 	local sg2 = Bali2._screenGui
 	win2:Destroy()

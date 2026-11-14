@@ -496,6 +496,9 @@ function Tab.new(window, options)
 	self:SetCompact(self._compact, true)
 
 	maid:Give(button.MouseEnter:Connect(function()
+		if not window._visible or window._morphing or window._unloading or window._destroyed then
+			return
+		end
 		if not self.Selected and not Transition.IsOverlayBlocking(button) then
 			Tween.Play(button, { BackgroundTransparency = 0.55 }, Tween.Instant)
 			if self._iconInst then
@@ -516,7 +519,7 @@ function Tab.new(window, options)
 	end))
 
 	maid:Give(button.Activated:Connect(function(input)
-		if Transition.IsOverlayBlocking(button) then
+		if not window._visible or window._morphing or window._unloading or window._destroyed or Transition.IsOverlayBlocking(button) then
 			return
 		end
 		Transition.Ripple(button, input, "Accent")
@@ -634,9 +637,13 @@ function Tab:_setActiveVisual(active, instant)
 		self:_syncSubTabIndicator(instant)
 	end
 	self.Page.Visible = active
-	if active and not instant then
+	if active then
 		local activeScroll = self.ActiveSubTab and self.ActiveSubTab.Scroll or self._defaultFlow.Scroll
-		Transition.Cascade(activeScroll, 0.018, 12, 10)
+		if instant then
+			Transition.RestoreCascade(activeScroll)
+		else
+			Transition.Cascade(activeScroll, 0.018, 12, 10)
+		end
 	end
 end
 
@@ -685,7 +692,7 @@ function Tab:AddSection(options)
 	return self._defaultFlow.AddSection(options)
 end
 
-function Tab:SelectSubTab(subTab)
+function Tab:SelectSubTab(subTab, instant)
 	if type(subTab) == "string" then
 		for _, candidate in ipairs(self.SubTabs) do
 			if candidate.Title == subTab then
@@ -700,7 +707,8 @@ function Tab:SelectSubTab(subTab)
 		return
 	end
 
-	if self.ActiveSubTab == subTab then
+	local effectiveInstant = instant == true or (self.Window ~= nil and (not self.Window._visible or self.Window._morphing or self.Window._unloading))
+	if self.ActiveSubTab == subTab and not effectiveInstant then
 		return
 	end
 
@@ -731,8 +739,12 @@ function Tab:SelectSubTab(subTab)
 	end
 
 	self.ActiveSubTab = subTab
-	Transition.Cascade(subTab.Scroll, 0.018, 12, dir * 12)
-	self:_syncSubTabIndicator(false)
+	if effectiveInstant then
+		Transition.RestoreCascade(subTab.Scroll)
+	else
+		Transition.Cascade(subTab.Scroll, 0.018, 12, dir * 12)
+	end
+	self:_syncSubTabIndicator(effectiveInstant)
 
 	if self.Window and self.Window.ActiveTab == self then
 		self.Window:_updateBreadcrumb()
@@ -830,7 +842,7 @@ function Tab:AddSubTab(options)
 	Theme.Bind(subBtn, { BackgroundColor3 = "Tile" })
 	local subHovered = false
 	self.Maid:Give(subBtn.MouseEnter:Connect(function()
-		if self.ActiveSubTab == subTab or Util.IsTouchDevice() or Transition.IsOverlayBlocking(subBtn) then
+		if (self.Window and (not self.Window._visible or self.Window._morphing or self.Window._unloading or self.Window._destroyed)) or self.ActiveSubTab == subTab or Util.IsTouchDevice() or Transition.IsOverlayBlocking(subBtn) then
 			return
 		end
 		subHovered = true
@@ -846,7 +858,7 @@ function Tab:AddSubTab(options)
 	end))
 
 	self.Maid:Give(subBtn.Activated:Connect(function()
-		if Transition.IsOverlayBlocking(subBtn) then
+		if (self.Window and (not self.Window._visible or self.Window._morphing or self.Window._unloading or self.Window._destroyed)) or Transition.IsOverlayBlocking(subBtn) then
 			return
 		end
 		if subHovered then

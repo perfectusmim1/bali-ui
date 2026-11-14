@@ -2,8 +2,6 @@
 
 Display a branded glassmorphic splash loader (`Bali:LoadingScreen`) or credential verification gate (`Bali:KeySystem`) before constructing the main workspace window.
 
-![Bali Key Verification Gate](assets/screenshots/key-system.png)
-
 ---
 
 ## `Bali:LoadingScreen(opts)`

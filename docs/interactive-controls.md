@@ -2,8 +2,6 @@
 
 Every control can be constructed on a `Section`, `Accordion`, `Tab`, or `SubTab`. All elements share unified base methods (`:SetTitle()`, `:SetDesc()`, `:SetVisible()`, `:SetDisabled()`, `:Lock()`, `:Unlock()`, `:Flash()`, `:OnChanged()`, `:Destroy()`) and expose flags via `window.Flags[flagName]`.
 
-![Interactive Controls](assets/screenshots/interactive-controls.png)
-
 ---
 
 ## `AddButton` & `AddButtonGroup`
@@ -157,8 +155,6 @@ section:AddSegmented({
 
 ## `AddDropdown`
 
-![Searchable Dropdown Popover](assets/screenshots/dropdown-controls.png)
-
 Viewport-aware popover dropdown mounted in `BaliPopupLayer` with compact `28px` single-line option rows, active modal input blocking so sliders underneath cannot react while browsing options, live search filtering, single or multi selection, per-option icons/thumbnails/badges/colors, and dynamic option updates.
 
 ```lua
@@ -221,8 +217,6 @@ section:AddKeybind({
 ## `AddColorPicker`
 
 Interactive HSV square + hue slider + alpha channel slider (`Transparency`) + live Hex/RGB editors + solid color preset chips + animated `Rainbow` toggle.
-
-![Color Picker Popover](assets/screenshots/color-picker.png)
 
 ```lua
 section:AddColorPicker({

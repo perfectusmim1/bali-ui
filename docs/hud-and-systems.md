@@ -8,8 +8,6 @@ Bali separates system overlays into dedicated `ZIndex` layers (`HUD`, `Popup`, `
 
 Notifications render in `BaliNotifyLayer` without circular badges or outdated side bars, displaying a clean Lucide severity icon chip, dismiss control, hover-pausable linear timer pill, configurable default display window (`Bali:SetNotificationDuration(seconds)` / Settings slider `1s–15s`), and optional interactive action buttons.
 
-![Notification Toast](assets/screenshots/toast.png)
-
 ```lua
 -- Optional: override global default toast visibility window (1–30 seconds)
 Bali:SetNotificationDuration(6)
@@ -33,9 +31,7 @@ local toast = Bali:Notify({
 
 ### Notification Bell Popover
 
-Every dispatched `window:Notify(...)` or `Bali:Notify(...)` is automatically indexed in the notification feed accessible from the top-right bell button in the window header, with severity Lucide icons, timestamps, and **Clear All**:
-
-![Notification History Popover](assets/screenshots/notifications.png)
+Every dispatched `window:Notify(...)` or `Bali:Notify(...)` is automatically indexed in the notification feed accessible from the top-right bell button in the window header, with severity Lucide icons, timestamps, and **Clear All**.
 
 ---
 

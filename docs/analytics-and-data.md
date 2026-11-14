@@ -2,8 +2,6 @@
 
 Bali includes native real-time telemetry widgets (`StatCard`, `Chart`, `ProgressBar`, `Table`, `CardGrid`) alongside rich typography, syntax-highlighted code blocks, and profile cards.
 
-![Bali Telemetry Analytics & Table](assets/screenshots/analytics.png)
-
 ---
 
 ## `AddStatCard`

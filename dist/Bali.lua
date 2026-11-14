@@ -1440,6 +1440,7 @@ local Theme = require("Core/Theme")
 local Util = require("Core/Util")
 
 local Transition = {}
+local activeFadeEntries = setmetatable({}, { __mode = "k" })
 
 local function bumpAnimId(frame)
 	local nextId = (frame:GetAttribute("_BaliAnimId") or 0) + 1
@@ -1521,6 +1522,27 @@ local function collectFadeEntries(root)
 	local refresh = not isFading
 	local entries = {}
 
+	local cascadeAttrMap = {
+		BackgroundTransparency = "_BaliCascadeBg",
+		TextTransparency = "_BaliCascadeTxt",
+		ImageTransparency = "_BaliCascadeImg",
+		Transparency = "_BaliCascadeStroke",
+	}
+
+	local function hasCascadingAncestor(inst)
+		local cur = inst
+		while cur and cur ~= game do
+			if cur:GetAttribute("_BaliCascading") == true then
+				return true
+			end
+			if cur == root then
+				break
+			end
+			cur = cur.Parent
+		end
+		return false
+	end
+
 	local function isForegroundContent(inst, prop)
 		if prop == "TextTransparency" then
 			return true
@@ -1546,13 +1568,28 @@ local function collectFadeEntries(root)
 
 	local function record(inst, prop, attrName)
 		local val
+		local cascadeAttr = cascadeAttrMap[prop]
 		if refresh then
-			val = inst[prop]
+			if cascadeAttr and hasCascadingAncestor(inst) then
+				local cascadeVal = inst:GetAttribute(cascadeAttr)
+				if cascadeVal ~= nil then
+					val = cascadeVal
+				else
+					val = inst[prop]
+				end
+			else
+				val = inst[prop]
+			end
 			inst:SetAttribute(attrName, val)
 		else
 			val = inst:GetAttribute(attrName)
 			if val == nil then
-				val = inst[prop]
+				if cascadeAttr and hasCascadingAncestor(inst) then
+					val = inst:GetAttribute(cascadeAttr)
+				end
+				if val == nil then
+					val = inst[prop]
+				end
 				inst:SetAttribute(attrName, val)
 			end
 		end
@@ -1597,6 +1634,31 @@ local function collectFadeEntries(root)
 	scan(root)
 	walkVisibleDescendants(root)
 
+	local prevEntries = activeFadeEntries[root]
+	if prevEntries then
+		local activeSet = {}
+		for _, entry in ipairs(entries) do
+			local propsMap = activeSet[entry.Inst]
+			if not propsMap then
+				propsMap = {}
+				activeSet[entry.Inst] = propsMap
+			end
+			propsMap[entry.Prop] = true
+		end
+		for _, prev in ipairs(prevEntries) do
+			local inst = prev.Inst
+			local propsMap = inst and activeSet[inst]
+			if inst and inst.Parent and not (propsMap and propsMap[prev.Prop]) then
+				if prev.Target < 0.995 then
+					inst[prev.Prop] = prev.Target
+					if not Tween.Reduced then
+						Tween.Play(inst, { [prev.Prop] = prev.Target }, Tween.Instant)
+					end
+				end
+			end
+		end
+	end
+
 	return entries
 end
 
@@ -1605,11 +1667,11 @@ local function invalidateCascadeTree(root)
 		return
 	end
 	if root:IsA("ScrollingFrame") or root:GetAttribute("_BaliCascadeSeq") ~= nil then
-		root:SetAttribute("_BaliCascadeSeq", (root:GetAttribute("_BaliCascadeSeq") or 0) + 1)
+		Transition.RestoreCascade(root)
 	end
 	for _, desc in ipairs(root:GetDescendants()) do
 		if desc:IsA("ScrollingFrame") or desc:GetAttribute("_BaliCascadeSeq") ~= nil then
-			desc:SetAttribute("_BaliCascadeSeq", (desc:GetAttribute("_BaliCascadeSeq") or 0) + 1)
+			Transition.RestoreCascade(desc)
 		end
 	end
 end
@@ -1654,6 +1716,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 	local animId = bumpAnimId(frame)
 	invalidateCascadeTree(frame)
 	local entries = collectFadeEntries(frame)
+	activeFadeEntries[frame] = entries
 	local controlled = noPos or hasLayoutSiblingController(frame)
 
 	local targetPos = frame:GetAttribute("_BaliMountTargetPos")
@@ -1681,6 +1744,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 		frame:SetAttribute("_BaliFading", nil)
 		frame:SetAttribute("_BaliFadingIn", false)
 		frame:SetAttribute("_BaliMountTargetPos", nil)
+		activeFadeEntries[frame] = nil
 		return nil
 	end
 
@@ -1719,12 +1783,14 @@ function Transition.Mount(frame, _scaleFrom, opts)
 				frame:SetAttribute("_BaliFading", nil)
 				frame:SetAttribute("_BaliFadingIn", false)
 				frame:SetAttribute("_BaliMountTargetPos", nil)
+				activeFadeEntries[frame] = nil
 			end
 		end)
 	else
 		frame:SetAttribute("_BaliFading", nil)
 		frame:SetAttribute("_BaliFadingIn", false)
 		frame:SetAttribute("_BaliMountTargetPos", nil)
+		activeFadeEntries[frame] = nil
 	end
 
 	return mainTween
@@ -1743,6 +1809,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 	local animId = bumpAnimId(frame)
 	invalidateCascadeTree(frame)
 	local entries = collectFadeEntries(frame)
+	activeFadeEntries[frame] = entries
 	local controlled = noPos or hasLayoutSiblingController(frame)
 
 	local targetPos = frame:GetAttribute("_BaliMountTargetPos")
@@ -1781,6 +1848,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 						entry.Inst[entry.Prop] = entry.Target
 					end
 				end
+				activeFadeEntries[frame] = nil
 			end
 		end
 	end
@@ -2260,8 +2328,10 @@ function Transition.Cascade(container, stepDelay, maxItems, slideOffsetX)
 	container:SetAttribute("_BaliCascadeSeq", seq)
 
 	if Tween.Reduced then
+		container:SetAttribute("_BaliCascadeActive", nil)
 		return nil
 	end
+	container:SetAttribute("_BaliCascadeActive", true)
 
 	if slideOffsetX and slideOffsetX ~= 0 and not hasLayoutSiblingController(container) then
 		local restPos = container:GetAttribute("_BaliSlideTargetPos")
@@ -2288,6 +2358,7 @@ function Transition.Cascade(container, stepDelay, maxItems, slideOffsetX)
 	local targets = {}
 	collectCascadeTargets(container, targets, maxItems or 14)
 	if #targets == 0 then
+		container:SetAttribute("_BaliCascadeActive", nil)
 		return nil
 	end
 
@@ -2305,7 +2376,7 @@ function Transition.Cascade(container, stepDelay, maxItems, slideOffsetX)
 		local function reveal()
 			if container:GetAttribute("_BaliCascadeSeq") ~= seq then
 				if not container.Parent or isAncestorHidden(card) then
-					card:SetAttribute("_BaliCascading", false)
+					card:SetAttribute("_BaliCascading", nil)
 					for _, entry in ipairs(props) do
 						if entry.Inst.Parent and entry.Target < 1 then
 							entry.Inst[entry.Prop] = entry.Target
@@ -2314,24 +2385,46 @@ function Transition.Cascade(container, stepDelay, maxItems, slideOffsetX)
 				end
 				return
 			end
-			card:SetAttribute("_BaliCascading", false)
 			if not container.Parent or isAncestorHidden(card) then
+				card:SetAttribute("_BaliCascading", nil)
 				for _, entry in ipairs(props) do
 					if entry.Inst.Parent and entry.Target < 1 then
 						entry.Inst[entry.Prop] = entry.Target
 					end
 				end
+				if index == #targets then
+					container:SetAttribute("_BaliCascadeActive", nil)
+				end
 				return
 			end
+			local lastRevealTween = nil
 			for _, entry in ipairs(props) do
 				if entry.Inst.Parent and entry.Target < 1 then
-					Tween.Play(
+					local t = Tween.Play(
 						entry.Inst,
 						{ [entry.Prop] = entry.Target },
 						entry.IsContent and Tween.Normal or Tween.Fast,
 						Enum.EasingStyle.Quint,
 						Enum.EasingDirection.Out
 					)
+					if t then
+						lastRevealTween = t
+					end
+				end
+			end
+			if lastRevealTween then
+				Tween.Then(lastRevealTween, function()
+					if card.Parent and container:GetAttribute("_BaliCascadeSeq") == seq then
+						card:SetAttribute("_BaliCascading", nil)
+						if index == #targets then
+							container:SetAttribute("_BaliCascadeActive", nil)
+						end
+					end
+				end)
+			else
+				card:SetAttribute("_BaliCascading", nil)
+				if index == #targets then
+					container:SetAttribute("_BaliCascadeActive", nil)
 				end
 			end
 		end
@@ -2351,42 +2444,81 @@ function Transition.RestoreCascade(container)
 		return
 	end
 	container:SetAttribute("_BaliCascadeSeq", (container:GetAttribute("_BaliCascadeSeq") or 0) + 1)
+	container:SetAttribute("_BaliCascadeActive", nil)
 	local restPos = container:GetAttribute("_BaliSlideTargetPos")
 	if typeof(restPos) == "UDim2" then
 		container.Position = restPos
 		container:SetAttribute("_BaliSlideTargetPos", nil)
 	end
-	local function restoreInst(inst)
+	local function restoreInst(inst, inCascadingSubtree)
+		local cascadingHere = inCascadingSubtree or (inst:GetAttribute("_BaliCascading") == true)
+		if inst:IsA("GuiObject") and inst:GetAttribute("_BaliCascading") ~= nil then
+			inst:SetAttribute("_BaliCascading", nil)
+		end
+		if not cascadingHere then
+			return false
+		end
+		local restoreProps = nil
 		if inst:IsA("GuiObject") then
-			if inst:GetAttribute("_BaliCascading") then
-				inst:SetAttribute("_BaliCascading", false)
-			end
 			local bg = inst:GetAttribute("_BaliCascadeBg")
 			if bg ~= nil then
 				inst.BackgroundTransparency = bg
+				restoreProps = restoreProps or {}
+				restoreProps.BackgroundTransparency = bg
+				local restBg = inst:GetAttribute("_BaliRestBg")
+				if restBg == nil or restBg > bg + 0.01 then
+					inst:SetAttribute("_BaliRestBg", bg)
+				end
 			end
 		end
 		if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
 			local txt = inst:GetAttribute("_BaliCascadeTxt")
 			if txt ~= nil then
 				inst.TextTransparency = txt
+				restoreProps = restoreProps or {}
+				restoreProps.TextTransparency = txt
+				local restTxt = inst:GetAttribute("_BaliRestTxt")
+				if restTxt == nil or restTxt > txt + 0.01 then
+					inst:SetAttribute("_BaliRestTxt", txt)
+				end
 			end
 		elseif inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
 			local img = inst:GetAttribute("_BaliCascadeImg")
 			if img ~= nil then
 				inst.ImageTransparency = img
+				restoreProps = restoreProps or {}
+				restoreProps.ImageTransparency = img
+				local restImg = inst:GetAttribute("_BaliRestImg")
+				if restImg == nil or restImg > img + 0.01 then
+					inst:SetAttribute("_BaliRestImg", img)
+				end
 			end
 		elseif inst:IsA("UIStroke") then
 			local str = inst:GetAttribute("_BaliCascadeStroke")
 			if str ~= nil then
 				inst.Transparency = str
+				restoreProps = restoreProps or {}
+				restoreProps.Transparency = str
+				local restStr = inst:GetAttribute("_BaliRestStr")
+				if restStr == nil or restStr > str + 0.01 then
+					inst:SetAttribute("_BaliRestStr", str)
+				end
+			end
+		end
+		if restoreProps and next(restoreProps) ~= nil and not Tween.Reduced then
+			Tween.Play(inst, restoreProps, Tween.Instant)
+		end
+		return true
+	end
+	local function walkRestore(node, inCascadingSubtree)
+		local active = restoreInst(node, inCascadingSubtree)
+		for _, child in ipairs(node:GetChildren()) do
+			if child.Name ~= "_BaliRippleWash" then
+				walkRestore(child, active)
 			end
 		end
 	end
-	restoreInst(container)
-	for _, desc in ipairs(container:GetDescendants()) do
-		restoreInst(desc)
-	end
+	walkRestore(container, container:GetAttribute("_BaliCascading") == true)
 end
 
 return Transition
@@ -22857,6 +22989,9 @@ function Tab.new(window, options)
 	self:SetCompact(self._compact, true)
 
 	maid:Give(button.MouseEnter:Connect(function()
+		if not window._visible or window._morphing or window._unloading or window._destroyed then
+			return
+		end
 		if not self.Selected and not Transition.IsOverlayBlocking(button) then
 			Tween.Play(button, { BackgroundTransparency = 0.55 }, Tween.Instant)
 			if self._iconInst then
@@ -22877,7 +23012,7 @@ function Tab.new(window, options)
 	end))
 
 	maid:Give(button.Activated:Connect(function(input)
-		if Transition.IsOverlayBlocking(button) then
+		if not window._visible or window._morphing or window._unloading or window._destroyed or Transition.IsOverlayBlocking(button) then
 			return
 		end
 		Transition.Ripple(button, input, "Accent")
@@ -22995,9 +23130,13 @@ function Tab:_setActiveVisual(active, instant)
 		self:_syncSubTabIndicator(instant)
 	end
 	self.Page.Visible = active
-	if active and not instant then
+	if active then
 		local activeScroll = self.ActiveSubTab and self.ActiveSubTab.Scroll or self._defaultFlow.Scroll
-		Transition.Cascade(activeScroll, 0.018, 12, 10)
+		if instant then
+			Transition.RestoreCascade(activeScroll)
+		else
+			Transition.Cascade(activeScroll, 0.018, 12, 10)
+		end
 	end
 end
 
@@ -23046,7 +23185,7 @@ function Tab:AddSection(options)
 	return self._defaultFlow.AddSection(options)
 end
 
-function Tab:SelectSubTab(subTab)
+function Tab:SelectSubTab(subTab, instant)
 	if type(subTab) == "string" then
 		for _, candidate in ipairs(self.SubTabs) do
 			if candidate.Title == subTab then
@@ -23061,7 +23200,8 @@ function Tab:SelectSubTab(subTab)
 		return
 	end
 
-	if self.ActiveSubTab == subTab then
+	local effectiveInstant = instant == true or (self.Window ~= nil and (not self.Window._visible or self.Window._morphing or self.Window._unloading))
+	if self.ActiveSubTab == subTab and not effectiveInstant then
 		return
 	end
 
@@ -23092,8 +23232,12 @@ function Tab:SelectSubTab(subTab)
 	end
 
 	self.ActiveSubTab = subTab
-	Transition.Cascade(subTab.Scroll, 0.018, 12, dir * 12)
-	self:_syncSubTabIndicator(false)
+	if effectiveInstant then
+		Transition.RestoreCascade(subTab.Scroll)
+	else
+		Transition.Cascade(subTab.Scroll, 0.018, 12, dir * 12)
+	end
+	self:_syncSubTabIndicator(effectiveInstant)
 
 	if self.Window and self.Window.ActiveTab == self then
 		self.Window:_updateBreadcrumb()
@@ -23191,7 +23335,7 @@ function Tab:AddSubTab(options)
 	Theme.Bind(subBtn, { BackgroundColor3 = "Tile" })
 	local subHovered = false
 	self.Maid:Give(subBtn.MouseEnter:Connect(function()
-		if self.ActiveSubTab == subTab or Util.IsTouchDevice() or Transition.IsOverlayBlocking(subBtn) then
+		if (self.Window and (not self.Window._visible or self.Window._morphing or self.Window._unloading or self.Window._destroyed)) or self.ActiveSubTab == subTab or Util.IsTouchDevice() or Transition.IsOverlayBlocking(subBtn) then
 			return
 		end
 		subHovered = true
@@ -23207,7 +23351,7 @@ function Tab:AddSubTab(options)
 	end))
 
 	self.Maid:Give(subBtn.Activated:Connect(function()
-		if Transition.IsOverlayBlocking(subBtn) then
+		if (self.Window and (not self.Window._visible or self.Window._morphing or self.Window._unloading or self.Window._destroyed)) or Transition.IsOverlayBlocking(subBtn) then
 			return
 		end
 		if subHovered then
@@ -24896,6 +25040,9 @@ function Window:AddTab(options)
 end
 
 function Window:SelectTab(tab, instant)
+	if self._destroyed or self._unloading then
+		return nil
+	end
 	if type(tab) == "string" then
 		for _, candidate in ipairs(self.Tabs) do
 			if candidate.Title == tab then
@@ -24910,13 +25057,14 @@ function Window:SelectTab(tab, instant)
 		return nil
 	end
 
-	if self.ActiveTab == tab and not instant then
+	local effectiveInstant = instant == true or (not self._visible) or self._morphing
+	if self.ActiveTab == tab and not effectiveInstant then
 		return tab
 	end
 
 	self:ClosePopup()
 	for _, candidate in ipairs(self.Tabs) do
-		candidate:_setActiveVisual(candidate == tab, instant == true)
+		candidate:_setActiveVisual(candidate == tab, effectiveInstant)
 	end
 	self.ActiveTab = tab
 	self:_updateBreadcrumb()
@@ -25066,6 +25214,13 @@ function Window:SetVisible(visible)
 	if not visible then
 		self:ClosePopup()
 		CommandPalette.Close()
+		if self.ActiveTab then
+			Transition.RestoreCascade(self.ActiveTab.Page)
+			local activeScroll = self.ActiveTab.ActiveSubTab and self.ActiveTab.ActiveSubTab.Scroll or (self.ActiveTab._defaultFlow and self.ActiveTab._defaultFlow.Scroll)
+			if activeScroll then
+				Transition.RestoreCascade(activeScroll)
+			end
+		end
 
 		if not self._morphing then
 			self._restorePos = wrapper.Position

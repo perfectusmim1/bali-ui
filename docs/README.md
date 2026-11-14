@@ -4,8 +4,6 @@
 
 > **Published GitBook:** [bali-2.gitbook.io/bali-docs](https://bali-2.gitbook.io/bali-docs/)
 
-![Bali Suite Showcase](assets/promo-hero.png)
-
 ---
 
 ## Why Bali?
@@ -15,18 +13,6 @@
 - **164 Bundled Lucide Icons**: Self-contained `1024x704` sprite sheet hydrated cleanly into executor asset APIs, with sharp monochrome glyph fallbacks inside sandboxed environments like Roblox Studio.
 - **7 Built-in Themes & Live Customization**: Switch live between `Midnight`, `Ocean`, `Graphite`, `Aurora`, `Sunset`, `Emerald`, and `Light`, override accents dynamically, or register custom themes.
 - **Full Control & Telemetry Suite**: Buttons (with `Confirm` guards), Toggles with inline keybinds, Checkboxes, Sliders, RangeSliders, Steppers, Masked/Numeric Inputs, Segmented controls, Searchable Single/Multi Dropdowns, HSV + Alpha + Rainbow ColorPicker, StatCards with Sparklines, live Line/Bar Charts, ProgressBars, searchable Tables, and CardGrids.
-
----
-
-## Visual Tour
-
-### Real-Time Telemetry & Endpoint Grids
-
-![Bali Telemetry & Endpoint Matrix](assets/promo-analytics.png)
-
-### Live Multi-Theme Engine (`Midnight` & `Ocean`)
-
-![Bali Dual Theme Showcase](assets/promo-themes.png)
 
 ---
 
