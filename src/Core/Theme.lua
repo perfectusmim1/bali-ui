@@ -8,6 +8,7 @@
 	  function(t)  -> computed from the active theme table
 ]]
 
+local Assets = require("Core/Assets")
 local Tween = require("Core/Tween")
 local Signal = require("Core/Signal")
 
@@ -15,7 +16,7 @@ local Theme = {}
 
 local rgb = Color3.fromRGB
 
-Theme.Fonts = {
+Theme.BuiltInFonts = {
 	Gotham = "rbxasset://fonts/families/GothamSSm.json",
 	Builder = "rbxasset://fonts/families/BuilderSans.json",
 	Montserrat = "rbxasset://fonts/families/Montserrat.json",
@@ -23,6 +24,8 @@ Theme.Fonts = {
 	Nunito = "rbxasset://fonts/families/Nunito.json",
 	Mono = "rbxasset://fonts/families/RobotoMono.json",
 }
+Theme.Fonts = table.clone(Theme.BuiltInFonts)
+Theme.OnDeviceFonts = true
 Theme.FontOrder = { "Builder", "Gotham", "Montserrat", "Ubuntu", "Nunito" }
 Theme.FontFamily = "Builder"
 
@@ -206,14 +209,31 @@ Theme.Changed = Signal.new()
 local bindings = {} -- [Instance] = { [property] = key }
 local destroyHooks = {}
 
+function Theme.GetFontAsset(family)
+	local key = family or Theme.FontFamily
+	if Theme.OnDeviceFonts and Assets.GetFontFamily then
+		local onDevice = Assets.GetFontFamily(key)
+		if type(onDevice) == "string" and onDevice ~= "" then
+			return onDevice
+		end
+	end
+	return Theme.BuiltInFonts[key] or Theme.Fonts[key] or Theme.BuiltInFonts.Gotham
+end
+
+function Theme.SyncOnDeviceFonts()
+	for key in pairs(Theme.BuiltInFonts) do
+		Theme.Fonts[key] = Theme.GetFontAsset(key)
+	end
+end
+
 function Theme.Font(weight)
-	local family = Theme.Fonts[Theme.FontFamily] or Theme.Fonts.Gotham
+	local family = Theme.GetFontAsset(Theme.FontFamily)
 	local enumWeight = Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular
 	return Font.new(family, enumWeight, Enum.FontStyle.Normal)
 end
 
 function Theme.Mono(weight)
-	return Font.new(Theme.Fonts.Mono, Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular)
+	return Font.new(Theme.GetFontAsset("Mono"), Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular)
 end
 
 function Theme.Resolve(key)
@@ -366,12 +386,30 @@ function Theme.SetValue(key, value, animate)
 end
 
 function Theme.SetFont(family)
-	if not Theme.Fonts[family] then
+	if not Theme.BuiltInFonts[family] and not Theme.Fonts[family] then
 		return false
 	end
 	Theme.FontFamily = family
+	Theme.SyncOnDeviceFonts()
 	refresh(false)
 	return true
+end
+
+function Theme.SetOnDeviceFonts(enabled)
+	Theme.OnDeviceFonts = enabled == true
+	Theme.SyncOnDeviceFonts()
+	refresh(false)
+	if Theme.OnDeviceFonts and Assets.LoadFontsAsync then
+		Assets.LoadFontsAsync({ Theme.FontFamily, "Builder", "Gotham", "Mono" })
+	end
+	return Theme.OnDeviceFonts
+end
+
+Assets.OnFontsUpdated = function(familyName)
+	Theme.SyncOnDeviceFonts()
+	if Theme.OnDeviceFonts and (familyName == Theme.FontFamily or familyName == "Mono") then
+		refresh(false)
+	end
 end
 
 return Theme

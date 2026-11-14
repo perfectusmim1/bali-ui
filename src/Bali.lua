@@ -99,6 +99,7 @@ local Bali = {
 	_notifyReady = false,
 	_destroyed = false,
 	_destroying = false,
+	StealthMode = true,
 }
 
 if type(Util.Env) == "table" then
@@ -144,9 +145,10 @@ local function getGuiContainers()
 	local containers = {}
 	local seen = {}
 	local function pushContainer(inst)
-		if typeof(inst) == "Instance" and not seen[inst] then
-			seen[inst] = true
-			table.insert(containers, inst)
+		local safe = Util.CloneRef(inst)
+		if typeof(safe) == "Instance" and not seen[safe] then
+			seen[safe] = true
+			table.insert(containers, safe)
 		end
 	end
 
@@ -161,15 +163,7 @@ local function getGuiContainers()
 		return Services.CoreGui
 	end)
 	if okCore and typeof(coreGui) == "Instance" then
-		local canParent = pcall(function()
-			local probe = Instance.new("Folder")
-			probe.Name = "_BaliProbe"
-			probe.Parent = coreGui
-			probe:Destroy()
-		end)
-		if canParent then
-			pushContainer(coreGui)
-		end
+		pushContainer(coreGui)
 	end
 
 	local okPlayer, localPlayer = pcall(function()
@@ -183,12 +177,17 @@ local function getGuiContainers()
 	return containers
 end
 
-local function getSafeGuiParent()
-	local containers = getGuiContainers()
-	return containers[1]
-end
-
 local function cleanupOrphanGuis(excludeGui)
+	local prevStealthGui = Util.Global("_BaliScreenGui")
+	if typeof(prevStealthGui) == "Instance" and prevStealthGui ~= excludeGui then
+		pcall(function()
+			prevStealthGui:Destroy()
+		end)
+		if type(Util.Env) == "table" then
+			Util.Env._BaliScreenGui = nil
+		end
+	end
+
 	for _, container in ipairs(getGuiContainers()) do
 		pcall(function()
 			for _, child in ipairs(container:GetChildren()) do
@@ -199,6 +198,16 @@ local function cleanupOrphanGuis(excludeGui)
 				end
 			end
 		end)
+	end
+
+	local prevBlur = Util.Global("_BaliBlurEffect")
+	if typeof(prevBlur) == "Instance" then
+		pcall(function()
+			prevBlur:Destroy()
+		end)
+		if type(Util.Env) == "table" then
+			Util.Env._BaliBlurEffect = nil
+		end
 	end
 
 	pcall(function()
@@ -223,27 +232,31 @@ function Bali:_ensureScreenGui()
 
 	cleanupOrphanGuis(nil)
 
-	local parent = getSafeGuiParent()
-	assert(typeof(parent) == "Instance", "[Bali] Unable to locate gethui, CoreGui, or PlayerGui")
+	local containers = getGuiContainers()
+	assert(#containers > 0, "[Bali] Unable to locate gethui, CoreGui, or PlayerGui")
 
 	local gui = Instance.new("ScreenGui")
-	gui.Name = "BaliUI"
+	gui.Name = self.StealthMode and Util.RandomString(10) or "BaliUI"
 	gui.IgnoreGuiInset = true
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.DisplayOrder = 100
 
-	local parented = pcall(function()
-		gui.Parent = parent
-	end)
-	if not parented or not gui.Parent then
-		local okLp, lp = pcall(function()
-			return Services.Players.LocalPlayer
+	Util.ProtectGui(gui)
+
+	for _, candidate in ipairs(containers) do
+		local okParent = pcall(function()
+			gui.Parent = candidate
 		end)
-		local pg = okLp and lp and lp:FindFirstChildOfClass("PlayerGui")
-		if pg then
-			gui.Parent = pg
+		if okParent and gui.Parent then
+			break
 		end
+	end
+
+	assert(gui.Parent ~= nil, "[Bali] Unable to parent ScreenGui into gethui, CoreGui, or PlayerGui")
+
+	if type(Util.Env) == "table" then
+		Util.Env._BaliScreenGui = gui
 	end
 
 	self._screenGui = gui
@@ -417,6 +430,17 @@ function Bali:SetFont(family)
 	return Theme.SetFont(family)
 end
 
+function Bali:SetOnDeviceFonts(enabled)
+	return Theme.SetOnDeviceFonts(enabled)
+end
+
+function Bali:SetStealthMode(enabled)
+	local state = enabled == true
+	self.StealthMode = state
+	Icons.StealthMode = state
+	return state
+end
+
 function Bali:SetAutoSave(enabled)
 	return Config.SetAutoSave(enabled)
 end
@@ -484,8 +508,13 @@ function Bali:Destroy()
 	if Util.ErrorHandler == handleRuntimeError then
 		Util.ErrorHandler = nil
 	end
-	if type(Util.Env) == "table" and Util.Env._BaliInstance == self then
-		Util.Env._BaliInstance = nil
+	if type(Util.Env) == "table" then
+		if Util.Env._BaliInstance == self then
+			Util.Env._BaliInstance = nil
+		end
+		if Util.Env._BaliScreenGui == self._screenGui then
+			Util.Env._BaliScreenGui = nil
+		end
 	end
 
 	self._destroying = false

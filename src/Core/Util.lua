@@ -289,12 +289,16 @@ end
 -- ─── Executor shims ──────────────────────────────────────────────────────────
 
 local env = (typeof(getgenv) == "function" and getgenv()) or _G
+local _fenv = typeof(getfenv) == "function" and getfenv(1) or nil
 Util.Env = env
 
 function Util.Global(name)
 	local value = env[name]
 	if value == nil then
 		value = rawget(_G, name)
+	end
+	if value == nil and type(_fenv) == "table" then
+		value = _fenv[name]
 	end
 	return value
 end
@@ -327,7 +331,7 @@ function Util.ExtractInviteCode(raw)
 	return s:match("([^/]+)$") or s
 end
 
-function Util.HttpGet(url, acceptJson)
+function Util.HttpGet(url, acceptJson, noGameFallback)
 	local headers = { ["User-Agent"] = "Mozilla/5.0" }
 	if acceptJson ~= false then
 		headers["Accept"] = "application/json"
@@ -356,6 +360,10 @@ function Util.HttpGet(url, acceptJson)
 		end
 	end
 
+	if noGameFallback then
+		return nil, 0
+	end
+
 	local ok, body = pcall(function()
 		return game:HttpGet(url)
 	end)
@@ -363,6 +371,147 @@ function Util.HttpGet(url, acceptJson)
 		return body, 200
 	end
 	return nil, 0
+end
+
+function Util.CloneRef(instance)
+	if instance == nil then
+		return nil
+	end
+	local cloneFn = Util.Global("cloneref")
+	if type(cloneFn) == "function" then
+		local ok, cloned = pcall(cloneFn, instance)
+		if ok and cloned ~= nil then
+			return cloned
+		end
+	end
+	return instance
+end
+
+function Util.ProtectGui(gui)
+	if gui == nil then
+		return false
+	end
+	local synTbl = Util.Global("syn")
+	local protectFn = (type(synTbl) == "table" and synTbl.protect_gui)
+		or Util.Global("protect_gui")
+		or Util.Global("protectgui")
+	if type(protectFn) == "function" then
+		local ok = pcall(protectFn, gui)
+		return ok
+	end
+	return false
+end
+
+function Util.ConstantTimeEquals(a, b)
+	if type(a) ~= "string" or type(b) ~= "string" then
+		return false
+	end
+	local lenA, lenB = #a, #b
+	local diff = bit32.bxor(lenA, lenB)
+	local maxLen = math.max(lenA, lenB)
+	local byte = string.byte
+	for i = 1, maxLen do
+		local ca = i <= lenA and byte(a, i) or 0
+		local cb = i <= lenB and byte(b, i) or 0
+		diff = bit32.bor(diff, bit32.bxor(ca, cb))
+	end
+	return diff == 0
+end
+
+-- Deterministic 256-bit keyed digest (8 independent 32-bit avalanche lanes -> 64 hex chars)
+function Util.HashKey(input, salt)
+	local text = tostring(salt or "BaliKeySalt_v1") .. "\0" .. tostring(input or "")
+	local lanes = {
+		0x811c9dc5, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35,
+		0x27d4eb2f, 0x165667b1, 0x5bd1e995, 0x6c62272e,
+	}
+	local bxor = bit32.bxor
+	local lrot = bit32.lrotate
+	local rshift = bit32.rshift
+	local band = bit32.band
+	local byte = string.byte
+
+	for i = 1, #text do
+		local b = byte(text, i)
+		for lane = 1, 8 do
+			local h = bxor(lanes[lane], b + i * (lane * 17))
+			h = band(h * 0x01000193, 0xFFFFFFFF)
+			h = bxor(lrot(h, (lane * 5 + i) % 31 + 1), rshift(h, (lane % 7) + 3))
+			lanes[lane] = band(h + lanes[((lane % 8) + 1)], 0xFFFFFFFF)
+		end
+	end
+
+	-- Cross-lane finalization rounds
+	for round = 1, 4 do
+		for lane = 1, 8 do
+			local prev = lanes[((lane + 6) % 8) + 1]
+			local h = bxor(lanes[lane], rshift(prev, 13))
+			h = bxor(lrot(h, 7 + round), prev)
+			h = band(h * 0x85ebca6b, 0xFFFFFFFF)
+			lanes[lane] = bxor(h, rshift(h, 16))
+		end
+	end
+
+	local out = table.create(8)
+	for lane = 1, 8 do
+		out[lane] = string.format("%08x", lanes[lane])
+	end
+	return table.concat(out)
+end
+
+function Util.SanitizeKeyInput(text, maxLen)
+	local s = tostring(text or "")
+	s = string.gsub(s, "%c", "")
+	s = Util.Trim(s)
+	local cap = tonumber(maxLen) or 128
+	if #s > cap then
+		s = string.sub(s, 1, cap)
+	end
+	return s
+end
+
+local _corePcall = pcall
+local _coreRawequal = rawequal
+local _coreTostring = tostring
+local _coreByte = string.byte
+local _coreBxor = bit32.bxor
+local _coreClock = os.clock
+
+function Util.VerifyIntegrity()
+	if not _coreRawequal(pcall, _corePcall)
+		or not _coreRawequal(rawequal, _coreRawequal)
+		or not _coreRawequal(tostring, _coreTostring)
+		or not _coreRawequal(string.byte, _coreByte)
+		or not _coreRawequal(bit32.bxor, _coreBxor)
+		or not _coreRawequal(os.clock, _coreClock)
+	then
+		return false, "Runtime primitive mismatch detected"
+	end
+
+	local isLuaFn = Util.Global("islclosure")
+	local isCFn = Util.Global("iscclosure")
+	local coreList = { _corePcall, _coreRawequal, _coreTostring, _coreByte, _coreBxor, _coreClock }
+	for _, fn in ipairs(coreList) do
+		if type(isLuaFn) == "function" then
+			local ok, hooked = _corePcall(isLuaFn, fn)
+			if ok and hooked == true then
+				return false, "Hooked core primitive detected"
+			end
+		end
+		if type(isCFn) == "function" then
+			local ok, native = _corePcall(isCFn, fn)
+			if ok and native == false then
+				return false, "Non-C core primitive detected"
+			end
+		end
+		if type(debug) == "table" and type(debug.info) == "function" then
+			local ok, src = _corePcall(debug.info, fn, "s")
+			if ok and src ~= nil and src ~= "[C]" then
+				return false, "Tampered primitive source detected"
+			end
+		end
+	end
+	return true
 end
 
 Util.FS = {

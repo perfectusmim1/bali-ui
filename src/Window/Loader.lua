@@ -57,21 +57,23 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 	constraint.Parent = container
 
 	local shadowDesc = Assets.Shadow()
-	Create.New("ImageLabel", {
-		Name = "Shadow",
-		Image = shadowDesc.Image,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = shadowDesc.Slice,
-		Position = UDim2.fromOffset(-shadowDesc.Inset, -shadowDesc.Inset + 6),
-		Size = UDim2.new(1, shadowDesc.Inset * 2, 1, shadowDesc.Inset * 2),
-		BackgroundTransparency = 1,
-		Theme = {
-			ImageColor3 = "Shadow",
-			ImageTransparency = "ShadowTransparency",
-		},
-		ZIndex = 1,
-		Parent = container,
-	})
+	if shadowDesc and shadowDesc.Image and shadowDesc.Image ~= "" then
+		Create.New("ImageLabel", {
+			Name = "Shadow",
+			Image = shadowDesc.Image,
+			ScaleType = Enum.ScaleType.Slice,
+			SliceCenter = shadowDesc.Slice,
+			Position = UDim2.fromOffset(-shadowDesc.Inset, -shadowDesc.Inset + 6),
+			Size = UDim2.new(1, shadowDesc.Inset * 2, 1, shadowDesc.Inset * 2),
+			BackgroundTransparency = 1,
+			Theme = {
+				ImageColor3 = "Shadow",
+				ImageTransparency = "ShadowTransparency",
+			},
+			ZIndex = 1,
+			Parent = container,
+		})
+	end
 
 	local card = Create.New("Frame", {
 		Name = "GlassCard",
@@ -490,6 +492,8 @@ function Loader.KeySystem(parentGui, options)
 		Icon = "key",
 		Key = nil,
 		Keys = nil,
+		KeyHashes = nil,
+		KeySalt = nil,
 		Verify = nil,
 		CheckKey = nil,
 		Callback = nil,
@@ -525,9 +529,13 @@ function Loader.KeySystem(parentGui, options)
 
 	local customVerify = options.Verify or options.CheckKey or options.Callback
 	local function verifyKey(candidate)
-		candidate = Util.Trim(candidate or "")
+		candidate = Util.SanitizeKeyInput(candidate, 128)
 		if candidate == "" then
 			return false, "Please enter a key."
+		end
+		local okInt, intMsg = Util.VerifyIntegrity()
+		if not okInt then
+			return false, intMsg or "Integrity check failed."
 		end
 		if type(customVerify) == "function" then
 			local ok, result, message = pcall(customVerify, candidate)
@@ -539,17 +547,27 @@ function Loader.KeySystem(parentGui, options)
 			end
 			return false, tostring(message or "Invalid key. Please try again.")
 		end
+		local hashList = options.KeyHashes
+		if type(hashList) == "table" and #hashList > 0 then
+			local candidateHash = string.lower(Util.HashKey(candidate, options.KeySalt))
+			for _, validHash in ipairs(hashList) do
+				if Util.ConstantTimeEquals(candidateHash, string.lower(tostring(validHash))) then
+					return true
+				end
+			end
+			return false, "Invalid key. Please try again."
+		end
 		local list = options.Keys
 		if type(list) == "table" then
 			for _, valid in ipairs(list) do
-				if tostring(valid) == candidate then
+				if Util.ConstantTimeEquals(candidate, tostring(valid)) then
 					return true
 				end
 			end
 			return false, "Invalid key. Please try again."
 		end
 		if options.Key ~= nil then
-			if tostring(options.Key) == candidate then
+			if Util.ConstantTimeEquals(candidate, tostring(options.Key)) then
 				return true
 			end
 			return false, "Invalid key. Please try again."
@@ -587,6 +605,7 @@ function Loader.KeySystem(parentGui, options)
 	local masked = false
 	local attemptsLeft = math.max(0, tonumber(options.MaxAttempts) or 5)
 	local cooldownUntil = 0
+	local cooldownTriggers = 0
 
 	local vp = parentGui.AbsoluteSize
 	local useWide = vp.X <= 0 or vp.X >= 680
@@ -625,21 +644,23 @@ function Loader.KeySystem(parentGui, options)
 	})
 
 	local shadowDesc = Assets.Shadow()
-	Create.New("ImageLabel", {
-		Name = "Shadow",
-		Image = shadowDesc.Image,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = shadowDesc.Slice,
-		Position = UDim2.fromOffset(-shadowDesc.Inset, -shadowDesc.Inset + 8),
-		Size = UDim2.new(1, shadowDesc.Inset * 2, 1, shadowDesc.Inset * 2),
-		BackgroundTransparency = 1,
-		Theme = {
-			ImageColor3 = "Shadow",
-			ImageTransparency = "ShadowTransparency",
-		},
-		ZIndex = 1,
-		Parent = container,
-	})
+	if shadowDesc and shadowDesc.Image and shadowDesc.Image ~= "" then
+		Create.New("ImageLabel", {
+			Name = "Shadow",
+			Image = shadowDesc.Image,
+			ScaleType = Enum.ScaleType.Slice,
+			SliceCenter = shadowDesc.Slice,
+			Position = UDim2.fromOffset(-shadowDesc.Inset, -shadowDesc.Inset + 8),
+			Size = UDim2.new(1, shadowDesc.Inset * 2, 1, shadowDesc.Inset * 2),
+			BackgroundTransparency = 1,
+			Theme = {
+				ImageColor3 = "Shadow",
+				ImageTransparency = "ShadowTransparency",
+			},
+			ZIndex = 1,
+			Parent = container,
+		})
+	end
 
 	local mainCard = Create.New("Frame", {
 		Name = "GlassCard",
@@ -1577,7 +1598,13 @@ function Loader.KeySystem(parentGui, options)
 		end
 		local str = tostring(iconSrc)
 		if tonumber(str) then
+			if Icons.StealthMode and not Icons.AllowRemoteAssets then
+				return
+			end
 			str = "rbxassetid://" .. str
+		end
+		if (string.find(str, "^rbxassetid://") or string.find(str, "^rbxthumb://")) and Icons.StealthMode and not Icons.AllowRemoteAssets then
+			return
 		end
 		if str:find("://") and not str:find("^https?://") then
 			dcImg.Image = str
@@ -2021,7 +2048,7 @@ function Loader.KeySystem(parentGui, options)
 			Transition.Ripple(verifyBtn, input, "AccentText")
 		end
 		verifyLabel.Text = "Verifying..."
-		local entered = Util.Trim(keyBox.Text)
+		local entered = Util.SanitizeKeyInput(keyBox.Text, 128)
 
 		task.spawn(function()
 			local ok, message = verifyKey(entered)
@@ -2052,7 +2079,10 @@ function Loader.KeySystem(parentGui, options)
 				if (tonumber(options.MaxAttempts) or 0) > 0 then
 					attemptsLeft = math.max(attemptsLeft - 1, 0)
 					if attemptsLeft <= 0 then
-						cooldownUntil = os.clock() + (tonumber(options.Cooldown) or 8)
+						cooldownTriggers += 1
+						local baseCooldown = tonumber(options.Cooldown) or 8
+						local waitSec = baseCooldown * (2 ^ math.min(cooldownTriggers - 1, 4))
+						cooldownUntil = os.clock() + waitSec
 						attemptsLeft = tonumber(options.MaxAttempts) or 5
 						attemptsLabel.Text = "Cooldown..."
 					else

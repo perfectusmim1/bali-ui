@@ -7,7 +7,10 @@ local Assets = require("Core/Assets")
 local Theme = require("Core/Theme")
 local Create = require("Core/Create")
 
-local Icons = {}
+local Icons = {
+	StealthMode = true,
+	AllowRemoteAssets = false,
+}
 
 local glyphs = {
 	check = "✓",
@@ -32,11 +35,20 @@ local glyphs = {
 }
 local glyphRotation = { ["chevron-down"] = 90, ["chevron-up"] = -90 }
 
-local function isAssetString(text)
-	return string.find(text, "^rbxasset") ~= nil
-		or string.find(text, "^rbxthumb") ~= nil
-		or string.find(text, "^https?://") ~= nil
+local function isLocalAsset(text)
+	return string.find(text, "^rbxasset://") ~= nil
+end
+
+local function isRemoteRobloxAsset(text)
+	return string.find(text, "^rbxassetid://") ~= nil
+		or string.find(text, "^rbxthumb://") ~= nil
 		or string.find(text, "^%d+$") ~= nil
+end
+
+local function isAssetString(text)
+	return isLocalAsset(text)
+		or isRemoteRobloxAsset(text)
+		or string.find(text, "^https?://") ~= nil
 end
 
 -- Returns a descriptor table or nil when no icon was requested
@@ -45,10 +57,24 @@ function Icons.Resolve(icon)
 		return nil
 	end
 	if type(icon) == "number" then
+		if Icons.StealthMode and not Icons.AllowRemoteAssets then
+			return {
+				Kind = "Glyph",
+				Text = glyphs.circle,
+				Rotation = 0,
+			}
+		end
 		return { Kind = "Asset", Image = "rbxassetid://" .. icon }
 	end
 	icon = tostring(icon)
 	if isAssetString(icon) then
+		if isRemoteRobloxAsset(icon) and Icons.StealthMode and not Icons.AllowRemoteAssets then
+			return {
+				Kind = "Glyph",
+				Text = glyphs.circle,
+				Rotation = 0,
+			}
+		end
 		if string.find(icon, "^%d+$") then
 			icon = "rbxassetid://" .. icon
 		end

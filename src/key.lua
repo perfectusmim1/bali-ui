@@ -9,8 +9,11 @@ local Config = {
 	DiscordName    = "Bali Community",
 	DiscordInvite  = "e9CScDQSv",
 	DiscordGuildId = "", -- Optional fallback Server ID for Discord widget JSON if invite expires
-	DiscordIcon    = "", -- Server icon ("rbxassetid://..." or leave blank to auto-fetch from Discord)
+	DiscordIcon    = "", -- Server icon URL (or local rbxasset:// asset; remote Roblox asset IDs require AllowRemoteAssets=true)
+	AllowRemoteAssets = false,
 	Keys           = { "BALI-2026-PRO", "BALI-FREE-KEY", "test" },
+	KeyHashes      = {}, -- Optional SHA-style 64-hex hashes generated via Bali.Util.HashKey(key, Config.KeySalt)
+	KeySalt        = "BaliKeySalt_v1",
 	ValidateKey    = nil, -- function(key) return true/false, "message" end  (custom API check)
 	SupportedGames = {    -- PlaceId or GameId (universe) = name
 		[2753915549] = "Blox Fruits",
@@ -35,17 +38,33 @@ local Config = {
 }
 
 ---------------------------------------------------------------------
--- SERVICES
+-- SERVICES & STEALTH PRIMITIVES
 ---------------------------------------------------------------------
-local Players            = game:GetService("Players")
-local TweenService       = game:GetService("TweenService")
-local UIS                = game:GetService("UserInputService")
-local RunService         = game:GetService("RunService")
-local HttpService        = game:GetService("HttpService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local GuiService         = game:GetService("GuiService")
-local CoreGui            = game:GetService("CoreGui")
+local _cloneref = typeof(cloneref) == "function" and cloneref or function(o) return o end
+local function getSvc(name)
+	return _cloneref(game:GetService(name))
+end
+
+local Players            = getSvc("Players")
+local TweenService       = getSvc("TweenService")
+local UIS                = getSvc("UserInputService")
+local RunService         = getSvc("RunService")
+local HttpService        = getSvc("HttpService")
+local MarketplaceService = getSvc("MarketplaceService")
+local GuiService         = getSvc("GuiService")
+local CoreGui            = getSvc("CoreGui")
 local LocalPlayer        = Players.LocalPlayer
+
+local _pcall, _rawequal, _tostring, _byte, _bxor, _clock = pcall, rawequal, tostring, string.byte, bit32.bxor, os.clock
+local function randomString(len)
+	local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	local out = table.create(len)
+	for i = 1, len do
+		local idx = math.random(1, #chars)
+		out[i] = string.sub(chars, idx, idx)
+	end
+	return table.concat(out)
+end
 
 local W, H = 640, 380
 local UI = {}
@@ -121,6 +140,105 @@ local Hooks = {}
 ---------------------------------------------------------------------
 local R, M, S, B = Enum.FontWeight.Regular, Enum.FontWeight.Medium, Enum.FontWeight.SemiBold, Enum.FontWeight.Bold
 local FONT = "rbxasset://fonts/families/GothamSSm.json"
+local FontTargets = setmetatable({}, { __mode = "k" })
+
+local function getAssetFn()
+	return getcustomasset or getsynasset
+end
+
+local function execFetchBytes(url)
+	local req = (syn and syn.request) or (http and http.request) or http_request or request or (fluxus and fluxus.request)
+	if type(req) ~= "function" then return nil end
+	local ok, res = pcall(req, { Url = url, Method = "GET", Headers = { ["User-Agent"] = "Mozilla/5.0" } })
+	if ok and type(res) == "table" and type(res.Body) == "string" and #res.Body > 64 then
+		local code = tonumber(res.StatusCode or res.status_code)
+		if (res.Success == nil or res.Success == true) and (not code or (code >= 200 and code < 300)) then
+			return res.Body
+		end
+	end
+	return nil
+end
+
+local function isValidFontBytes(bytes)
+	if type(bytes) ~= "string" or #bytes < 64 then return false end
+	local sig = string.sub(bytes, 1, 4)
+	return sig == "\000\001\000\000" or sig == "OTTO" or sig == "true" or sig == "ttcf"
+end
+
+local function refreshKeyFonts()
+	for obj, weight in pairs(FontTargets) do
+		if obj and obj.Parent then
+			pcall(function() obj.FontFace = Font.new(FONT, weight or R) end)
+		end
+	end
+end
+
+local function initOnDeviceFont()
+	local getAsset = getAssetFn()
+	if not canFile or type(getAsset) ~= "function" then return end
+	local folder = "Bali/Fonts"
+	local weights = {
+		{ Name = "Regular",  Weight = 400, Url = "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf" },
+		{ Name = "Medium",   Weight = 500, Url = "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuI6fMZg.ttf" },
+		{ Name = "SemiBold", Weight = 600, Url = "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf" },
+		{ Name = "Bold",     Weight = 700, Url = "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYMZg.ttf" },
+	}
+	local function buildCachedFamily()
+		local items = {}
+		for _, meta in ipairs(weights) do
+			local p = folder .. "/KeyFont_" .. meta.Name .. ".ttf"
+			if isfile(p) then
+				local ok, id = pcall(getAsset, p)
+				if ok and type(id) == "string" and id ~= "" then
+					table.insert(items, string.format('{"name":"%s","weight":%d,"style":"normal","assetId":"%s"}', meta.Name, meta.Weight, id))
+				end
+			end
+		end
+		if #items == 0 then return false end
+		local jsonPath = folder .. "/KeyFont.json"
+		local okW = pcall(writefile, jsonPath, '{"name":"KeyFont","faces":[' .. table.concat(items, ",") .. ']}')
+		if not okW then return false end
+		local okFam, famId = pcall(getAsset, jsonPath)
+		if okFam and type(famId) == "string" and famId ~= "" then
+			FONT = famId
+			return true
+		end
+		return false
+	end
+
+	pcall(function()
+		if typeof(makefolder) == "function" then
+			if typeof(isfolder) == "function" and not isfolder("Bali") then pcall(makefolder, "Bali") end
+			if typeof(isfolder) == "function" and not isfolder(folder) then pcall(makefolder, folder) end
+		end
+	end)
+	if buildCachedFamily() then
+		return
+	end
+
+	task.spawn(function()
+		local downloaded = false
+		for _, meta in ipairs(weights) do
+			if not Alive then return end
+			local p = folder .. "/KeyFont_" .. meta.Name .. ".ttf"
+			if not isfile(p) then
+				local body = execFetchBytes(meta.Url)
+				if isValidFontBytes(body) then
+					pcall(writefile, p, body)
+					downloaded = true
+				end
+			else
+				downloaded = true
+			end
+		end
+		if downloaded and Alive and buildCachedFamily() then
+			refreshKeyFonts()
+		end
+	end)
+end
+
+initOnDeviceFont()
+
 local function F(w)
 	local ok, f = pcall(function() return Font.new(FONT, w or R) end)
 	if ok and f then return f end
@@ -197,6 +315,7 @@ local function label(parent, text, size, weight, colorKey, extra)
 		TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.fromOffset(120, (size or 13) + 4), Parent = parent,
 	})
 	if extra then for k, v in pairs(extra) do l[k] = v end end
+	FontTargets[l] = weight or R
 	if colorKey then bind(l, { TextColor3 = colorKey }) end
 	return l
 end
@@ -394,20 +513,28 @@ end
 ---------------------------------------------------------------------
 -- ROOT GUI
 ---------------------------------------------------------------------
-local GUI_NAME = "Bali_KeySystem"
-for _, parent in ipairs({ CoreGui, LocalPlayer:FindFirstChildOfClass("PlayerGui") }) do
-	pcall(function() local old = parent:FindFirstChild(GUI_NAME); if old then old:Destroy() end end)
+local genv = typeof(getgenv) == "function" and getgenv() or _G
+if type(genv) == "table" and typeof(genv._BaliKeySystemGui) == "Instance" then
+	pcall(function() genv._BaliKeySystemGui:Destroy() end)
+	genv._BaliKeySystemGui = nil
 end
-pcall(function() if gethui then local old = gethui():FindFirstChild(GUI_NAME); if old then old:Destroy() end end end)
+
+local GUI_NAME = randomString(12)
+for _, parent in ipairs({ CoreGui, LocalPlayer:FindFirstChildOfClass("PlayerGui") }) do
+	pcall(function() local old = parent:FindFirstChild("Bali_KeySystem"); if old then old:Destroy() end end)
+end
+pcall(function() if gethui then local old = _cloneref(gethui()):FindFirstChild("Bali_KeySystem"); if old then old:Destroy() end end end)
 
 local Gui = create("ScreenGui", {
 	Name = GUI_NAME, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, ResetOnSpawn = false,
 	IgnoreGuiInset = false, DisplayOrder = 999,
 })
-pcall(function() if syn and syn.protect_gui then syn.protect_gui(Gui) end end)
-pcall(function() if gethui then Gui.Parent = gethui() end end)
+local protectFn = (syn and syn.protect_gui) or protect_gui or protectgui
+if type(protectFn) == "function" then pcall(protectFn, Gui) end
+pcall(function() if gethui then Gui.Parent = _cloneref(gethui()) end end)
 if not Gui.Parent then pcall(function() Gui.Parent = CoreGui end) end
 if not Gui.Parent then Gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+if type(genv) == "table" then genv._BaliKeySystemGui = Gui end
 
 ---------------------------------------------------------------------
 -- TOOLTIP
@@ -612,6 +739,7 @@ do
 		PlaceholderText = "Paste your key here", ClearTextOnFocus = false, FontFace = F(M), TextSize = 14,
 		TextXAlignment = Enum.TextXAlignment.Left, ClipsDescendants = true, Parent = input,
 	})
+	FontTargets[UI.KeyBox] = M
 	bind(UI.KeyBox, { TextColor3 = "Text", PlaceholderColor3 = "Muted" })
 	UI.Mask = label(input, "", 16, B, "Text", { Position = UDim2.fromOffset(46, 0), Size = UDim2.new(1, -92, 1, 0), Visible = false })
 
@@ -1226,10 +1354,101 @@ end
 
 
 
+local function constantTimeEquals(a, b)
+	if type(a) ~= "string" or type(b) ~= "string" then return false end
+	local lenA, lenB = #a, #b
+	local diff = bit32.bxor(lenA, lenB)
+	local maxLen = math.max(lenA, lenB)
+	for i = 1, maxLen do
+		local ca = i <= lenA and _byte(a, i) or 0
+		local cb = i <= lenB and _byte(b, i) or 0
+		diff = bit32.bor(diff, bit32.bxor(ca, cb))
+	end
+	return diff == 0
+end
+
+local function hashKey(input, salt)
+	local text = tostring(salt or "BaliKeySalt_v1") .. "\0" .. tostring(input or "")
+	local lanes = {
+		0x811c9dc5, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35,
+		0x27d4eb2f, 0x165667b1, 0x5bd1e995, 0x6c62272e,
+	}
+	local lrot, rshift, band = bit32.lrotate, bit32.rshift, bit32.band
+	for i = 1, #text do
+		local b = _byte(text, i)
+		for lane = 1, 8 do
+			local h = _bxor(lanes[lane], b + i * (lane * 17))
+			h = band(h * 0x01000193, 0xFFFFFFFF)
+			h = _bxor(lrot(h, (lane * 5 + i) % 31 + 1), rshift(h, (lane % 7) + 3))
+			lanes[lane] = band(h + lanes[((lane % 8) + 1)], 0xFFFFFFFF)
+		end
+	end
+	for round = 1, 4 do
+		for lane = 1, 8 do
+			local prev = lanes[((lane + 6) % 8) + 1]
+			local h = _bxor(lanes[lane], rshift(prev, 13))
+			h = _bxor(lrot(h, 7 + round), prev)
+			h = band(h * 0x85ebca6b, 0xFFFFFFFF)
+			lanes[lane] = _bxor(h, rshift(h, 16))
+		end
+	end
+	local out = table.create(8)
+	for lane = 1, 8 do
+		out[lane] = string.format("%08x", lanes[lane])
+	end
+	return table.concat(out)
+end
+
+local function sanitizeKeyInput(text, maxLen)
+	local s = string.gsub(tostring(text or ""), "%c", "")
+	s = trim(s)
+	local cap = tonumber(maxLen) or 128
+	if #s > cap then s = string.sub(s, 1, cap) end
+	return s
+end
+
+local function verifyIntegrity()
+	if not _rawequal(pcall, _pcall)
+		or not _rawequal(rawequal, _rawequal)
+		or not _rawequal(tostring, _tostring)
+		or not _rawequal(string.byte, _byte)
+		or not _rawequal(bit32.bxor, _bxor)
+		or not _rawequal(os.clock, _clock)
+	then
+		return false, "Runtime primitive tampered"
+	end
+	for _, fn in ipairs({ _pcall, _rawequal, _tostring, _byte, _bxor, _clock }) do
+		if type(islclosure) == "function" then
+			local ok, hooked = _pcall(islclosure, fn)
+			if ok and hooked == true then return false, "Hooked core primitive detected" end
+		end
+		if type(iscclosure) == "function" then
+			local ok, native = _pcall(iscclosure, fn)
+			if ok and native == false then return false, "Non-C core primitive detected" end
+		end
+		if type(debug) == "table" and type(debug.info) == "function" then
+			local ok, src = _pcall(debug.info, fn, "s")
+			if ok and src ~= nil and src ~= "[C]" then return false, "Tampered primitive source" end
+		end
+	end
+	return true
+end
+
 local function validate(key)
+	key = sanitizeKeyInput(key, 128)
+	if key == "" then return false, "Please enter a key" end
+	local okInt, intMsg = verifyIntegrity()
+	if not okInt then return false, intMsg end
 	if Config.ValidateKey then return Config.ValidateKey(key) end
+	if type(Config.KeyHashes) == "table" and #Config.KeyHashes > 0 then
+		local digest = string.lower(hashKey(key, Config.KeySalt))
+		for _, expectedHash in ipairs(Config.KeyHashes) do
+			if constantTimeEquals(digest, string.lower(tostring(expectedHash))) then return true end
+		end
+		return false, "Invalid key"
+	end
 	for _, k in ipairs(Config.Keys) do
-		if k == key then return true end
+		if constantTimeEquals(key, tostring(k)) then return true end
 	end
 	return false, "Invalid key"
 end
@@ -1237,6 +1456,9 @@ end
 local function destroyAll()
 	Alive = false
 	for _, c in ipairs(Conns) do pcall(function() c:Disconnect() end) end
+	if type(genv) == "table" and genv._BaliKeySystemGui == Gui then
+		genv._BaliKeySystemGui = nil
+	end
 	Gui:Destroy()
 end
 
@@ -1286,10 +1508,13 @@ local function setMinimized(v)
 	end
 end
 
+local cooldownTriggers = 0
 local function startCooldown()
 	cooling = true
+	cooldownTriggers += 1
+	local duration = math.max(1, (tonumber(Config.Cooldown) or 8) * (2 ^ math.min(cooldownTriggers - 1, 4)))
 	task.spawn(function()
-		for i = Config.Cooldown, 1, -1 do
+		for i = duration, 1, -1 do
 			if not Alive then return end
 			setSubmit("arrow", "Wait " .. i .. "s", "disabled")
 			task.wait(1)
@@ -1299,11 +1524,12 @@ local function startCooldown()
 		setSubmit("arrow", "Submit", "accent")
 		setStatus("You can try again", "warning")
 	end)
+	return duration
 end
 
 local function submit()
 	if busy or verified or cooling or closing then return end
-	local key = trim(UI.KeyBox.Text)
+	local key = sanitizeKeyInput(UI.KeyBox.Text, 128)
 	if key == "" then
 		setInputStroke("Error")
 		setStatus("Please enter a key", "error")
@@ -1340,9 +1566,8 @@ local function submit()
 		if canFile then pcall(function() if isfile(Config.FileName) then delfile(Config.FileName) end end) end
 		if left <= 0 then
 			setStatus("Too many attempts", "error")
-			Notify("Slow down", "Too many invalid attempts. Wait " .. Config.Cooldown .. " seconds.", "error", 4)
-			task.wait(0.9)
-			startCooldown()
+			local waitSec = startCooldown()
+			Notify("Slow down", "Too many invalid attempts. Wait " .. waitSec .. " seconds.", "error", 4)
 		else
 			setStatus((msg or "Invalid key") .. " • " .. left .. " left", "error")
 			Notify("Invalid key", (msg or "That key is not valid.") .. " Press \"Get a key\" for a new one.", "error", 4)
@@ -1569,7 +1794,11 @@ local function setDiscordIcon(icon)
 	local iconStr = tostring(icon)
 	if iconStr == "" then return end
 	if tonumber(iconStr) then
+		if not Config.AllowRemoteAssets then return end
 		iconStr = "rbxassetid://" .. iconStr
+	end
+	if (iconStr:find("^rbxassetid://") or iconStr:find("^rbxthumb://")) and not Config.AllowRemoteAssets then
+		return
 	end
 	if iconStr:find("://") and not iconStr:find("^https?://") then
 		UI.DiscordIcon.Image = iconStr

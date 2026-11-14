@@ -2667,6 +2667,58 @@ assertTrue(
 regFlags["Pickers_Clusters"]:Close()
 stepClock(0.15, true)
 
+-- 6b. Stealth, On-Device Fonts & Key Security verification
+log("--- Testing Stealth, On-Device Fonts & Key Security ---")
+do
+	assertEq(Bali.Assets.Available, true, "Assets pipeline succeeds locally in executor mode without PreloadAsync")
+	assertTrue(services1.Lighting:FindFirstChild("BaliBlur") == nil, "Lighting never exposes static BaliBlur instance name")
+	assertTrue(mockGenv._BaliBlurEffect == nil or mockGenv._BaliBlurEffect.Name ~= "BaliBlur", "BlurEffect uses randomized Name in Lighting")
+	assertTrue(screenGui.Name ~= "BaliUI" and #screenGui.Name == 10, "Stealth ScreenGui uses randomized Name instead of static BaliUI")
+	local sh = Bali.Assets.Shadow()
+	assertTrue(sh ~= nil and not string.find(tostring(sh.Image), "rbxassetid://"), "Assets.Shadow never references foreign rbxassetid://")
+	local blockedIcon = Bali.Icons.Resolve(123456)
+	assertEq(blockedIcon and blockedIcon.Kind, "Glyph", "Icons.Resolve blocks numeric rbxassetid under StealthMode")
+	local blockedStrIcon = Bali.Icons.Resolve("rbxassetid://6014261993")
+	assertEq(blockedStrIcon and blockedStrIcon.Kind, "Glyph", "Icons.Resolve blocks explicit rbxassetid:// string under StealthMode")
+
+	local fakeTtf = "\000\001\000\000" .. string.rep("F", 96)
+	local customFontUri = Bali.Assets.MaterializeFontFamily("Gotham", {
+		Regular = fakeTtf,
+		Bold = fakeTtf,
+	})
+	assertTrue(type(customFontUri) == "string" and string.find(customFontUri, "^rbxasset://custom/Bali/Fonts/Gotham_v") ~= nil, "Assets.MaterializeFontFamily writes .ttf + .json and returns local getcustomasset URI")
+	assertEq(Bali.Theme.GetFontAsset("Gotham"), customFontUri, "Theme.GetFontAsset resolves materialized on-device font when OnDeviceFonts=true")
+	Bali:SetFont("Gotham")
+	assertEq(Bali.Theme.Font("Bold").Family, customFontUri, "Theme.Font binds on-device custom font family URI")
+	Bali:SetOnDeviceFonts(false)
+	assertEq(Bali.Theme.GetFontAsset("Gotham"), "rbxasset://fonts/families/GothamSSm.json", "Theme.SetOnDeviceFonts(false) falls back cleanly to local rbxasset:// built-in font")
+	Bali:SetOnDeviceFonts(true)
+	Bali:SetFont("Builder")
+
+	assertEq(Bali.Util.ConstantTimeEquals("KEY-1234", "KEY-1234"), true, "ConstantTimeEquals matches equal strings")
+	assertEq(Bali.Util.ConstantTimeEquals("KEY-1234", "KEY-1235"), false, "ConstantTimeEquals rejects mismatched suffix")
+	assertEq(Bali.Util.ConstantTimeEquals("KEY-123", "KEY-1234"), false, "ConstantTimeEquals rejects mismatched lengths")
+	local h1 = Bali.Util.HashKey("SECRET-KEY", "SaltA")
+	local h2 = Bali.Util.HashKey("SECRET-KEY", "SaltA")
+	local h3 = Bali.Util.HashKey("SECRET-KEY", "SaltB")
+	assertTrue(#h1 == 64 and h1 == h2 and h1 ~= h3, "Util.HashKey produces deterministic salted 64-hex digest")
+	assertEq(Bali.Util.SanitizeKeyInput(" \n\t\rBALI-SAFE  ", 32), "BALI-SAFE", "Util.SanitizeKeyInput strips control chars and trims whitespace")
+	local okInt = Bali.Util.VerifyIntegrity()
+	assertEq(okInt, true, "Util.VerifyIntegrity passes on untampered primitives")
+
+	vfsFiles["Bali/hash_verify_test.txt"] = "  BALI-HASH-99\n"
+	local ksHashCtrl = Bali:KeySystem({
+		Title = "HashAuth",
+		KeyHashes = { Bali.Util.HashKey("BALI-HASH-99", "BaliTestSalt") },
+		KeySalt = "BaliTestSalt",
+		SaveKey = true,
+		FileName = "hash_verify_test.txt",
+		Yield = false,
+	})
+	assertTrue(ksHashCtrl ~= nil and ksHashCtrl.Verified == true and ksHashCtrl.Key == "BALI-HASH-99", "KeySystem verifies saved key via KeyHashes + KeySalt and ConstantTimeEquals")
+	vfsFiles["Bali/hash_verify_test.txt"] = nil
+end
+
 -- 7. Re-execution safety: run dist/BaliExample.lua a SECOND time without destroying the first
 log("--- Testing Re-execution Safety ---")
 local firstBali = Bali

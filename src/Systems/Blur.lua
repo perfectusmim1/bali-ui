@@ -31,26 +31,31 @@ local function ensureEffect()
 	if not lighting then
 		return nil
 	end
-	local legacy = lighting:FindFirstChild("LuminaBlur")
-	if legacy and legacy:IsA("BlurEffect") then
-		pcall(function()
-			legacy:Destroy()
-		end)
+	for _, legacyName in ipairs({ "LuminaBlur", "BaliBlur" }) do
+		local legacy = lighting:FindFirstChild(legacyName)
+		if legacy and legacy:IsA("BlurEffect") then
+			pcall(function()
+				legacy:Destroy()
+			end)
+		end
 	end
-	local existing = lighting:FindFirstChild("BaliBlur")
-	if existing and existing:IsA("BlurEffect") then
-		blurEffect = existing
+	local envBlur = Util.Global("_BaliBlurEffect")
+	if typeof(envBlur) == "Instance" and envBlur:IsA("BlurEffect") and envBlur.Parent == lighting then
+		blurEffect = envBlur
 		return blurEffect
 	end
 	local created
 	pcall(function()
 		created = Instance.new("BlurEffect")
-		created.Name = "BaliBlur"
+		created.Name = Util.RandomString(10)
 		created.Size = 0
 		created.Enabled = false
 		created.Parent = lighting
 	end)
 	blurEffect = created
+	if created and type(Util.Env) == "table" then
+		Util.Env._BaliBlurEffect = created
+	end
 	return blurEffect
 end
 
@@ -129,6 +134,9 @@ function Blur.Destroy()
 		activeTween = nil
 	end
 	if blurEffect then
+		if type(Util.Env) == "table" and Util.Env._BaliBlurEffect == blurEffect then
+			Util.Env._BaliBlurEffect = nil
+		end
 		pcall(function()
 			blurEffect:Destroy()
 		end)

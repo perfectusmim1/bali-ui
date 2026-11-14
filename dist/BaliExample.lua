@@ -229,20 +229,142 @@ __modules["Core/Assets"] = function()
 	file API + getcustomasset, verifies they load, and exposes graceful fallbacks.
 ]]
 
-local Services = require("Core/Services")
 local Util = require("Core/Util")
 local Data = require("Generated/AssetData")
 
 local Assets = {
 	Loaded = false,
 	Available = false, -- true when the custom image pipeline works on this executor
+	FontsLoaded = false,
 	Images = {},
+	Fonts = {},
 	Folder = "Bali/Assets",
+	FontsFolder = "Bali/Fonts",
+	OnFontsUpdated = nil,
 }
 
--- Fallbacks hosted on Roblox (used when custom assets are unavailable)
+-- Procedural shadow silhouette fallback is handled without external rbxassetid:// fetches
 Assets.Fallback = {
-	Shadow = { Image = "rbxassetid://6014261993", Slice = Rect.new(49, 49, 450, 450), Inset = 24 },
+	Shadow = { Image = "", Slice = Rect.new(49, 49, 450, 450), Inset = 24 },
+}
+
+-- Verified static-weight TTF mirrors served via HTTPS CDNs/proxies (never rbxassetid://)
+local FONT_WEIGHT_META = {
+	{ Name = "Regular", Weight = 400 },
+	{ Name = "Medium", Weight = 500 },
+	{ Name = "SemiBold", Weight = 600 },
+	{ Name = "Bold", Weight = 700 },
+}
+
+local FONT_SOURCES = {
+	Builder = {
+		Regular = {
+			"https://fonts.gstatic.com/s/plusjakartasans/v12/LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_qU7NSg.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf",
+		},
+		Medium = {
+			"https://fonts.gstatic.com/s/plusjakartasans/v12/LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_m07NSg.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf",
+		},
+		SemiBold = {
+			"https://fonts.gstatic.com/s/plusjakartasans/v12/LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_d0nNSg.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf",
+		},
+		Bold = {
+			"https://fonts.gstatic.com/s/plusjakartasans/v12/LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_TknNSg.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf",
+		},
+	},
+	Gotham = {
+		Regular = {
+			"https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+		},
+		Medium = {
+			"https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuI6fMZg.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+		},
+		SemiBold = {
+			"https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+		},
+		Bold = {
+			"https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYMZg.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+		},
+	},
+	Montserrat = {
+		Regular = {
+			"https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Ew-.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+		},
+		Medium = {
+			"https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtZ6Ew-.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+		},
+		SemiBold = {
+			"https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCu170w-.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+		},
+		Bold = {
+			"https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM70w-.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+		},
+	},
+	Ubuntu = {
+		Regular = {
+			"https://fonts.gstatic.com/s/ubuntu/v21/4iCs6KVjbNBYlgo6eA.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ufl/ubuntu/Ubuntu-Regular.ttf",
+		},
+		Medium = {
+			"https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCjC3Ttw.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ufl/ubuntu/Ubuntu-Medium.ttf",
+		},
+		SemiBold = {
+			"https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ufl/ubuntu/Ubuntu-Bold.ttf",
+		},
+		Bold = {
+			"https://fonts.gstatic.com/s/ubuntu/v21/4iCv6KVjbNBYlgoCxCvTtw.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ufl/ubuntu/Ubuntu-Bold.ttf",
+		},
+	},
+	Nunito = {
+		Regular = {
+			"https://fonts.gstatic.com/s/nunito/v32/XRXI3I6Li01BKofiOc5wtlZ2di8HDLshRTM.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nunito/Nunito%5Bwght%5D.ttf",
+		},
+		Medium = {
+			"https://fonts.gstatic.com/s/nunito/v32/XRXI3I6Li01BKofiOc5wtlZ2di8HDIkhRTM.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nunito/Nunito%5Bwght%5D.ttf",
+		},
+		SemiBold = {
+			"https://fonts.gstatic.com/s/nunito/v32/XRXI3I6Li01BKofiOc5wtlZ2di8HDGUmRTM.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nunito/Nunito%5Bwght%5D.ttf",
+		},
+		Bold = {
+			"https://fonts.gstatic.com/s/nunito/v32/XRXI3I6Li01BKofiOc5wtlZ2di8HDFwmRTM.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nunito/Nunito%5Bwght%5D.ttf",
+		},
+	},
+	Mono = {
+		Regular = {
+			"https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_3vqPQw.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
+		},
+		Medium = {
+			"https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_7PqPQw.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
+		},
+		SemiBold = {
+			"https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_Of2PQw.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
+		},
+		Bold = {
+			"https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_Of2PQw.ttf",
+			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
+		},
+	},
 }
 
 -- ─── Base64 ──────────────────────────────────────────────────────────────────
@@ -315,30 +437,192 @@ local function getAssetFunction()
 	return Util.Global("getcustomasset") or Util.Global("getsynasset")
 end
 
-local function verify(contentId)
-	local ContentProvider = Services.ContentProvider
-	local probe = Instance.new("ImageLabel")
-	probe.Image = contentId
-	local status = nil
-	local done = false
-	task.spawn(function()
-		local ok = pcall(function()
-			ContentProvider:PreloadAsync({ probe }, function(_, fetchStatus)
-				status = fetchStatus
-			end)
-		end)
-		if not ok then
-			status = nil
-		end
-		done = true
-	end)
-	local started = os.clock()
-	while not done and os.clock() - started < 3 do
-		task.wait()
+local function hasExecutorHttp()
+	local synTbl = Util.Global("syn")
+	local httpTbl = Util.Global("http")
+	local fluxusTbl = Util.Global("fluxus")
+	return type(type(synTbl) == "table" and synTbl.request) == "function"
+		or type(type(httpTbl) == "table" and httpTbl.request) == "function"
+		or type(Util.Global("http_request")) == "function"
+		or type(Util.Global("request")) == "function"
+		or type(type(fluxusTbl) == "table" and fluxusTbl.request) == "function"
+end
+
+local function isValidPngBytes(bytes)
+	return type(bytes) == "string" and #bytes > 24 and string.sub(bytes, 1, 8) == "\137PNG\r\n\26\n"
+end
+
+local function isValidFontBytes(bytes)
+	if type(bytes) ~= "string" or #bytes < 64 then
+		return false
 	end
-	probe:Destroy()
-	-- Optimistic: only an explicit failure disables the custom image pipeline
-	return status ~= Enum.AssetFetchStatus.Failure and status ~= Enum.AssetFetchStatus.TimedOut
+	local sig = string.sub(bytes, 1, 4)
+	return sig == "\000\001\000\000" or sig == "OTTO" or sig == "true" or sig == "ttcf"
+end
+
+local function verify(path, contentId)
+	-- Validate local file presence and URI locally without ContentProvider:PreloadAsync (avoids PreloadAsync hooks)
+	return type(contentId) == "string"
+		and #contentId > 0
+		and not string.find(contentId, "^rbxassetid://")
+		and Util.FS.IsFile(path)
+end
+
+local function jsonStringEscape(str)
+	local s = tostring(str or "")
+	s = string.gsub(s, "\\", "\\\\")
+	s = string.gsub(s, '"', '\\"')
+	return '"' .. s .. '"'
+end
+
+local function buildFontFamilyJson(familyName, faces)
+	local items = {}
+	for _, face in ipairs(faces) do
+		table.insert(
+			items,
+			string.format(
+				'{"name":%s,"weight":%d,"style":"normal","assetId":%s}',
+				jsonStringEscape(face.name),
+				face.weight,
+				jsonStringEscape(face.assetId)
+			)
+		)
+	end
+	return string.format('{"name":%s,"faces":[%s]}', jsonStringEscape(familyName), table.concat(items, ","))
+end
+
+function Assets.MaterializeFontFamily(familyName, facesData)
+	local getAsset = getAssetFunction()
+	if type(getAsset) ~= "function" or not Util.FS.Supported() then
+		return nil
+	end
+
+	Util.FS.MakeFolder(Assets.FontsFolder)
+	local faceEntries = {}
+	for _, meta in ipairs(FONT_WEIGHT_META) do
+		local weightName = meta.Name
+		local ttfPath = string.format("%s/%s_%s_v%s.ttf", Assets.FontsFolder, familyName, weightName, Data.Version)
+		local provided = type(facesData) == "table" and facesData[weightName] or nil
+		if isValidFontBytes(provided) then
+			if not Util.FS.IsFile(ttfPath) then
+				Util.FS.Write(ttfPath, provided)
+			end
+		end
+		if Util.FS.IsFile(ttfPath) then
+			local okId, ttfAsset = pcall(getAsset, ttfPath)
+			if okId and type(ttfAsset) == "string" and ttfAsset ~= "" then
+				table.insert(faceEntries, {
+					name = weightName,
+					weight = meta.Weight,
+					assetId = ttfAsset,
+				})
+			end
+		end
+	end
+
+	if #faceEntries == 0 then
+		return nil
+	end
+
+	local jsonPath = string.format("%s/%s_v%s.json", Assets.FontsFolder, familyName, Data.Version)
+	local jsonBody = buildFontFamilyJson(familyName, faceEntries)
+	Util.FS.Write(jsonPath, jsonBody)
+
+	local okFam, familyAsset = pcall(getAsset, jsonPath)
+	if okFam and verify(jsonPath, familyAsset) then
+		Assets.Fonts[familyName] = familyAsset
+		return familyAsset
+	end
+	return nil
+end
+
+local function loadCachedFontsSync()
+	local getAsset = getAssetFunction()
+	if type(getAsset) ~= "function" or not Util.FS.Supported() then
+		return false
+	end
+	local anyLoaded = false
+	for familyName in pairs(FONT_SOURCES) do
+		local jsonPath = string.format("%s/%s_v%s.json", Assets.FontsFolder, familyName, Data.Version)
+		if Util.FS.IsFile(jsonPath) then
+			-- Ensure at least Regular TTF also exists locally
+			local regPath = string.format("%s/%s_Regular_v%s.ttf", Assets.FontsFolder, familyName, Data.Version)
+			if Util.FS.IsFile(regPath) then
+				-- Refresh JSON descriptors in case session custom-asset prefix changed
+				local refreshed = Assets.MaterializeFontFamily(familyName, nil)
+				if refreshed then
+					anyLoaded = true
+				end
+			end
+		end
+	end
+	return anyLoaded
+end
+
+local fontsHydrating = false
+function Assets.LoadFontsAsync(priorityList)
+	if fontsHydrating or not hasExecutorHttp() then
+		return
+	end
+	local getAsset = getAssetFunction()
+	if type(getAsset) ~= "function" or not Util.FS.Supported() then
+		return
+	end
+
+	fontsHydrating = true
+	Util.Spawn(function()
+		pcall(function()
+			Util.FS.MakeFolder(Assets.FontsFolder)
+			local order = priorityList or { "Builder", "Gotham", "Mono", "Montserrat", "Ubuntu", "Nunito" }
+			for _, familyName in ipairs(order) do
+				if not Assets.Fonts[familyName] and FONT_SOURCES[familyName] then
+					local facesData = {}
+					local downloadedAny = false
+					local weightUrls = FONT_SOURCES[familyName]
+					for _, meta in ipairs(FONT_WEIGHT_META) do
+						local weightName = meta.Name
+						local ttfPath = string.format("%s/%s_%s_v%s.ttf", Assets.FontsFolder, familyName, weightName, Data.Version)
+						if Util.FS.IsFile(ttfPath) then
+							downloadedAny = true
+						else
+							local candidates = weightUrls[weightName]
+							if type(candidates) == "table" then
+								for _, url in ipairs(candidates) do
+									local body = Util.HttpGet(url, false, true)
+									if isValidFontBytes(body) then
+										Util.FS.Write(ttfPath, body)
+										facesData[weightName] = body
+										downloadedAny = true
+										break
+									end
+								end
+							end
+						end
+					end
+					if downloadedAny then
+						local famAsset = Assets.MaterializeFontFamily(familyName, facesData)
+						if famAsset and type(Assets.OnFontsUpdated) == "function" then
+							pcall(Assets.OnFontsUpdated, familyName, famAsset)
+						end
+					end
+				end
+			end
+			Assets.FontsLoaded = true
+		end)
+		fontsHydrating = false
+	end)
+end
+
+function Assets.LoadFonts(syncOnly)
+	loadCachedFontsSync()
+	if not syncOnly then
+		Assets.LoadFontsAsync()
+	end
+	return Assets.Fonts
+end
+
+function Assets.GetFontFamily(name)
+	return Assets.Fonts[name]
 end
 
 function Assets.Load()
@@ -352,6 +636,7 @@ function Assets.Load()
 		return false
 	end
 
+	local atlasPath = string.format("%s/%s_v%s.png", Assets.Folder, "Atlas", Data.Version)
 	local ok = pcall(function()
 		Util.FS.MakeFolder(Assets.Folder)
 		local sources = {
@@ -366,21 +651,31 @@ function Assets.Load()
 		for name, payload in pairs(sources) do
 			local path = string.format("%s/%s_v%s.png", Assets.Folder, name, Data.Version)
 			if not Util.FS.IsFile(path) then
-				Util.FS.Write(path, Assets.Decode(payload))
+				local raw = Assets.Decode(payload)
+				if isValidPngBytes(raw) then
+					Util.FS.Write(path, raw)
+				end
 			end
-			local id = getAsset(path)
-			if type(id) == "string" and id ~= "" then
-				Assets.Images[name] = id
+			if Util.FS.IsFile(path) then
+				local id = getAsset(path)
+				if type(id) == "string" and id ~= "" then
+					Assets.Images[name] = id
+				end
 			end
 		end
 	end)
 
-	if ok and Assets.Images.Atlas and verify(Assets.Images.Atlas) then
+	if ok and Assets.Images.Atlas and verify(atlasPath, Assets.Images.Atlas) then
 		Assets.Available = true
 	else
 		Assets.Images = {}
 		Assets.Available = false
 	end
+
+	-- Synchronously mount cached on-device fonts and hydrate any missing fonts via proxy CDN
+	loadCachedFontsSync()
+	Assets.LoadFontsAsync()
+
 	return Assets.Available
 end
 
@@ -607,7 +902,10 @@ local Assets = require("Core/Assets")
 local Theme = require("Core/Theme")
 local Create = require("Core/Create")
 
-local Icons = {}
+local Icons = {
+	StealthMode = true,
+	AllowRemoteAssets = false,
+}
 
 local glyphs = {
 	check = "✓",
@@ -632,11 +930,20 @@ local glyphs = {
 }
 local glyphRotation = { ["chevron-down"] = 90, ["chevron-up"] = -90 }
 
-local function isAssetString(text)
-	return string.find(text, "^rbxasset") ~= nil
-		or string.find(text, "^rbxthumb") ~= nil
-		or string.find(text, "^https?://") ~= nil
+local function isLocalAsset(text)
+	return string.find(text, "^rbxasset://") ~= nil
+end
+
+local function isRemoteRobloxAsset(text)
+	return string.find(text, "^rbxassetid://") ~= nil
+		or string.find(text, "^rbxthumb://") ~= nil
 		or string.find(text, "^%d+$") ~= nil
+end
+
+local function isAssetString(text)
+	return isLocalAsset(text)
+		or isRemoteRobloxAsset(text)
+		or string.find(text, "^https?://") ~= nil
 end
 
 -- Returns a descriptor table or nil when no icon was requested
@@ -645,10 +952,24 @@ function Icons.Resolve(icon)
 		return nil
 	end
 	if type(icon) == "number" then
+		if Icons.StealthMode and not Icons.AllowRemoteAssets then
+			return {
+				Kind = "Glyph",
+				Text = glyphs.circle,
+				Rotation = 0,
+			}
+		end
 		return { Kind = "Asset", Image = "rbxassetid://" .. icon }
 	end
 	icon = tostring(icon)
 	if isAssetString(icon) then
+		if isRemoteRobloxAsset(icon) and Icons.StealthMode and not Icons.AllowRemoteAssets then
+			return {
+				Kind = "Glyph",
+				Text = glyphs.circle,
+				Rotation = 0,
+			}
+		end
 		if string.find(icon, "^%d+$") then
 			icon = "rbxassetid://" .. icon
 		end
@@ -1058,6 +1379,7 @@ __modules["Core/Theme"] = function()
 	  function(t)  -> computed from the active theme table
 ]]
 
+local Assets = require("Core/Assets")
 local Tween = require("Core/Tween")
 local Signal = require("Core/Signal")
 
@@ -1065,7 +1387,7 @@ local Theme = {}
 
 local rgb = Color3.fromRGB
 
-Theme.Fonts = {
+Theme.BuiltInFonts = {
 	Gotham = "rbxasset://fonts/families/GothamSSm.json",
 	Builder = "rbxasset://fonts/families/BuilderSans.json",
 	Montserrat = "rbxasset://fonts/families/Montserrat.json",
@@ -1073,6 +1395,8 @@ Theme.Fonts = {
 	Nunito = "rbxasset://fonts/families/Nunito.json",
 	Mono = "rbxasset://fonts/families/RobotoMono.json",
 }
+Theme.Fonts = table.clone(Theme.BuiltInFonts)
+Theme.OnDeviceFonts = true
 Theme.FontOrder = { "Builder", "Gotham", "Montserrat", "Ubuntu", "Nunito" }
 Theme.FontFamily = "Builder"
 
@@ -1256,14 +1580,31 @@ Theme.Changed = Signal.new()
 local bindings = {} -- [Instance] = { [property] = key }
 local destroyHooks = {}
 
+function Theme.GetFontAsset(family)
+	local key = family or Theme.FontFamily
+	if Theme.OnDeviceFonts and Assets.GetFontFamily then
+		local onDevice = Assets.GetFontFamily(key)
+		if type(onDevice) == "string" and onDevice ~= "" then
+			return onDevice
+		end
+	end
+	return Theme.BuiltInFonts[key] or Theme.Fonts[key] or Theme.BuiltInFonts.Gotham
+end
+
+function Theme.SyncOnDeviceFonts()
+	for key in pairs(Theme.BuiltInFonts) do
+		Theme.Fonts[key] = Theme.GetFontAsset(key)
+	end
+end
+
 function Theme.Font(weight)
-	local family = Theme.Fonts[Theme.FontFamily] or Theme.Fonts.Gotham
+	local family = Theme.GetFontAsset(Theme.FontFamily)
 	local enumWeight = Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular
 	return Font.new(family, enumWeight, Enum.FontStyle.Normal)
 end
 
 function Theme.Mono(weight)
-	return Font.new(Theme.Fonts.Mono, Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular)
+	return Font.new(Theme.GetFontAsset("Mono"), Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular)
 end
 
 function Theme.Resolve(key)
@@ -1416,12 +1757,30 @@ function Theme.SetValue(key, value, animate)
 end
 
 function Theme.SetFont(family)
-	if not Theme.Fonts[family] then
+	if not Theme.BuiltInFonts[family] and not Theme.Fonts[family] then
 		return false
 	end
 	Theme.FontFamily = family
+	Theme.SyncOnDeviceFonts()
 	refresh(false)
 	return true
+end
+
+function Theme.SetOnDeviceFonts(enabled)
+	Theme.OnDeviceFonts = enabled == true
+	Theme.SyncOnDeviceFonts()
+	refresh(false)
+	if Theme.OnDeviceFonts and Assets.LoadFontsAsync then
+		Assets.LoadFontsAsync({ Theme.FontFamily, "Builder", "Gotham", "Mono" })
+	end
+	return Theme.OnDeviceFonts
+end
+
+Assets.OnFontsUpdated = function(familyName)
+	Theme.SyncOnDeviceFonts()
+	if Theme.OnDeviceFonts and (familyName == Theme.FontFamily or familyName == "Mono") then
+		refresh(false)
+	end
 end
 
 return Theme
@@ -2935,12 +3294,16 @@ end
 -- ─── Executor shims ──────────────────────────────────────────────────────────
 
 local env = (typeof(getgenv) == "function" and getgenv()) or _G
+local _fenv = typeof(getfenv) == "function" and getfenv(1) or nil
 Util.Env = env
 
 function Util.Global(name)
 	local value = env[name]
 	if value == nil then
 		value = rawget(_G, name)
+	end
+	if value == nil and type(_fenv) == "table" then
+		value = _fenv[name]
 	end
 	return value
 end
@@ -2973,7 +3336,7 @@ function Util.ExtractInviteCode(raw)
 	return s:match("([^/]+)$") or s
 end
 
-function Util.HttpGet(url, acceptJson)
+function Util.HttpGet(url, acceptJson, noGameFallback)
 	local headers = { ["User-Agent"] = "Mozilla/5.0" }
 	if acceptJson ~= false then
 		headers["Accept"] = "application/json"
@@ -3002,6 +3365,10 @@ function Util.HttpGet(url, acceptJson)
 		end
 	end
 
+	if noGameFallback then
+		return nil, 0
+	end
+
 	local ok, body = pcall(function()
 		return game:HttpGet(url)
 	end)
@@ -3009,6 +3376,147 @@ function Util.HttpGet(url, acceptJson)
 		return body, 200
 	end
 	return nil, 0
+end
+
+function Util.CloneRef(instance)
+	if instance == nil then
+		return nil
+	end
+	local cloneFn = Util.Global("cloneref")
+	if type(cloneFn) == "function" then
+		local ok, cloned = pcall(cloneFn, instance)
+		if ok and cloned ~= nil then
+			return cloned
+		end
+	end
+	return instance
+end
+
+function Util.ProtectGui(gui)
+	if gui == nil then
+		return false
+	end
+	local synTbl = Util.Global("syn")
+	local protectFn = (type(synTbl) == "table" and synTbl.protect_gui)
+		or Util.Global("protect_gui")
+		or Util.Global("protectgui")
+	if type(protectFn) == "function" then
+		local ok = pcall(protectFn, gui)
+		return ok
+	end
+	return false
+end
+
+function Util.ConstantTimeEquals(a, b)
+	if type(a) ~= "string" or type(b) ~= "string" then
+		return false
+	end
+	local lenA, lenB = #a, #b
+	local diff = bit32.bxor(lenA, lenB)
+	local maxLen = math.max(lenA, lenB)
+	local byte = string.byte
+	for i = 1, maxLen do
+		local ca = i <= lenA and byte(a, i) or 0
+		local cb = i <= lenB and byte(b, i) or 0
+		diff = bit32.bor(diff, bit32.bxor(ca, cb))
+	end
+	return diff == 0
+end
+
+-- Deterministic 256-bit keyed digest (8 independent 32-bit avalanche lanes -> 64 hex chars)
+function Util.HashKey(input, salt)
+	local text = tostring(salt or "BaliKeySalt_v1") .. "\0" .. tostring(input or "")
+	local lanes = {
+		0x811c9dc5, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35,
+		0x27d4eb2f, 0x165667b1, 0x5bd1e995, 0x6c62272e,
+	}
+	local bxor = bit32.bxor
+	local lrot = bit32.lrotate
+	local rshift = bit32.rshift
+	local band = bit32.band
+	local byte = string.byte
+
+	for i = 1, #text do
+		local b = byte(text, i)
+		for lane = 1, 8 do
+			local h = bxor(lanes[lane], b + i * (lane * 17))
+			h = band(h * 0x01000193, 0xFFFFFFFF)
+			h = bxor(lrot(h, (lane * 5 + i) % 31 + 1), rshift(h, (lane % 7) + 3))
+			lanes[lane] = band(h + lanes[((lane % 8) + 1)], 0xFFFFFFFF)
+		end
+	end
+
+	-- Cross-lane finalization rounds
+	for round = 1, 4 do
+		for lane = 1, 8 do
+			local prev = lanes[((lane + 6) % 8) + 1]
+			local h = bxor(lanes[lane], rshift(prev, 13))
+			h = bxor(lrot(h, 7 + round), prev)
+			h = band(h * 0x85ebca6b, 0xFFFFFFFF)
+			lanes[lane] = bxor(h, rshift(h, 16))
+		end
+	end
+
+	local out = table.create(8)
+	for lane = 1, 8 do
+		out[lane] = string.format("%08x", lanes[lane])
+	end
+	return table.concat(out)
+end
+
+function Util.SanitizeKeyInput(text, maxLen)
+	local s = tostring(text or "")
+	s = string.gsub(s, "%c", "")
+	s = Util.Trim(s)
+	local cap = tonumber(maxLen) or 128
+	if #s > cap then
+		s = string.sub(s, 1, cap)
+	end
+	return s
+end
+
+local _corePcall = pcall
+local _coreRawequal = rawequal
+local _coreTostring = tostring
+local _coreByte = string.byte
+local _coreBxor = bit32.bxor
+local _coreClock = os.clock
+
+function Util.VerifyIntegrity()
+	if not _coreRawequal(pcall, _corePcall)
+		or not _coreRawequal(rawequal, _coreRawequal)
+		or not _coreRawequal(tostring, _coreTostring)
+		or not _coreRawequal(string.byte, _coreByte)
+		or not _coreRawequal(bit32.bxor, _coreBxor)
+		or not _coreRawequal(os.clock, _coreClock)
+	then
+		return false, "Runtime primitive mismatch detected"
+	end
+
+	local isLuaFn = Util.Global("islclosure")
+	local isCFn = Util.Global("iscclosure")
+	local coreList = { _corePcall, _coreRawequal, _coreTostring, _coreByte, _coreBxor, _coreClock }
+	for _, fn in ipairs(coreList) do
+		if type(isLuaFn) == "function" then
+			local ok, hooked = _corePcall(isLuaFn, fn)
+			if ok and hooked == true then
+				return false, "Hooked core primitive detected"
+			end
+		end
+		if type(isCFn) == "function" then
+			local ok, native = _corePcall(isCFn, fn)
+			if ok and native == false then
+				return false, "Non-C core primitive detected"
+			end
+		end
+		if type(debug) == "table" and type(debug.info) == "function" then
+			local ok, src = _corePcall(debug.info, fn, "s")
+			if ok and src ~= nil and src ~= "[C]" then
+				return false, "Tampered primitive source detected"
+			end
+		end
+	end
+	return true
 end
 
 Util.FS = {
@@ -3109,26 +3617,31 @@ local function ensureEffect()
 	if not lighting then
 		return nil
 	end
-	local legacy = lighting:FindFirstChild("LuminaBlur")
-	if legacy and legacy:IsA("BlurEffect") then
-		pcall(function()
-			legacy:Destroy()
-		end)
+	for _, legacyName in ipairs({ "LuminaBlur", "BaliBlur" }) do
+		local legacy = lighting:FindFirstChild(legacyName)
+		if legacy and legacy:IsA("BlurEffect") then
+			pcall(function()
+				legacy:Destroy()
+			end)
+		end
 	end
-	local existing = lighting:FindFirstChild("BaliBlur")
-	if existing and existing:IsA("BlurEffect") then
-		blurEffect = existing
+	local envBlur = Util.Global("_BaliBlurEffect")
+	if typeof(envBlur) == "Instance" and envBlur:IsA("BlurEffect") and envBlur.Parent == lighting then
+		blurEffect = envBlur
 		return blurEffect
 	end
 	local created
 	pcall(function()
 		created = Instance.new("BlurEffect")
-		created.Name = "BaliBlur"
+		created.Name = Util.RandomString(10)
 		created.Size = 0
 		created.Enabled = false
 		created.Parent = lighting
 	end)
 	blurEffect = created
+	if created and type(Util.Env) == "table" then
+		Util.Env._BaliBlurEffect = created
+	end
 	return blurEffect
 end
 
@@ -3207,6 +3720,9 @@ function Blur.Destroy()
 		activeTween = nil
 	end
 	if blurEffect then
+		if type(Util.Env) == "table" and Util.Env._BaliBlurEffect == blurEffect then
+			Util.Env._BaliBlurEffect = nil
+		end
 		pcall(function()
 			blurEffect:Destroy()
 		end)
@@ -20491,21 +21007,23 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 	constraint.Parent = container
 
 	local shadowDesc = Assets.Shadow()
-	Create.New("ImageLabel", {
-		Name = "Shadow",
-		Image = shadowDesc.Image,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = shadowDesc.Slice,
-		Position = UDim2.fromOffset(-shadowDesc.Inset, -shadowDesc.Inset + 6),
-		Size = UDim2.new(1, shadowDesc.Inset * 2, 1, shadowDesc.Inset * 2),
-		BackgroundTransparency = 1,
-		Theme = {
-			ImageColor3 = "Shadow",
-			ImageTransparency = "ShadowTransparency",
-		},
-		ZIndex = 1,
-		Parent = container,
-	})
+	if shadowDesc and shadowDesc.Image and shadowDesc.Image ~= "" then
+		Create.New("ImageLabel", {
+			Name = "Shadow",
+			Image = shadowDesc.Image,
+			ScaleType = Enum.ScaleType.Slice,
+			SliceCenter = shadowDesc.Slice,
+			Position = UDim2.fromOffset(-shadowDesc.Inset, -shadowDesc.Inset + 6),
+			Size = UDim2.new(1, shadowDesc.Inset * 2, 1, shadowDesc.Inset * 2),
+			BackgroundTransparency = 1,
+			Theme = {
+				ImageColor3 = "Shadow",
+				ImageTransparency = "ShadowTransparency",
+			},
+			ZIndex = 1,
+			Parent = container,
+		})
+	end
 
 	local card = Create.New("Frame", {
 		Name = "GlassCard",
@@ -20924,6 +21442,8 @@ function Loader.KeySystem(parentGui, options)
 		Icon = "key",
 		Key = nil,
 		Keys = nil,
+		KeyHashes = nil,
+		KeySalt = nil,
 		Verify = nil,
 		CheckKey = nil,
 		Callback = nil,
@@ -20959,9 +21479,13 @@ function Loader.KeySystem(parentGui, options)
 
 	local customVerify = options.Verify or options.CheckKey or options.Callback
 	local function verifyKey(candidate)
-		candidate = Util.Trim(candidate or "")
+		candidate = Util.SanitizeKeyInput(candidate, 128)
 		if candidate == "" then
 			return false, "Please enter a key."
+		end
+		local okInt, intMsg = Util.VerifyIntegrity()
+		if not okInt then
+			return false, intMsg or "Integrity check failed."
 		end
 		if type(customVerify) == "function" then
 			local ok, result, message = pcall(customVerify, candidate)
@@ -20973,17 +21497,27 @@ function Loader.KeySystem(parentGui, options)
 			end
 			return false, tostring(message or "Invalid key. Please try again.")
 		end
+		local hashList = options.KeyHashes
+		if type(hashList) == "table" and #hashList > 0 then
+			local candidateHash = string.lower(Util.HashKey(candidate, options.KeySalt))
+			for _, validHash in ipairs(hashList) do
+				if Util.ConstantTimeEquals(candidateHash, string.lower(tostring(validHash))) then
+					return true
+				end
+			end
+			return false, "Invalid key. Please try again."
+		end
 		local list = options.Keys
 		if type(list) == "table" then
 			for _, valid in ipairs(list) do
-				if tostring(valid) == candidate then
+				if Util.ConstantTimeEquals(candidate, tostring(valid)) then
 					return true
 				end
 			end
 			return false, "Invalid key. Please try again."
 		end
 		if options.Key ~= nil then
-			if tostring(options.Key) == candidate then
+			if Util.ConstantTimeEquals(candidate, tostring(options.Key)) then
 				return true
 			end
 			return false, "Invalid key. Please try again."
@@ -21021,6 +21555,7 @@ function Loader.KeySystem(parentGui, options)
 	local masked = false
 	local attemptsLeft = math.max(0, tonumber(options.MaxAttempts) or 5)
 	local cooldownUntil = 0
+	local cooldownTriggers = 0
 
 	local vp = parentGui.AbsoluteSize
 	local useWide = vp.X <= 0 or vp.X >= 680
@@ -21059,21 +21594,23 @@ function Loader.KeySystem(parentGui, options)
 	})
 
 	local shadowDesc = Assets.Shadow()
-	Create.New("ImageLabel", {
-		Name = "Shadow",
-		Image = shadowDesc.Image,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = shadowDesc.Slice,
-		Position = UDim2.fromOffset(-shadowDesc.Inset, -shadowDesc.Inset + 8),
-		Size = UDim2.new(1, shadowDesc.Inset * 2, 1, shadowDesc.Inset * 2),
-		BackgroundTransparency = 1,
-		Theme = {
-			ImageColor3 = "Shadow",
-			ImageTransparency = "ShadowTransparency",
-		},
-		ZIndex = 1,
-		Parent = container,
-	})
+	if shadowDesc and shadowDesc.Image and shadowDesc.Image ~= "" then
+		Create.New("ImageLabel", {
+			Name = "Shadow",
+			Image = shadowDesc.Image,
+			ScaleType = Enum.ScaleType.Slice,
+			SliceCenter = shadowDesc.Slice,
+			Position = UDim2.fromOffset(-shadowDesc.Inset, -shadowDesc.Inset + 8),
+			Size = UDim2.new(1, shadowDesc.Inset * 2, 1, shadowDesc.Inset * 2),
+			BackgroundTransparency = 1,
+			Theme = {
+				ImageColor3 = "Shadow",
+				ImageTransparency = "ShadowTransparency",
+			},
+			ZIndex = 1,
+			Parent = container,
+		})
+	end
 
 	local mainCard = Create.New("Frame", {
 		Name = "GlassCard",
@@ -22011,7 +22548,13 @@ function Loader.KeySystem(parentGui, options)
 		end
 		local str = tostring(iconSrc)
 		if tonumber(str) then
+			if Icons.StealthMode and not Icons.AllowRemoteAssets then
+				return
+			end
 			str = "rbxassetid://" .. str
+		end
+		if (string.find(str, "^rbxassetid://") or string.find(str, "^rbxthumb://")) and Icons.StealthMode and not Icons.AllowRemoteAssets then
+			return
 		end
 		if str:find("://") and not str:find("^https?://") then
 			dcImg.Image = str
@@ -22455,7 +22998,7 @@ function Loader.KeySystem(parentGui, options)
 			Transition.Ripple(verifyBtn, input, "AccentText")
 		end
 		verifyLabel.Text = "Verifying..."
-		local entered = Util.Trim(keyBox.Text)
+		local entered = Util.SanitizeKeyInput(keyBox.Text, 128)
 
 		task.spawn(function()
 			local ok, message = verifyKey(entered)
@@ -22486,7 +23029,10 @@ function Loader.KeySystem(parentGui, options)
 				if (tonumber(options.MaxAttempts) or 0) > 0 then
 					attemptsLeft = math.max(attemptsLeft - 1, 0)
 					if attemptsLeft <= 0 then
-						cooldownUntil = os.clock() + (tonumber(options.Cooldown) or 8)
+						cooldownTriggers += 1
+						local baseCooldown = tonumber(options.Cooldown) or 8
+						local waitSec = baseCooldown * (2 ^ math.min(cooldownTriggers - 1, 4))
+						cooldownUntil = os.clock() + waitSec
 						attemptsLeft = tonumber(options.MaxAttempts) or 5
 						attemptsLabel.Text = "Cooldown..."
 					else
@@ -27040,6 +27586,7 @@ local Bali = {
 	_notifyReady = false,
 	_destroyed = false,
 	_destroying = false,
+	StealthMode = true,
 }
 
 if type(Util.Env) == "table" then
@@ -27085,9 +27632,10 @@ local function getGuiContainers()
 	local containers = {}
 	local seen = {}
 	local function pushContainer(inst)
-		if typeof(inst) == "Instance" and not seen[inst] then
-			seen[inst] = true
-			table.insert(containers, inst)
+		local safe = Util.CloneRef(inst)
+		if typeof(safe) == "Instance" and not seen[safe] then
+			seen[safe] = true
+			table.insert(containers, safe)
 		end
 	end
 
@@ -27102,15 +27650,7 @@ local function getGuiContainers()
 		return Services.CoreGui
 	end)
 	if okCore and typeof(coreGui) == "Instance" then
-		local canParent = pcall(function()
-			local probe = Instance.new("Folder")
-			probe.Name = "_BaliProbe"
-			probe.Parent = coreGui
-			probe:Destroy()
-		end)
-		if canParent then
-			pushContainer(coreGui)
-		end
+		pushContainer(coreGui)
 	end
 
 	local okPlayer, localPlayer = pcall(function()
@@ -27124,12 +27664,17 @@ local function getGuiContainers()
 	return containers
 end
 
-local function getSafeGuiParent()
-	local containers = getGuiContainers()
-	return containers[1]
-end
-
 local function cleanupOrphanGuis(excludeGui)
+	local prevStealthGui = Util.Global("_BaliScreenGui")
+	if typeof(prevStealthGui) == "Instance" and prevStealthGui ~= excludeGui then
+		pcall(function()
+			prevStealthGui:Destroy()
+		end)
+		if type(Util.Env) == "table" then
+			Util.Env._BaliScreenGui = nil
+		end
+	end
+
 	for _, container in ipairs(getGuiContainers()) do
 		pcall(function()
 			for _, child in ipairs(container:GetChildren()) do
@@ -27140,6 +27685,16 @@ local function cleanupOrphanGuis(excludeGui)
 				end
 			end
 		end)
+	end
+
+	local prevBlur = Util.Global("_BaliBlurEffect")
+	if typeof(prevBlur) == "Instance" then
+		pcall(function()
+			prevBlur:Destroy()
+		end)
+		if type(Util.Env) == "table" then
+			Util.Env._BaliBlurEffect = nil
+		end
 	end
 
 	pcall(function()
@@ -27164,27 +27719,31 @@ function Bali:_ensureScreenGui()
 
 	cleanupOrphanGuis(nil)
 
-	local parent = getSafeGuiParent()
-	assert(typeof(parent) == "Instance", "[Bali] Unable to locate gethui, CoreGui, or PlayerGui")
+	local containers = getGuiContainers()
+	assert(#containers > 0, "[Bali] Unable to locate gethui, CoreGui, or PlayerGui")
 
 	local gui = Instance.new("ScreenGui")
-	gui.Name = "BaliUI"
+	gui.Name = self.StealthMode and Util.RandomString(10) or "BaliUI"
 	gui.IgnoreGuiInset = true
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.DisplayOrder = 100
 
-	local parented = pcall(function()
-		gui.Parent = parent
-	end)
-	if not parented or not gui.Parent then
-		local okLp, lp = pcall(function()
-			return Services.Players.LocalPlayer
+	Util.ProtectGui(gui)
+
+	for _, candidate in ipairs(containers) do
+		local okParent = pcall(function()
+			gui.Parent = candidate
 		end)
-		local pg = okLp and lp and lp:FindFirstChildOfClass("PlayerGui")
-		if pg then
-			gui.Parent = pg
+		if okParent and gui.Parent then
+			break
 		end
+	end
+
+	assert(gui.Parent ~= nil, "[Bali] Unable to parent ScreenGui into gethui, CoreGui, or PlayerGui")
+
+	if type(Util.Env) == "table" then
+		Util.Env._BaliScreenGui = gui
 	end
 
 	self._screenGui = gui
@@ -27358,6 +27917,17 @@ function Bali:SetFont(family)
 	return Theme.SetFont(family)
 end
 
+function Bali:SetOnDeviceFonts(enabled)
+	return Theme.SetOnDeviceFonts(enabled)
+end
+
+function Bali:SetStealthMode(enabled)
+	local state = enabled == true
+	self.StealthMode = state
+	Icons.StealthMode = state
+	return state
+end
+
 function Bali:SetAutoSave(enabled)
 	return Config.SetAutoSave(enabled)
 end
@@ -27425,8 +27995,13 @@ function Bali:Destroy()
 	if Util.ErrorHandler == handleRuntimeError then
 		Util.ErrorHandler = nil
 	end
-	if type(Util.Env) == "table" and Util.Env._BaliInstance == self then
-		Util.Env._BaliInstance = nil
+	if type(Util.Env) == "table" then
+		if Util.Env._BaliInstance == self then
+			Util.Env._BaliInstance = nil
+		end
+		if Util.Env._BaliScreenGui == self._screenGui then
+			Util.Env._BaliScreenGui = nil
+		end
 	end
 
 	self._destroying = false
