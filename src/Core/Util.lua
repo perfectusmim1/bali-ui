@@ -307,6 +307,59 @@ function Util.SetClipboard(text)
 	return false
 end
 
+function Util.ExecutorName()
+	local name = "Roblox Studio"
+	pcall(function()
+		local fn = Util.Global("identifyexecutor") or Util.Global("getexecutorname")
+		if type(fn) == "function" then
+			local res = fn()
+			if res and tostring(res) ~= "" then
+				name = tostring(res)
+			end
+		end
+	end)
+	return name
+end
+
+function Util.ExtractInviteCode(raw)
+	local s = Util.Trim(tostring(raw or ""))
+	s = s:gsub("%?.*$", ""):gsub("/+$", "")
+	return s:match("([^/]+)$") or s
+end
+
+function Util.HttpGet(url, acceptJson)
+	local headers = { ["User-Agent"] = "Mozilla/5.0" }
+	if acceptJson ~= false then
+		headers["Accept"] = "application/json"
+	end
+	local synTbl = Util.Global("syn")
+	local httpTbl = Util.Global("http")
+	local fluxusTbl = Util.Global("fluxus")
+	local req = (type(synTbl) == "table" and synTbl.request)
+		or (type(httpTbl) == "table" and httpTbl.request)
+		or Util.Global("http_request")
+		or Util.Global("request")
+		or (type(fluxusTbl) == "table" and fluxusTbl.request)
+
+	if type(req) == "function" then
+		local ok, res = pcall(req, { Url = url, Method = "GET", Headers = headers })
+		if ok and type(res) == "table" and type(res.Body) == "string" and #res.Body > 0 then
+			local code = tonumber(res.StatusCode or res.status_code)
+			if (res.Success == nil or res.Success == true) and (not code or (code >= 200 and code < 300)) then
+				return res.Body, code or 200
+			end
+		end
+	end
+
+	local ok, body = pcall(function()
+		return game:HttpGet(url)
+	end)
+	if ok and type(body) == "string" and #body > 0 then
+		return body, 200
+	end
+	return nil, 0
+end
+
 Util.FS = {
 	Supported = function()
 		return type(Util.Global("writefile")) == "function" and type(Util.Global("readfile")) == "function"

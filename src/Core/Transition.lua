@@ -506,4 +506,124 @@ function Transition.Pulse(inst, prop, fromVal, toVal, period)
 	return stop
 end
 
+-- Rayfield-inspired sequential staggered reveal inside ScrollingFrames / containers.
+-- Never uses UIScale or mutates UIListLayout sibling sizes, keeping fonts razor sharp.
+local function collectCascadeTargets(container, out, limit)
+	for _, child in ipairs(container:GetChildren()) do
+		if #out >= limit then
+			return
+		end
+		if child:IsA("GuiObject") and child.Visible then
+			local name = child.Name
+			if name ~= "_BaliRippleWash" then
+				local hasChildrenList = false
+				if child:IsA("Frame") and (name == "SectionCard" or name == "ColumnRow" or name == "LeftColumn" or name == "RightColumn" or child:FindFirstChild("Items")) then
+					hasChildrenList = true
+				end
+				if hasChildrenList then
+					table.insert(out, child)
+					local items = child:FindFirstChild("Items") or child
+					for _, sub in ipairs(items:GetChildren()) do
+						if #out >= limit then
+							return
+						end
+						if sub:IsA("GuiObject") and sub.Visible and sub.Name ~= "_BaliRippleWash" then
+							table.insert(out, sub)
+						end
+					end
+				else
+					table.insert(out, child)
+				end
+			end
+		end
+	end
+end
+
+local function snapshotVisualProps(root)
+	local entries = {}
+	local function addInst(inst)
+		if inst:IsA("GuiObject") then
+			if inst:GetAttribute("_BaliCascadeBg") == nil then
+				inst:SetAttribute("_BaliCascadeBg", inst.BackgroundTransparency)
+			end
+			table.insert(entries, { Inst = inst, Prop = "BackgroundTransparency", Target = inst:GetAttribute("_BaliCascadeBg") })
+		end
+		if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
+			if inst:GetAttribute("_BaliCascadeTxt") == nil then
+				inst:SetAttribute("_BaliCascadeTxt", inst.TextTransparency)
+			end
+			table.insert(entries, { Inst = inst, Prop = "TextTransparency", Target = inst:GetAttribute("_BaliCascadeTxt") })
+		elseif inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
+			if inst:GetAttribute("_BaliCascadeImg") == nil then
+				inst:SetAttribute("_BaliCascadeImg", inst.ImageTransparency)
+			end
+			table.insert(entries, { Inst = inst, Prop = "ImageTransparency", Target = inst:GetAttribute("_BaliCascadeImg") })
+		elseif inst:IsA("UIStroke") then
+			if inst:GetAttribute("_BaliCascadeStroke") == nil then
+				inst:SetAttribute("_BaliCascadeStroke", inst.Transparency)
+			end
+			table.insert(entries, { Inst = inst, Prop = "Transparency", Target = inst:GetAttribute("_BaliCascadeStroke") })
+		end
+	end
+
+	addInst(root)
+	for _, desc in ipairs(root:GetDescendants()) do
+		if desc.Name ~= "_BaliRippleWash" then
+			addInst(desc)
+		end
+	end
+	return entries
+end
+
+function Transition.Cascade(container, stepDelay, maxItems)
+	if not container or Tween.Reduced then
+		return nil
+	end
+
+	local seq = (container:GetAttribute("_BaliCascadeSeq") or 0) + 1
+	container:SetAttribute("_BaliCascadeSeq", seq)
+
+	local targets = {}
+	collectCascadeTargets(container, targets, maxItems or 14)
+	if #targets == 0 then
+		return nil
+	end
+
+	local step = stepDelay or 0.024
+	for index, card in ipairs(targets) do
+		local props = snapshotVisualProps(card)
+		for _, entry in ipairs(props) do
+			if entry.Target < 1 then
+				entry.Inst[entry.Prop] = math.max(entry.Target, 0.94)
+			end
+		end
+
+		local delaySec = math.min((index - 1) * step, 0.24)
+		local function reveal()
+			if not container.Parent or container:GetAttribute("_BaliCascadeSeq") ~= seq then
+				return
+			end
+			for _, entry in ipairs(props) do
+				if entry.Inst.Parent and entry.Target < 1 then
+					Tween.Play(
+						entry.Inst,
+						{ [entry.Prop] = entry.Target },
+						Tween.Normal,
+						Enum.EasingStyle.Exponential,
+						Enum.EasingDirection.Out
+					)
+				end
+			end
+		end
+
+		if delaySec <= 0 then
+			reveal()
+		else
+			task.delay(delaySec, reveal)
+		end
+	end
+
+	return seq
+end
+
 return Transition

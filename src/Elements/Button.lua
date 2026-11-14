@@ -111,6 +111,35 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 	end
 end
 
+local function applyStateTransition(frame, stroke, variant, hovered, pressed, confirming, animate)
+	local theme = Theme.Current
+	local targetBg = frame.BackgroundColor3
+	local targetTrans = frame.BackgroundTransparency
+	local targetStroke = stroke.Transparency
+	local tileHover = theme.TileHover or theme.Tile
+	local accentHover = theme.AccentHover or theme.Accent
+
+	if not confirming and variant == "Default" then
+		targetBg = pressed and Util.LerpColor(tileHover, theme.Accent, 0.08) or (hovered and tileHover or theme.Tile)
+		targetTrans = pressed and math.max(0.06, theme.TileTransparency - 0.14)
+			or (hovered and math.max(0.12, theme.TileTransparency - 0.08) or theme.TileTransparency)
+		targetStroke = pressed and 0.42 or (hovered and 0.56 or theme.StrokeTransparency)
+	elseif variant == "Primary" and not confirming then
+		targetBg = pressed and Util.LerpColor(accentHover, Color3.new(1, 1, 1), 0.08)
+			or (hovered and accentHover or theme.Accent)
+		targetTrans = pressed and 0.02 or (hovered and 0.06 or 0.14)
+	end
+
+	if animate then
+		Tween.Play(frame, { BackgroundColor3 = targetBg, BackgroundTransparency = targetTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
+		Tween.Play(stroke, { Transparency = targetStroke }, Tween.Fast, Enum.EasingStyle.Exponential)
+	else
+		frame.BackgroundColor3 = targetBg
+		frame.BackgroundTransparency = targetTrans
+		stroke.Transparency = targetStroke
+	end
+end
+
 -- ─── Button ──────────────────────────────────────────────────────────────────
 
 local Button = {}
@@ -194,31 +223,7 @@ function Button.new(parent, opts, ctx)
 			Icons.SetColor(rightIcon, confirming and "Error" or (variant == "Primary" and "AccentText" or "Muted"))
 		end
 
-		local theme = Theme.Current
-		local targetBg = row.Frame.BackgroundColor3
-		local targetTrans = row.Frame.BackgroundTransparency
-		local targetStrokeTrans = row.Stroke.Transparency
-
-		if not confirming and variant == "Default" then
-			targetBg = pressed and Util.LerpColor(theme.TileHover, theme.Accent, 0.08)
-				or (hovered and theme.TileHover or theme.Tile)
-			targetTrans = pressed and math.max(0.06, theme.TileTransparency - 0.14)
-				or (hovered and math.max(0.12, theme.TileTransparency - 0.08) or theme.TileTransparency)
-			targetStrokeTrans = pressed and 0.42 or (hovered and 0.56 or theme.StrokeTransparency)
-		elseif variant == "Primary" and not confirming then
-			targetBg = pressed and Util.LerpColor(theme.AccentHover, Color3.new(1, 1, 1), 0.08)
-				or (hovered and theme.AccentHover or theme.Accent)
-			targetTrans = pressed and 0.02 or (hovered and 0.06 or 0.14)
-		end
-
-		if animate then
-			Tween.Play(row.Frame, { BackgroundColor3 = targetBg, BackgroundTransparency = targetTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
-			Tween.Play(row.Stroke, { Transparency = targetStrokeTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
-		else
-			row.Frame.BackgroundColor3 = targetBg
-			row.Frame.BackgroundTransparency = targetTrans
-			row.Stroke.Transparency = targetStrokeTrans
-		end
+		applyStateTransition(row.Frame, row.Stroke, variant, hovered, pressed, confirming, animate)
 	end
 
 	refreshVisual(false)
@@ -505,29 +510,7 @@ function ButtonGroup.new(parent, opts, ctx)
 				iconObj[Icons.TransparencyProperty(iconObj)] = dim
 			end
 
-			local theme = Theme.Current
-			local targetBg = btn.BackgroundColor3
-			local targetTrans = btn.BackgroundTransparency
-			local targetStroke = stroke.Transparency
-			if bVariant == "Default" then
-				targetBg = isPressed and Util.LerpColor(theme.TileHover, theme.Accent, 0.08)
-					or (isHovered and theme.TileHover or theme.Tile)
-				targetTrans = isPressed and math.max(0.06, theme.TileTransparency - 0.14)
-					or (isHovered and math.max(0.12, theme.TileTransparency - 0.08) or theme.TileTransparency)
-				targetStroke = isPressed and 0.42 or (isHovered and 0.56 or theme.StrokeTransparency)
-			elseif bVariant == "Primary" then
-				targetBg = isPressed and Util.LerpColor(theme.AccentHover, Color3.new(1, 1, 1), 0.08)
-					or (isHovered and theme.AccentHover or theme.Accent)
-				targetTrans = isPressed and 0.02 or (isHovered and 0.06 or 0.14)
-			end
-			if animate then
-				Tween.Play(btn, { BackgroundColor3 = targetBg, BackgroundTransparency = targetTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
-				Tween.Play(stroke, { Transparency = targetStroke }, Tween.Fast, Enum.EasingStyle.Exponential)
-			else
-				btn.BackgroundColor3 = targetBg
-				btn.BackgroundTransparency = targetTrans
-				stroke.Transparency = targetStroke
-			end
+			applyStateTransition(btn, stroke, bVariant, isHovered, isPressed, false, animate)
 		end
 
 		refreshBtn(false)

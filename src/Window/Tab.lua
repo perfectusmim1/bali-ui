@@ -572,6 +572,7 @@ function Tab:_setActiveVisual(active, instant)
 	if active and not instant then
 		local activeScroll = self.ActiveSubTab and self.ActiveSubTab.Scroll or self._defaultFlow.Scroll
 		Transition.SlideFade(activeScroll, 8)
+		Transition.Cascade(activeScroll, 0.022, 12)
 	end
 end
 
@@ -664,6 +665,7 @@ function Tab:SelectSubTab(subTab)
 
 	self.ActiveSubTab = subTab
 	Transition.SlideFade(subTab.Scroll, 0, dir * 16)
+	Transition.Cascade(subTab.Scroll, 0.02, 10)
 	self:_syncSubTabIndicator(false)
 
 	if self.Window and self.Window.ActiveTab == self then

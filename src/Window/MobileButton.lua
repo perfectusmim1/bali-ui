@@ -22,18 +22,28 @@ function MobileButton.new(parentLayer, window, options)
 	assert(typeof(parentLayer) == "Instance", "[Bali] MobileButton expects a parentLayer Instance")
 	options = Util.Options(options, {
 		Title = "Bali",
+		Subtitle = "Tap to show",
 		Icon = "sparkles",
 		Enabled = true,
 		AlwaysShow = false,
-		Position = UDim2.fromOffset(18, 18),
+		Centered = true,
+		Position = nil,
 	}, "Title")
 
 	local maid = Maid.new()
+	local userDragged = options.Position ~= nil
+
+	local function defaultCenteredPos()
+		local vpX = parentLayer.AbsoluteSize.X
+		local approxW = 168
+		local x = vpX > 0 and math.floor((vpX - approxW) * 0.5) or 18
+		return UDim2.fromOffset(math.max(8, x), 12)
+	end
 
 	local wrapper = Create.New("Frame", {
 		Name = "BaliMobileButton",
-		Position = options.Position or UDim2.fromOffset(18, 18),
-		Size = UDim2.fromOffset(0, 38),
+		Position = options.Position or defaultCenteredPos(),
+		Size = UDim2.fromOffset(0, 42),
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundTransparency = 1,
 		Visible = false,
@@ -61,7 +71,7 @@ function MobileButton.new(parentLayer, window, options)
 
 	local pill = Create.New("TextButton", {
 		Name = "Pill",
-		Size = UDim2.fromOffset(0, 38),
+		Size = UDim2.fromOffset(0, 42),
 		AutomaticSize = Enum.AutomaticSize.X,
 		Text = "",
 		AutoButtonColor = false,
@@ -69,9 +79,11 @@ function MobileButton.new(parentLayer, window, options)
 		Corner = 999,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = "CardTransparency",
+			BackgroundTransparency = function(t)
+				return math.min(t.CardTransparency, 0.04)
+			end,
 		},
-		Padding = { 0, 12, 0, 8 },
+		Padding = { 0, 14, 0, 10 },
 		ZIndex = 2,
 		Parent = wrapper,
 	})
@@ -86,7 +98,7 @@ function MobileButton.new(parentLayer, window, options)
 	})
 	Create.List(content, {
 		Direction = Enum.FillDirection.Horizontal,
-		Gap = 8,
+		Gap = 9,
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 
@@ -113,15 +125,38 @@ function MobileButton.new(parentLayer, window, options)
 		Parent = badge,
 	})
 
+	local textCol = Create.New("Frame", {
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+		Parent = content,
+	})
+	Create.List(textCol, {
+		Gap = 1,
+		VAlign = Enum.VerticalAlignment.Center,
+	})
+
 	local titleLabel = Create.Text({
 		Text = tostring(options.Title or "Bali"),
 		Font = "SemiBold",
 		TextSize = 12,
 		Color = "Text",
-		Size = UDim2.fromScale(0, 1),
+		Size = UDim2.fromOffset(0, 14),
+		AutomaticSize = Enum.AutomaticSize.X,
+		LayoutOrder = 1,
+		Parent = textCol,
+	})
+
+	local subLabel = Create.Text({
+		Text = tostring(options.Subtitle or "Tap to show"),
+		Font = "Regular",
+		TextSize = 10,
+		Color = "SubText",
+		Size = UDim2.fromOffset(0, 12),
 		AutomaticSize = Enum.AutomaticSize.X,
 		LayoutOrder = 2,
-		Parent = content,
+		Parent = textCol,
 	})
 
 	local statusDot = Create.New("Frame", {
@@ -142,6 +177,7 @@ function MobileButton.new(parentLayer, window, options)
 		Enabled = options.Enabled ~= false,
 		AlwaysShow = options.AlwaysShow == true,
 		_titleLabel = titleLabel,
+		_subLabel = subLabel,
 		_statusDot = statusDot,
 	}, MobileButton)
 
@@ -157,6 +193,18 @@ function MobileButton.new(parentLayer, window, options)
 		local maxX = math.max(8, vp.X - size.X - 8)
 		local maxY = math.max(8, vp.Y - size.Y - 8)
 		return Util.Clamp(x, 8, maxX), Util.Clamp(y, 8, maxY)
+	end
+
+	local function recenterIfAuto()
+		if userDragged then
+			return
+		end
+		local vpX = parentLayer.AbsoluteSize.X
+		local w = wrapper.AbsoluteSize.X > 0 and wrapper.AbsoluteSize.X or 168
+		if vpX > 0 then
+			local nx, ny = clampPosition(math.floor((vpX - w) * 0.5), 12)
+			wrapper.Position = UDim2.fromOffset(math.floor(nx), math.floor(ny))
+		end
 	end
 
 	maid:Give(pill.InputBegan:Connect(function(input)
@@ -176,6 +224,7 @@ function MobileButton.new(parentLayer, window, options)
 		local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStartMouse
 		if not moved and delta.Magnitude >= DRAG_THRESHOLD then
 			moved = true
+			userDragged = true
 		end
 		if moved then
 			local nx, ny = clampPosition(dragStartPos.X + delta.X, dragStartPos.Y + delta.Y)
@@ -197,12 +246,29 @@ function MobileButton.new(parentLayer, window, options)
 	end))
 
 	maid:Give(parentLayer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		local nx, ny = clampPosition(wrapper.Position.X.Offset, wrapper.Position.Y.Offset)
-		wrapper.Position = UDim2.fromOffset(math.floor(nx), math.floor(ny))
+		if not userDragged then
+			recenterIfAuto()
+		else
+			local nx, ny = clampPosition(wrapper.Position.X.Offset, wrapper.Position.Y.Offset)
+			wrapper.Position = UDim2.fromOffset(math.floor(nx), math.floor(ny))
+		end
 	end))
+	maid:Give(wrapper:GetPropertyChangedSignal("AbsoluteSize"):Connect(recenterIfAuto))
 
 	self:UpdateVisibility()
 	return self
+end
+
+function MobileButton:GetRect()
+	local w = self.Frame.AbsoluteSize.X > 0 and self.Frame.AbsoluteSize.X or 168
+	local h = self.Frame.AbsoluteSize.Y > 0 and self.Frame.AbsoluteSize.Y or 40
+	local vp = self.Frame.Parent and self.Frame.Parent.AbsoluteSize or Vector2.new(1280, 720)
+	local x = self.Frame.Position.X.Offset
+	if x <= 0 and vp.X > 0 then
+		x = math.floor((vp.X - w) * 0.5)
+	end
+	local y = self.Frame.Position.Y.Offset > 0 and self.Frame.Position.Y.Offset or 12
+	return x, y, w, h
 end
 
 function MobileButton:SetTitle(text)

@@ -84,12 +84,18 @@ function Icons.List()
 end
 
 local function colorProperty(instance)
-	return instance:IsA("TextLabel") and "TextColor3" or "ImageColor3"
+	if instance:IsA("TextLabel") then
+		return "TextColor3"
+	elseif instance:IsA("Frame") then
+		return "BackgroundColor3"
+	end
+	return "ImageColor3"
 end
 
 -- Icons.Create(icon, { Size, Position, AnchorPoint, Color = "SubText" | Color3, Transparency, ZIndex, Parent, Name })
 function Icons.Create(icon, props)
 	props = props or {}
+	local iconKey = type(icon) == "string" and string.lower(icon) or nil
 	local descriptor = Icons.Resolve(icon)
 	if not descriptor then
 		return nil
@@ -97,7 +103,25 @@ function Icons.Create(icon, props)
 
 	local size = props.Size or UDim2.fromOffset(16, 16)
 	local instance
-	if descriptor.Kind == "Glyph" then
+	local barChild = nil
+	if iconKey == "minus" then
+		-- Crisp 2px vector bar avoids blurry/faint 1px atlas scaling on compact action buttons
+		instance = Create.New("Frame", {
+			Name = props.Name or "Icon",
+			Size = size,
+			BackgroundTransparency = 1,
+		})
+		local barW = math.max(9, math.floor((size.X.Offset or 14) * 0.72))
+		barChild = Create.New("Frame", {
+			Name = "MinusBar",
+			Size = UDim2.fromOffset(barW, 2),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			BackgroundTransparency = props.Transparency or 0,
+			Corner = 99,
+			Parent = instance,
+		})
+	elseif descriptor.Kind == "Glyph" then
 		instance = Create.New("TextLabel", {
 			Name = props.Name or "Icon",
 			Size = size,
@@ -137,10 +161,11 @@ function Icons.Create(icon, props)
 	end
 
 	local color = props.Color or "Text"
+	local colorTarget = barChild or instance
 	if typeof(color) == "Color3" then
-		instance[colorProperty(instance)] = color
+		colorTarget[colorProperty(colorTarget)] = color
 	else
-		Theme.Bind(instance, { [colorProperty(instance)] = color })
+		Theme.Bind(colorTarget, { [colorProperty(colorTarget)] = color })
 	end
 
 	if props.Parent then
@@ -179,13 +204,14 @@ function Icons.SetColor(instance, color, animate)
 	if not instance then
 		return
 	end
-	local property = colorProperty(instance)
+	local target = instance:FindFirstChild("MinusBar") or instance
+	local property = colorProperty(target)
 	if typeof(color) == "Color3" then
-		Theme.Unbind(instance, property)
-		instance[property] = color
+		Theme.Unbind(target, property)
+		target[property] = color
 		return
 	end
-	Theme.Bind(instance, { [property] = color })
+	Theme.Bind(target, { [property] = color })
 end
 
 function Icons.ColorProperty(instance)
@@ -193,7 +219,12 @@ function Icons.ColorProperty(instance)
 end
 
 function Icons.TransparencyProperty(instance)
-	return instance:IsA("TextLabel") and "TextTransparency" or "ImageTransparency"
+	if instance:IsA("TextLabel") then
+		return "TextTransparency"
+	elseif instance:IsA("Frame") then
+		return "BackgroundTransparency"
+	end
+	return "ImageTransparency"
 end
 
 return Icons

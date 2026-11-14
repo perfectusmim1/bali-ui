@@ -80,12 +80,22 @@ local function createActionButton(parent, iconName, tooltipText, layoutOrder, ma
 		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
 	})
 	local iconInst = Icons.Create(iconName, {
-		Size = UDim2.fromOffset(14, 14),
+		Size = UDim2.fromOffset(15, 15),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "SubText",
+		Color = "Text",
 		Parent = btn,
 	})
+	maid:Give(btn.MouseEnter:Connect(function()
+		if iconName ~= "x" then
+			Icons.SetColor(iconInst, "Accent")
+		end
+	end))
+	maid:Give(btn.MouseLeave:Connect(function()
+		if iconName ~= "x" then
+			Icons.SetColor(iconInst, "Text")
+		end
+	end))
 	maid:Give(Transition.Hover(btn, btn, "Tile", "TileHover", stroke))
 	if tooltipText and tooltipText ~= "" then
 		maid:Give(Tooltip.Bind(btn, tooltipText))
@@ -848,6 +858,9 @@ function Window.new(screenGui, options)
 		_sidebarExpandedWidth = expandedWidth,
 		_sidebarCollapsed = isCollapsed,
 		_visible = true,
+		_visSeq = 0,
+		_morphing = false,
+		_mainCorner = main:FindFirstChildOfClass("UICorner"),
 		_destroyed = false,
 		_activePopup = nil,
 		_layoutChanged = Signal.new(),
@@ -1114,7 +1127,7 @@ function Window.new(screenGui, options)
 		Icons.SetColor(closeIcon, "Error")
 	end))
 	maid:Give(closeBtn.MouseLeave:Connect(function()
-		Icons.SetColor(closeIcon, "SubText")
+		Icons.SetColor(closeIcon, "Text")
 	end))
 	maid:Give(closeBtn.Activated:Connect(function(input)
 		Transition.Ripple(closeBtn, input, "Error")
@@ -1637,23 +1650,134 @@ function Window:SetVisible(visible)
 		return
 	end
 	self._visible = visible
+	self._visSeq = (self._visSeq or 0) + 1
+	local seq = self._visSeq
 
 	Blur.SetOpen(visible)
-	if not visible then
-		self:ClosePopup()
-		CommandPalette.Close()
-		Transition.Unmount(self.MainWrapper, 0.95, function()
-			if not self._visible and self.MainWrapper and self.MainWrapper.Parent then
-				self.MainWrapper.Visible = false
-			end
-		end)
-	else
-		self.MainWrapper.Visible = true
-		Transition.Mount(self.MainWrapper, 0.95)
-	end
+
+	local wrapper = self.MainWrapper
+	local mainCorner = self._mainCorner
+	local pill = self._mobileButton
 
 	if self._mobileButton then
 		self._mobileButton:UpdateVisibility()
+	end
+
+	if not visible then
+		self:ClosePopup()
+		CommandPalette.Close()
+
+		if not self._morphing then
+			self._restorePos = wrapper.Position
+			self._restoreSize = wrapper.Size
+		end
+
+		if pill and pill.Enabled and not Tween.Reduced then
+			self._morphing = true
+			local px, py, pw, ph = pill:GetRect()
+			local restorePos = self._restorePos
+			local restoreSize = self._restoreSize
+
+			self.Sidebar.Visible = false
+			self.BodyArea.Visible = false
+			wrapper.ZIndex = 20
+
+			Tween.Play(
+				wrapper,
+				{ Position = UDim2.fromOffset(px, py), Size = UDim2.fromOffset(pw, ph) },
+				0.21,
+				Enum.EasingStyle.Exponential,
+				Enum.EasingDirection.Out
+			)
+			if mainCorner then
+				Tween.Play(mainCorner, { CornerRadius = UDim.new(0, 22) }, 0.2, Enum.EasingStyle.Exponential)
+			end
+
+			task.delay(0.21, function()
+				if self._visSeq ~= seq or self._visible or not wrapper.Parent then
+					return
+				end
+				wrapper.Visible = false
+				wrapper.ZIndex = 2
+				if restorePos and restoreSize then
+					wrapper.Position = restorePos
+					wrapper.Size = restoreSize
+				end
+				if mainCorner then
+					mainCorner.CornerRadius = UDim.new(0, 14)
+				end
+				self.Sidebar.Visible = true
+				self.BodyArea.Visible = true
+				self._morphing = false
+			end)
+			return
+		end
+
+		Transition.Unmount(wrapper, 0.95, function()
+			if not self._visible and wrapper and wrapper.Parent then
+				wrapper.Visible = false
+			end
+		end)
+	else
+		if pill and pill.Enabled and not Tween.Reduced then
+			self._morphing = true
+			local px, py, pw, ph = pill:GetRect()
+			local restorePos = self._restorePos or wrapper.Position
+			local restoreSize = self._restoreSize or wrapper.Size
+
+			wrapper.Position = UDim2.fromOffset(px, py)
+			wrapper.Size = UDim2.fromOffset(pw, ph)
+			if mainCorner then
+				mainCorner.CornerRadius = UDim.new(0, 22)
+			end
+			self.Sidebar.Visible = false
+			self.BodyArea.Visible = false
+			wrapper.ZIndex = 20
+			wrapper.Visible = true
+
+			Tween.Play(
+				wrapper,
+				{ Position = restorePos, Size = restoreSize },
+				0.22,
+				Enum.EasingStyle.Exponential,
+				Enum.EasingDirection.Out
+			)
+			if mainCorner then
+				Tween.Play(mainCorner, { CornerRadius = UDim.new(0, 14) }, 0.22, Enum.EasingStyle.Exponential)
+			end
+
+			task.delay(0.09, function()
+				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
+					return
+				end
+				self.Sidebar.Visible = true
+				self.BodyArea.Visible = true
+				if self.ActiveTab then
+					local activeScroll = self.ActiveTab.ActiveSubTab and self.ActiveTab.ActiveSubTab.Scroll
+						or (self.ActiveTab._defaultFlow and self.ActiveTab._defaultFlow.Scroll)
+					if activeScroll then
+						Transition.Cascade(activeScroll, 0.022, 12)
+					end
+				end
+			end)
+
+			task.delay(0.23, function()
+				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
+					return
+				end
+				wrapper.ZIndex = 2
+				self._morphing = false
+			end)
+			return
+		end
+
+		self.Sidebar.Visible = true
+		self.BodyArea.Visible = true
+		if mainCorner then
+			mainCorner.CornerRadius = UDim.new(0, 14)
+		end
+		wrapper.Visible = true
+		Transition.Mount(wrapper, 0.95)
 	end
 end
 

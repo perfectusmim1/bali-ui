@@ -1227,9 +1227,13 @@ modalsSection:AddButton({
 	Callback = function()
 		Bali:KeySystem({
 			Title = "Bali Access Gate",
-			Subtitle = "Demo verification key: BALI-DEMO",
+			Subtitle = "Demo key: BALI-DEMO",
+			Version = "v2.0",
 			Icon = "key",
 			Key = "BALI-DEMO",
+			KeyUrl = "https://github.com/perfectusmim1/bali-ui",
+			DiscordName = "Bali Community",
+			SupportedGames = { [game.PlaceId] = "Active Workspace" },
 			Closable = true,
 			OnSuccess = function(acceptedKey)
 				window:Notify({

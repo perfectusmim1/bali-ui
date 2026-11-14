@@ -1892,7 +1892,10 @@ local function buildServices(opts)
 		Workspace = Workspace,
 	}
 
-	local gameObj = {}
+	local gameObj = {
+		PlaceId = 123456,
+		GameId = 789012,
+	}
 	function gameObj:GetService(name)
 		local svc = services[name]
 		if not svc then
@@ -2153,7 +2156,7 @@ window:ToggleSidebar(false)
 stepClock(0.25, true)
 assertEq(window._sidebarCollapsed, false, "Window:ToggleSidebar(false) restored sidebar")
 
--- Mobile toggle pill & Window SetVisible cycle
+-- Mobile toggle pill & Window SetVisible cycle (Rayfield pill morph + restore cascade)
 assertTrue(window._mobileButton ~= nil, "MobileButton initialized on Window")
 window:SetVisible(false)
 stepClock(0.25, true)
@@ -2162,6 +2165,8 @@ assertEq(window._mobileButton.Frame.Visible, true, "MobileButton visible when wi
 window:SetVisible(true)
 stepClock(0.25, true)
 assertEq(window:IsVisible(), true, "Window:SetVisible(true) restores window")
+assertEq(window.Sidebar.Visible, true, "Window Sidebar restored after pill morph")
+assertEq(window.BodyArea.Visible, true, "Window BodyArea restored after pill morph")
 
 -- Popup Open / Close lifecycle for Dropdown and ColorPicker
 local regFlags = window.Flags or window._registry
@@ -2201,12 +2206,31 @@ loaderCtrl:Close()
 stepClock(0.25, true)
 loaderCtrl:Destroy()
 
--- KeySystem lifecycle (reject invalid key, verify valid demo key, invoke OnSuccess)
+-- KeySystem lifecycle (reject invalid key, Supported/Not Supported badges, verify valid demo key, invoke OnSuccess)
+assertEq(Bali.Util.ExtractInviteCode("https://discord.gg/bali123?foo=bar"), "bali123", "ExtractInviteCode normalizes invite URL")
+local unsupportedCtrl = Bali:KeySystem({
+	Title = "Unsupported Check",
+	Key = "X",
+	SupportedGames = { [999999999] = "Other Game" },
+})
+stepClock(0.05, true)
+local sawNotSupported = false
+for _, desc in ipairs(unsupportedCtrl.Frame:GetDescendants()) do
+	if desc:IsA("TextLabel") and desc.Text == "Not Supported" then
+		sawNotSupported = true
+		break
+	end
+end
+assertTrue(sawNotSupported, "KeySystem renders Not Supported badge when game is not listed")
+unsupportedCtrl:Destroy()
+
 local verifiedKeyValue = nil
 local keyCtrl = Bali:KeySystem({
 	Title = "License Check",
 	Subtitle = "Enter access key",
+	Version = "v2.0",
 	Key = "BALI-DEMO",
+	SupportedGames = { [game1.PlaceId] = "Demo Place" },
 	SaveKey = false,
 	OnSuccess = function(entered)
 		verifiedKeyValue = entered
@@ -2214,6 +2238,14 @@ local keyCtrl = Bali:KeySystem({
 })
 stepClock(0.1, true)
 assertTrue(keyCtrl ~= nil and keyCtrl.Frame ~= nil, "KeySystem returns controller with Frame")
+local sawSupported = false
+for _, desc in ipairs(keyCtrl.Frame:GetDescendants()) do
+	if desc:IsA("TextLabel") and desc.Text == "Supported" then
+		sawSupported = true
+		break
+	end
+end
+assertTrue(sawSupported, "KeySystem renders Supported badge when PlaceId matches SupportedGames")
 local checkKeyBtn = nil
 for _, desc in ipairs(keyCtrl.Frame:GetDescendants()) do
 	if desc:IsA("TextButton") and desc.BackgroundTransparency == 0 then

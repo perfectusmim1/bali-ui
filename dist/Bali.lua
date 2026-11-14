@@ -678,12 +678,18 @@ function Icons.List()
 end
 
 local function colorProperty(instance)
-	return instance:IsA("TextLabel") and "TextColor3" or "ImageColor3"
+	if instance:IsA("TextLabel") then
+		return "TextColor3"
+	elseif instance:IsA("Frame") then
+		return "BackgroundColor3"
+	end
+	return "ImageColor3"
 end
 
 -- Icons.Create(icon, { Size, Position, AnchorPoint, Color = "SubText" | Color3, Transparency, ZIndex, Parent, Name })
 function Icons.Create(icon, props)
 	props = props or {}
+	local iconKey = type(icon) == "string" and string.lower(icon) or nil
 	local descriptor = Icons.Resolve(icon)
 	if not descriptor then
 		return nil
@@ -691,7 +697,25 @@ function Icons.Create(icon, props)
 
 	local size = props.Size or UDim2.fromOffset(16, 16)
 	local instance
-	if descriptor.Kind == "Glyph" then
+	local barChild = nil
+	if iconKey == "minus" then
+		-- Crisp 2px vector bar avoids blurry/faint 1px atlas scaling on compact action buttons
+		instance = Create.New("Frame", {
+			Name = props.Name or "Icon",
+			Size = size,
+			BackgroundTransparency = 1,
+		})
+		local barW = math.max(9, math.floor((size.X.Offset or 14) * 0.72))
+		barChild = Create.New("Frame", {
+			Name = "MinusBar",
+			Size = UDim2.fromOffset(barW, 2),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			BackgroundTransparency = props.Transparency or 0,
+			Corner = 99,
+			Parent = instance,
+		})
+	elseif descriptor.Kind == "Glyph" then
 		instance = Create.New("TextLabel", {
 			Name = props.Name or "Icon",
 			Size = size,
@@ -731,10 +755,11 @@ function Icons.Create(icon, props)
 	end
 
 	local color = props.Color or "Text"
+	local colorTarget = barChild or instance
 	if typeof(color) == "Color3" then
-		instance[colorProperty(instance)] = color
+		colorTarget[colorProperty(colorTarget)] = color
 	else
-		Theme.Bind(instance, { [colorProperty(instance)] = color })
+		Theme.Bind(colorTarget, { [colorProperty(colorTarget)] = color })
 	end
 
 	if props.Parent then
@@ -773,13 +798,14 @@ function Icons.SetColor(instance, color, animate)
 	if not instance then
 		return
 	end
-	local property = colorProperty(instance)
+	local target = instance:FindFirstChild("MinusBar") or instance
+	local property = colorProperty(target)
 	if typeof(color) == "Color3" then
-		Theme.Unbind(instance, property)
-		instance[property] = color
+		Theme.Unbind(target, property)
+		target[property] = color
 		return
 	end
-	Theme.Bind(instance, { [property] = color })
+	Theme.Bind(target, { [property] = color })
 end
 
 function Icons.ColorProperty(instance)
@@ -787,7 +813,12 @@ function Icons.ColorProperty(instance)
 end
 
 function Icons.TransparencyProperty(instance)
-	return instance:IsA("TextLabel") and "TextTransparency" or "ImageTransparency"
+	if instance:IsA("TextLabel") then
+		return "TextTransparency"
+	elseif instance:IsA("Frame") then
+		return "BackgroundTransparency"
+	end
+	return "ImageTransparency"
 end
 
 return Icons
@@ -1012,10 +1043,18 @@ local Base = {
 	NoiseTransparency = 0.965,
 }
 
+local function computeAccentHover(theme)
+	local target = (theme.Dark == false) and Color3.new(0, 0, 0) or Color3.new(1, 1, 1)
+	return theme.Accent:Lerp(target, 0.14)
+end
+
 local function preset(overrides)
 	local theme = table.clone(Base)
 	for key, value in pairs(overrides) do
 		theme[key] = value
+	end
+	if theme.AccentHover == nil then
+		theme.AccentHover = computeAccentHover(theme)
 	end
 	return theme
 end
@@ -1249,6 +1288,7 @@ function Theme.Set(name, animate)
 	if Theme.AccentOverride then
 		Theme.Current.Accent = Theme.AccentOverride
 		Theme.Current.Accent2 = Theme.AccentOverride:Lerp(source.Accent2, 0.45)
+		Theme.Current.AccentHover = computeAccentHover(Theme.Current)
 	end
 	refresh(animate ~= false)
 	return true
@@ -1269,9 +1309,11 @@ function Theme.SetAccent(color, animate)
 	if color then
 		Theme.Current.Accent = color
 		Theme.Current.Accent2 = color:Lerp(source.Accent2, 0.45)
+		Theme.Current.AccentHover = computeAccentHover(Theme.Current)
 	else
 		Theme.Current.Accent = source.Accent
 		Theme.Current.Accent2 = source.Accent2
+		Theme.Current.AccentHover = source.AccentHover or computeAccentHover(Theme.Current)
 	end
 	refresh(animate ~= false)
 end
@@ -1809,6 +1851,126 @@ function Transition.Pulse(inst, prop, fromVal, toVal, period)
 	return stop
 end
 
+-- Rayfield-inspired sequential staggered reveal inside ScrollingFrames / containers.
+-- Never uses UIScale or mutates UIListLayout sibling sizes, keeping fonts razor sharp.
+local function collectCascadeTargets(container, out, limit)
+	for _, child in ipairs(container:GetChildren()) do
+		if #out >= limit then
+			return
+		end
+		if child:IsA("GuiObject") and child.Visible then
+			local name = child.Name
+			if name ~= "_BaliRippleWash" then
+				local hasChildrenList = false
+				if child:IsA("Frame") and (name == "SectionCard" or name == "ColumnRow" or name == "LeftColumn" or name == "RightColumn" or child:FindFirstChild("Items")) then
+					hasChildrenList = true
+				end
+				if hasChildrenList then
+					table.insert(out, child)
+					local items = child:FindFirstChild("Items") or child
+					for _, sub in ipairs(items:GetChildren()) do
+						if #out >= limit then
+							return
+						end
+						if sub:IsA("GuiObject") and sub.Visible and sub.Name ~= "_BaliRippleWash" then
+							table.insert(out, sub)
+						end
+					end
+				else
+					table.insert(out, child)
+				end
+			end
+		end
+	end
+end
+
+local function snapshotVisualProps(root)
+	local entries = {}
+	local function addInst(inst)
+		if inst:IsA("GuiObject") then
+			if inst:GetAttribute("_BaliCascadeBg") == nil then
+				inst:SetAttribute("_BaliCascadeBg", inst.BackgroundTransparency)
+			end
+			table.insert(entries, { Inst = inst, Prop = "BackgroundTransparency", Target = inst:GetAttribute("_BaliCascadeBg") })
+		end
+		if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
+			if inst:GetAttribute("_BaliCascadeTxt") == nil then
+				inst:SetAttribute("_BaliCascadeTxt", inst.TextTransparency)
+			end
+			table.insert(entries, { Inst = inst, Prop = "TextTransparency", Target = inst:GetAttribute("_BaliCascadeTxt") })
+		elseif inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
+			if inst:GetAttribute("_BaliCascadeImg") == nil then
+				inst:SetAttribute("_BaliCascadeImg", inst.ImageTransparency)
+			end
+			table.insert(entries, { Inst = inst, Prop = "ImageTransparency", Target = inst:GetAttribute("_BaliCascadeImg") })
+		elseif inst:IsA("UIStroke") then
+			if inst:GetAttribute("_BaliCascadeStroke") == nil then
+				inst:SetAttribute("_BaliCascadeStroke", inst.Transparency)
+			end
+			table.insert(entries, { Inst = inst, Prop = "Transparency", Target = inst:GetAttribute("_BaliCascadeStroke") })
+		end
+	end
+
+	addInst(root)
+	for _, desc in ipairs(root:GetDescendants()) do
+		if desc.Name ~= "_BaliRippleWash" then
+			addInst(desc)
+		end
+	end
+	return entries
+end
+
+function Transition.Cascade(container, stepDelay, maxItems)
+	if not container or Tween.Reduced then
+		return nil
+	end
+
+	local seq = (container:GetAttribute("_BaliCascadeSeq") or 0) + 1
+	container:SetAttribute("_BaliCascadeSeq", seq)
+
+	local targets = {}
+	collectCascadeTargets(container, targets, maxItems or 14)
+	if #targets == 0 then
+		return nil
+	end
+
+	local step = stepDelay or 0.024
+	for index, card in ipairs(targets) do
+		local props = snapshotVisualProps(card)
+		for _, entry in ipairs(props) do
+			if entry.Target < 1 then
+				entry.Inst[entry.Prop] = math.max(entry.Target, 0.94)
+			end
+		end
+
+		local delaySec = math.min((index - 1) * step, 0.24)
+		local function reveal()
+			if not container.Parent or container:GetAttribute("_BaliCascadeSeq") ~= seq then
+				return
+			end
+			for _, entry in ipairs(props) do
+				if entry.Inst.Parent and entry.Target < 1 then
+					Tween.Play(
+						entry.Inst,
+						{ [entry.Prop] = entry.Target },
+						Tween.Normal,
+						Enum.EasingStyle.Exponential,
+						Enum.EasingDirection.Out
+					)
+				end
+			end
+		end
+
+		if delaySec <= 0 then
+			reveal()
+		else
+			task.delay(delaySec, reveal)
+		end
+	end
+
+	return seq
+end
+
 return Transition
 end
 
@@ -2236,6 +2398,59 @@ function Util.SetClipboard(text)
 		return (pcall(fn, tostring(text)))
 	end
 	return false
+end
+
+function Util.ExecutorName()
+	local name = "Roblox Studio"
+	pcall(function()
+		local fn = Util.Global("identifyexecutor") or Util.Global("getexecutorname")
+		if type(fn) == "function" then
+			local res = fn()
+			if res and tostring(res) ~= "" then
+				name = tostring(res)
+			end
+		end
+	end)
+	return name
+end
+
+function Util.ExtractInviteCode(raw)
+	local s = Util.Trim(tostring(raw or ""))
+	s = s:gsub("%?.*$", ""):gsub("/+$", "")
+	return s:match("([^/]+)$") or s
+end
+
+function Util.HttpGet(url, acceptJson)
+	local headers = { ["User-Agent"] = "Mozilla/5.0" }
+	if acceptJson ~= false then
+		headers["Accept"] = "application/json"
+	end
+	local synTbl = Util.Global("syn")
+	local httpTbl = Util.Global("http")
+	local fluxusTbl = Util.Global("fluxus")
+	local req = (type(synTbl) == "table" and synTbl.request)
+		or (type(httpTbl) == "table" and httpTbl.request)
+		or Util.Global("http_request")
+		or Util.Global("request")
+		or (type(fluxusTbl) == "table" and fluxusTbl.request)
+
+	if type(req) == "function" then
+		local ok, res = pcall(req, { Url = url, Method = "GET", Headers = headers })
+		if ok and type(res) == "table" and type(res.Body) == "string" and #res.Body > 0 then
+			local code = tonumber(res.StatusCode or res.status_code)
+			if (res.Success == nil or res.Success == true) and (not code or (code >= 200 and code < 300)) then
+				return res.Body, code or 200
+			end
+		end
+	end
+
+	local ok, body = pcall(function()
+		return game:HttpGet(url)
+	end)
+	if ok and type(body) == "string" and #body > 0 then
+		return body, 200
+	end
+	return nil, 0
 end
 
 Util.FS = {
@@ -10262,6 +10477,35 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 	end
 end
 
+local function applyStateTransition(frame, stroke, variant, hovered, pressed, confirming, animate)
+	local theme = Theme.Current
+	local targetBg = frame.BackgroundColor3
+	local targetTrans = frame.BackgroundTransparency
+	local targetStroke = stroke.Transparency
+	local tileHover = theme.TileHover or theme.Tile
+	local accentHover = theme.AccentHover or theme.Accent
+
+	if not confirming and variant == "Default" then
+		targetBg = pressed and Util.LerpColor(tileHover, theme.Accent, 0.08) or (hovered and tileHover or theme.Tile)
+		targetTrans = pressed and math.max(0.06, theme.TileTransparency - 0.14)
+			or (hovered and math.max(0.12, theme.TileTransparency - 0.08) or theme.TileTransparency)
+		targetStroke = pressed and 0.42 or (hovered and 0.56 or theme.StrokeTransparency)
+	elseif variant == "Primary" and not confirming then
+		targetBg = pressed and Util.LerpColor(accentHover, Color3.new(1, 1, 1), 0.08)
+			or (hovered and accentHover or theme.Accent)
+		targetTrans = pressed and 0.02 or (hovered and 0.06 or 0.14)
+	end
+
+	if animate then
+		Tween.Play(frame, { BackgroundColor3 = targetBg, BackgroundTransparency = targetTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
+		Tween.Play(stroke, { Transparency = targetStroke }, Tween.Fast, Enum.EasingStyle.Exponential)
+	else
+		frame.BackgroundColor3 = targetBg
+		frame.BackgroundTransparency = targetTrans
+		stroke.Transparency = targetStroke
+	end
+end
+
 -- ─── Button ──────────────────────────────────────────────────────────────────
 
 local Button = {}
@@ -10345,31 +10589,7 @@ function Button.new(parent, opts, ctx)
 			Icons.SetColor(rightIcon, confirming and "Error" or (variant == "Primary" and "AccentText" or "Muted"))
 		end
 
-		local theme = Theme.Current
-		local targetBg = row.Frame.BackgroundColor3
-		local targetTrans = row.Frame.BackgroundTransparency
-		local targetStrokeTrans = row.Stroke.Transparency
-
-		if not confirming and variant == "Default" then
-			targetBg = pressed and Util.LerpColor(theme.TileHover, theme.Accent, 0.08)
-				or (hovered and theme.TileHover or theme.Tile)
-			targetTrans = pressed and math.max(0.06, theme.TileTransparency - 0.14)
-				or (hovered and math.max(0.12, theme.TileTransparency - 0.08) or theme.TileTransparency)
-			targetStrokeTrans = pressed and 0.42 or (hovered and 0.56 or theme.StrokeTransparency)
-		elseif variant == "Primary" and not confirming then
-			targetBg = pressed and Util.LerpColor(theme.AccentHover, Color3.new(1, 1, 1), 0.08)
-				or (hovered and theme.AccentHover or theme.Accent)
-			targetTrans = pressed and 0.02 or (hovered and 0.06 or 0.14)
-		end
-
-		if animate then
-			Tween.Play(row.Frame, { BackgroundColor3 = targetBg, BackgroundTransparency = targetTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
-			Tween.Play(row.Stroke, { Transparency = targetStrokeTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
-		else
-			row.Frame.BackgroundColor3 = targetBg
-			row.Frame.BackgroundTransparency = targetTrans
-			row.Stroke.Transparency = targetStrokeTrans
-		end
+		applyStateTransition(row.Frame, row.Stroke, variant, hovered, pressed, confirming, animate)
 	end
 
 	refreshVisual(false)
@@ -10656,29 +10876,7 @@ function ButtonGroup.new(parent, opts, ctx)
 				iconObj[Icons.TransparencyProperty(iconObj)] = dim
 			end
 
-			local theme = Theme.Current
-			local targetBg = btn.BackgroundColor3
-			local targetTrans = btn.BackgroundTransparency
-			local targetStroke = stroke.Transparency
-			if bVariant == "Default" then
-				targetBg = isPressed and Util.LerpColor(theme.TileHover, theme.Accent, 0.08)
-					or (isHovered and theme.TileHover or theme.Tile)
-				targetTrans = isPressed and math.max(0.06, theme.TileTransparency - 0.14)
-					or (isHovered and math.max(0.12, theme.TileTransparency - 0.08) or theme.TileTransparency)
-				targetStroke = isPressed and 0.42 or (isHovered and 0.56 or theme.StrokeTransparency)
-			elseif bVariant == "Primary" then
-				targetBg = isPressed and Util.LerpColor(theme.AccentHover, Color3.new(1, 1, 1), 0.08)
-					or (isHovered and theme.AccentHover or theme.Accent)
-				targetTrans = isPressed and 0.02 or (isHovered and 0.06 or 0.14)
-			end
-			if animate then
-				Tween.Play(btn, { BackgroundColor3 = targetBg, BackgroundTransparency = targetTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
-				Tween.Play(stroke, { Transparency = targetStroke }, Tween.Fast, Enum.EasingStyle.Exponential)
-			else
-				btn.BackgroundColor3 = targetBg
-				btn.BackgroundTransparency = targetTrans
-				stroke.Transparency = targetStroke
-			end
+			applyStateTransition(btn, stroke, bVariant, isHovered, isPressed, false, animate)
 		end
 
 		refreshBtn(false)
@@ -16691,6 +16889,12 @@ function Toggle.new(parent, opts, ctx)
 
 		if animate then
 			Tween.Spring(knob, { Position = targetPos }, Tween.Fast + 0.08)
+			Tween.Play(knob, { Size = UDim2.fromOffset(22, 18) }, 0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			task.delay(0.07, function()
+				if knob.Parent and not element._destroyed then
+					Tween.Spring(knob, { Size = UDim2.fromOffset(18, 18) }, 0.13)
+				end
+			end)
 			Tween.Play(accentFill, { BackgroundTransparency = targetAlpha }, Tween.Fast, Enum.EasingStyle.Quad)
 			Tween.Play(trackStroke, {
 				Color = targetStrokeColor,
@@ -17864,6 +18068,7 @@ local Assets = require("Core/Assets")
 local Create = require("Core/Create")
 local Icons = require("Core/Icons")
 local Maid = require("Core/Maid")
+local Services = require("Core/Services")
 local Theme = require("Core/Theme")
 local Transition = require("Core/Transition")
 local Tween = require("Core/Tween")
@@ -18290,6 +18495,61 @@ local function writeSavedKey(options, key)
 	Util.FS.Write(path, tostring(key))
 end
 
+local function fetchJson(url)
+	local body = Util.HttpGet(url, true)
+	if not body then
+		return nil
+	end
+	local ok, data = pcall(function()
+		return Services.HttpService:JSONDecode(body)
+	end)
+	if ok and type(data) == "table" then
+		return data
+	end
+	return nil
+end
+
+local function createPillBadge(parent, bgColorKey, strokeColorKey, dotColorKey, text, textSize, layoutOrder)
+	local badge = Create.New("Frame", {
+		Size = UDim2.fromOffset(0, 20),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Corner = 99,
+		Theme = { BackgroundColor3 = "Tile" },
+		BackgroundTransparency = 0.15,
+		Padding = { 0, 8, 0, 7 },
+		LayoutOrder = layoutOrder or 1,
+		Parent = parent,
+	})
+	Create.List(badge, {
+		Direction = Enum.FillDirection.Horizontal,
+		Gap = 5,
+		VAlign = Enum.VerticalAlignment.Center,
+	})
+	local badgeStroke = Create.Stroke(badge, {
+		Theme = { Color = strokeColorKey or "Stroke" },
+		Transparency = 0.42,
+		Thickness = 1,
+	})
+	local dot = Create.New("Frame", {
+		Size = UDim2.fromOffset(6, 6),
+		Corner = 99,
+		Theme = { BackgroundColor3 = dotColorKey or "Accent" },
+		LayoutOrder = 1,
+		Parent = badge,
+	})
+	local label = Create.Text({
+		Text = tostring(text or ""),
+		Font = "SemiBold",
+		TextSize = textSize or 11,
+		Color = dotColorKey or "Text",
+		Size = UDim2.fromOffset(0, 16),
+		AutomaticSize = Enum.AutomaticSize.X,
+		LayoutOrder = 2,
+		Parent = badge,
+	})
+	return badge, badgeStroke, dot, label
+end
+
 function Loader.KeySystem(parentGui, options)
 	assert(typeof(parentGui) == "Instance", "[Bali] Loader.KeySystem expects a parentGui Instance")
 	if not Assets.Loaded then
@@ -18298,7 +18558,8 @@ function Loader.KeySystem(parentGui, options)
 
 	options = Util.Options(options, {
 		Title = "Key Verification",
-		Subtitle = "Enter your access key to unlock this workspace.",
+		Subtitle = "Key System",
+		Version = "v2.0",
 		Note = nil,
 		Icon = "key",
 		Key = nil,
@@ -18312,14 +18573,29 @@ function Loader.KeySystem(parentGui, options)
 		KeyLink = nil,
 		OnGetKey = nil,
 		SaveKey = false,
+		RememberByDefault = nil,
 		Folder = "Bali",
 		FileName = "key.txt",
 		SavePath = nil,
+		SupportedGames = nil,
+		DefaultSupported = true,
+		DiscordName = nil,
+		DiscordInvite = nil,
+		DiscordGuildId = nil,
+		DiscordIcon = nil,
+		Changelog = nil,
+		MaxAttempts = 5,
+		Cooldown = 8,
 		Closable = true,
+		Minimizable = true,
 		Yield = false,
 		OnSuccess = nil,
 		OnCancel = nil,
 	}, "Title")
+
+	local rememberKey = options.SaveKey == true or options.RememberByDefault == true
+	local runtimeOpts = table.clone(options)
+	runtimeOpts.SaveKey = rememberKey
 
 	local customVerify = options.Verify or options.CheckKey or options.Callback
 	local function verifyKey(candidate)
@@ -18355,7 +18631,7 @@ function Loader.KeySystem(parentGui, options)
 		return true
 	end
 
-	local savedValid = checkSavedKey(options, verifyKey)
+	local savedValid = checkSavedKey(runtimeOpts, verifyKey)
 	if savedValid then
 		if type(options.OnSuccess) == "function" then
 			Util.Spawn(options.OnSuccess, savedValid)
@@ -18381,81 +18657,161 @@ function Loader.KeySystem(parentGui, options)
 	local verified = false
 	local finalKey = nil
 	local busy = false
+	local minimized = false
+	local masked = false
+	local attemptsLeft = math.max(0, tonumber(options.MaxAttempts) or 5)
+	local cooldownUntil = 0
 
-	local root, backdrop, container, _, inner = createBackdropAndCard(parentGui, maid, 400, true)
+	local vp = parentGui.AbsoluteSize
+	local useWide = vp.X <= 0 or vp.X >= 680
+	local cardW = useWide and 640 or math.max(300, math.min(440, vp.X - 24))
+	local cardH = useWide and 386 or 530
 
-	local header = Create.New("Frame", {
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+	local root = Create.New("Frame", {
+		Name = "LoaderOverlay",
+		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
-		LayoutOrder = 1,
-		Parent = inner,
+		ZIndex = 250,
+		Parent = parentGui,
 	})
+	maid:Give(root)
 
-	local leftHeader = Create.New("Frame", {
-		Size = UDim2.new(1, options.Closable ~= false and -32 or 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+	local backdrop = Create.New("TextButton", {
+		Name = "Backdrop",
+		Size = UDim2.fromScale(1, 1),
+		Text = "",
+		AutoButtonColor = false,
+		Theme = { BackgroundColor3 = "Overlay" },
 		BackgroundTransparency = 1,
-		Parent = header,
+		ZIndex = 1,
+		Parent = root,
 	})
-	Create.List(leftHeader, {
-		Direction = Enum.FillDirection.Horizontal,
-		Gap = 10,
-		VAlign = Enum.VerticalAlignment.Center,
-	})
+	Tween.Play(backdrop, { BackgroundTransparency = Theme.Current.OverlayTransparency }, Tween.Fast)
 
-	local iconBadge = Create.New("Frame", {
-		Size = UDim2.fromOffset(36, 36),
-		Corner = 10,
-		Theme = { BackgroundColor3 = "Accent" },
-		BackgroundTransparency = 0.86,
-		LayoutOrder = 1,
-		Parent = leftHeader,
-	})
-	Create.Stroke(iconBadge, { Theme = { Color = "Accent" }, Transparency = 0.72 })
-	Icons.Create(options.Icon or "key", {
-		Size = UDim2.fromOffset(17, 17),
+	local container = Create.New("Frame", {
+		Name = "CardContainer",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "Accent",
-		Parent = iconBadge,
-	})
-
-	local headerText = Create.New("Frame", {
-		Size = UDim2.new(1, -46, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.fromOffset(cardW, cardH),
 		BackgroundTransparency = 1,
-		LayoutOrder = 2,
-		Parent = leftHeader,
-	})
-	Create.List(headerText, { Gap = 2 })
-
-	Create.Text({
-		Text = tostring(options.Title or "Key Verification"),
-		Font = "SemiBold",
-		TextSize = 16,
-		Color = "Text",
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		TextWrapped = true,
-		LayoutOrder = 1,
-		Parent = headerText,
+		ZIndex = 2,
+		Parent = root,
 	})
 
-	local subText = options.Note or options.Subtitle
-	if subText and tostring(subText) ~= "" then
-		Create.Text({
-			Text = tostring(subText),
-			Font = "Regular",
-			TextSize = 12,
-			Color = "SubText",
-			Size = UDim2.new(1, 0, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			TextWrapped = true,
-			LayoutOrder = 2,
-			Parent = headerText,
+	local shadowDesc = Assets.Shadow()
+	Create.New("ImageLabel", {
+		Name = "Shadow",
+		Image = shadowDesc.Image,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = shadowDesc.Slice,
+		Position = UDim2.fromOffset(-shadowDesc.Inset, -shadowDesc.Inset + 8),
+		Size = UDim2.new(1, shadowDesc.Inset * 2, 1, shadowDesc.Inset * 2),
+		BackgroundTransparency = 1,
+		Theme = {
+			ImageColor3 = "Shadow",
+			ImageTransparency = "ShadowTransparency",
+		},
+		ZIndex = 1,
+		Parent = container,
+	})
+
+	local mainCard = Create.New("Frame", {
+		Name = "GlassCard",
+		Size = UDim2.fromScale(1, 1),
+		Theme = {
+			BackgroundColor3 = "Card",
+			BackgroundTransparency = function(t)
+				return math.min(t.CardTransparency, 0.02)
+			end,
+		},
+		Corner = 16,
+		ClipsDescendants = true,
+		ZIndex = 2,
+		Parent = container,
+	})
+	Create.GlassStroke(mainCard, 0.05)
+
+	local glowAsset = Assets.Get("Glow")
+	if glowAsset and Assets.Available then
+		Create.New("ImageLabel", {
+			Name = "GlowTop",
+			Image = glowAsset,
+			Size = UDim2.fromOffset(320, 320),
+			Position = UDim2.fromOffset(-120, -120),
+			BackgroundTransparency = 1,
+			Theme = {
+				ImageColor3 = "Accent",
+				ImageTransparency = "GlowTransparency",
+			},
+			ZIndex = 1,
+			Parent = mainCard,
+		})
+		Create.New("ImageLabel", {
+			Name = "GlowBottom",
+			Image = glowAsset,
+			AnchorPoint = Vector2.new(1, 1),
+			Size = UDim2.fromOffset(290, 290),
+			Position = UDim2.new(1, 110, 1, 110),
+			BackgroundTransparency = 1,
+			Theme = {
+				ImageColor3 = "Accent2",
+				ImageTransparency = "GlowTransparency",
+			},
+			ZIndex = 1,
+			Parent = mainCard,
 		})
 	end
+
+	-- Minimized floating restore pill
+	local restorePill = Create.New("TextButton", {
+		Name = "KeyMinimizePill",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 14),
+		Size = UDim2.fromOffset(0, 38),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Text = "",
+		AutoButtonColor = false,
+		Corner = 999,
+		Theme = {
+			BackgroundColor3 = "Card",
+			BackgroundTransparency = function(t)
+				return math.min(t.CardTransparency, 0.04)
+			end,
+		},
+		Padding = { 0, 14, 0, 10 },
+		Visible = false,
+		ZIndex = 5,
+		Parent = root,
+	})
+	local pillStroke = Create.GlassStroke(restorePill, 0.05)
+	Transition.Hover(restorePill, restorePill, "Card", "TileHover", pillStroke)
+	local pillRow = Create.New("Frame", {
+		Size = UDim2.fromScale(0, 1),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundTransparency = 1,
+		Parent = restorePill,
+	})
+	Create.List(pillRow, {
+		Direction = Enum.FillDirection.Horizontal,
+		Gap = 8,
+		VAlign = Enum.VerticalAlignment.Center,
+	})
+	Icons.Create(options.Icon or "key", {
+		Size = UDim2.fromOffset(14, 14),
+		Color = "Accent",
+		LayoutOrder = 1,
+		Parent = pillRow,
+	})
+	Create.Text({
+		Text = tostring(options.Title or "Key System") .. "  ·  Click to restore",
+		Font = "SemiBold",
+		TextSize = 12,
+		Color = "Text",
+		Size = UDim2.fromScale(0, 1),
+		AutomaticSize = Enum.AutomaticSize.X,
+		LayoutOrder = 2,
+		Parent = pillRow,
+	})
 
 	local controller = {
 		Frame = root,
@@ -18490,54 +18846,216 @@ function Loader.KeySystem(parentGui, options)
 		return verified, finalKey
 	end
 
-	if options.Closable ~= false then
-		local closeBtn = Create.New("TextButton", {
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.fromScale(1, 0),
-			Size = UDim2.fromOffset(28, 28),
-			Text = "",
-			Corner = 8,
-			Theme = { BackgroundColor3 = "Tile", BackgroundTransparency = "TileTransparency" },
-			Parent = header,
-		})
-		local closeStroke = Create.Stroke(closeBtn, {
-			Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
-		})
-		Icons.Create("x", {
-			Size = UDim2.fromOffset(14, 14),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Color = "SubText",
-			Parent = closeBtn,
-		})
-		Transition.Hover(closeBtn, closeBtn, "Tile", "TileHover", closeStroke)
-		maid:Give(closeBtn.Activated:Connect(function()
-			controller:Close()
-			if type(options.OnCancel) == "function" then
-				Util.Spawn(options.OnCancel)
-			end
-		end))
+	local function setMinimized(state)
+		if closed then
+			return
+		end
+		minimized = state == true
+		if minimized then
+			Tween.Play(backdrop, { BackgroundTransparency = 1 }, Tween.Fast)
+			restorePill.Visible = true
+			Transition.Unmount(container, 0.94, function()
+				if minimized and container.Parent then
+					container.Visible = false
+				end
+			end)
+		else
+			restorePill.Visible = false
+			Tween.Play(backdrop, { BackgroundTransparency = Theme.Current.OverlayTransparency }, Tween.Fast)
+			container.Visible = true
+			Transition.Mount(container, 0.94)
+		end
 	end
 
-	-- Input Field
-	local field = Create.New("Frame", {
-		Size = UDim2.new(1, 0, 0, 38),
-		Corner = 9,
-		Theme = { BackgroundColor3 = "Field" },
+	maid:Give(restorePill.Activated:Connect(function(input)
+		Transition.Ripple(restorePill, input, "Accent")
+		setMinimized(false)
+	end))
+
+	-- Responsive Left & Right Panes
+	local leftPane = Create.New("Frame", {
+		Name = "LeftPane",
+		Position = UDim2.fromOffset(0, 0),
+		Size = useWide and UDim2.new(0, 384, 1, 0) or UDim2.new(1, 0, 0, 296),
+		BackgroundTransparency = 1,
+		Padding = { 24, 24, 20, 24 },
+		ZIndex = 2,
+		Parent = mainCard,
+	})
+
+	if useWide then
+		Create.New("Frame", {
+			Name = "VerticalDivider",
+			Position = UDim2.fromOffset(384, 22),
+			Size = UDim2.new(0, 1, 1, -44),
+			Theme = {
+				BackgroundColor3 = "Divider",
+				BackgroundTransparency = "DividerTransparency",
+			},
+			ZIndex = 2,
+			Parent = mainCard,
+		})
+	end
+
+	local rightPane = Create.New("Frame", {
+		Name = "RightPane",
+		Position = useWide and UDim2.fromOffset(385, 0) or UDim2.fromOffset(0, 296),
+		Size = useWide and UDim2.new(1, -385, 1, 0) or UDim2.new(1, 0, 1, -296),
+		BackgroundTransparency = 1,
+		Padding = { 18, 20, 18, 20 },
+		ZIndex = 2,
+		Parent = mainCard,
+	})
+
+	-- ─── Left Column: Brand Header ────────────────────────────────────────────
+	local header = Create.New("Frame", {
+		Size = UDim2.new(1, 0, 0, 44),
+		BackgroundTransparency = 1,
+		Parent = leftPane,
+	})
+	Create.List(header, {
+		Direction = Enum.FillDirection.Horizontal,
+		Gap = 11,
+		VAlign = Enum.VerticalAlignment.Center,
+	})
+
+	local iconBadge = Create.New("Frame", {
+		Size = UDim2.fromOffset(40, 40),
+		Corner = 11,
+		Theme = { BackgroundColor3 = "Accent" },
+		LayoutOrder = 1,
+		Parent = header,
+	})
+	local badgeGrad = Instance.new("UIGradient")
+	badgeGrad.Color = Theme.AccentSequence()
+	badgeGrad.Rotation = 35
+	badgeGrad.Parent = iconBadge
+	maid:Give(Theme.Changed:Connect(function(theme)
+		badgeGrad.Color = Theme.AccentSequence(theme)
+	end))
+	Icons.Create(options.Icon or "key", {
+		Size = UDim2.fromOffset(18, 18),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Color = "AccentText",
+		Parent = iconBadge,
+	})
+
+	local titleBlock = Create.New("Frame", {
+		Size = UDim2.new(1, -110, 1, 0),
+		BackgroundTransparency = 1,
 		LayoutOrder = 2,
-		Parent = inner,
+		Parent = header,
+	})
+	Create.List(titleBlock, { Gap = 2, VAlign = Enum.VerticalAlignment.Center })
+
+	Create.Text({
+		Text = tostring(options.Title or "Key Verification"),
+		Font = "Bold",
+		TextSize = 17,
+		Color = "Text",
+		Size = UDim2.new(1, 0, 0, 20),
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		LayoutOrder = 1,
+		Parent = titleBlock,
+	})
+
+	local subText = options.Note or options.Subtitle or "Key System"
+	Create.Text({
+		Text = tostring(subText),
+		Font = "Regular",
+		TextSize = 12,
+		Color = "SubText",
+		Size = UDim2.new(1, 0, 0, 16),
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		LayoutOrder = 2,
+		Parent = titleBlock,
+	})
+
+	local verPill = Create.New("Frame", {
+		Size = UDim2.fromOffset(0, 22),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Corner = 99,
+		Theme = { BackgroundColor3 = "Tile" },
+		BackgroundTransparency = 0.25,
+		Padding = { 0, 9, 0, 9 },
+		LayoutOrder = 3,
+		Parent = header,
+	})
+	Create.Stroke(verPill, { Theme = { Color = "Accent" }, Transparency = 0.55 })
+	Create.Text({
+		Text = tostring(options.Version or "v2.0"),
+		Font = "Bold",
+		TextSize = 11,
+		Color = "Accent",
+		Size = UDim2.fromOffset(0, 22),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Parent = verPill,
+	})
+
+	Create.New("Frame", {
+		Position = UDim2.fromOffset(0, 56),
+		Size = UDim2.new(1, 0, 0, 1),
+		Theme = {
+			BackgroundColor3 = "Divider",
+			BackgroundTransparency = "DividerTransparency",
+		},
+		Parent = leftPane,
+	})
+
+	-- ─── Left Column: License Key Input + Actions ─────────────────────────────
+	local labelRow = Create.New("Frame", {
+		Position = UDim2.fromOffset(0, 72),
+		Size = UDim2.new(1, 0, 0, 16),
+		BackgroundTransparency = 1,
+		Parent = leftPane,
+	})
+	Create.Text({
+		Text = "License key",
+		Font = "Medium",
+		TextSize = 12,
+		Color = "SubText",
+		Size = UDim2.new(0.55, 0, 1, 0),
+		Parent = labelRow,
+	})
+	local attemptsLabel = Create.Text({
+		Text = attemptsLeft > 0 and (tostring(attemptsLeft) .. " attempts") or "",
+		Font = "Medium",
+		TextSize = 11,
+		Color = "Muted",
+		Size = UDim2.new(0.45, 0, 1, 0),
+		Position = UDim2.fromScale(0.55, 0),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Parent = labelRow,
+	})
+
+	local field = Create.New("Frame", {
+		Position = UDim2.fromOffset(0, 94),
+		Size = UDim2.new(1, 0, 0, 42),
+		Corner = 10,
+		Theme = { BackgroundColor3 = "Field" },
+		Parent = leftPane,
 	})
 	local fieldStroke = Create.Stroke(field, {
 		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
 	})
 
+	Icons.Create("key", {
+		Size = UDim2.fromOffset(15, 15),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 13, 0.5, 0),
+		Color = "Muted",
+		Parent = field,
+	})
+
 	local keyBox = Create.New("TextBox", {
-		Position = UDim2.fromOffset(12, 0),
-		Size = UDim2.new(1, -24, 1, 0),
+		Position = UDim2.fromOffset(36, 0),
+		Size = UDim2.new(1, -74, 1, 0),
 		Text = "",
 		PlaceholderText = "Paste your key here...",
 		TextSize = 13,
 		Font = "Regular",
+		ClearTextOnFocus = false,
 		Theme = {
 			TextColor3 = "Text",
 			PlaceholderColor3 = "Muted",
@@ -18545,25 +19063,72 @@ function Loader.KeySystem(parentGui, options)
 		Parent = field,
 	})
 
+	local maskLabel = Create.Text({
+		Position = UDim2.fromOffset(36, 0),
+		Size = UDim2.new(1, -74, 1, 0),
+		Text = "",
+		Font = "Bold",
+		TextSize = 14,
+		Color = "Text",
+		Visible = false,
+		Parent = field,
+	})
+
+	local eyeBtn = Create.New("TextButton", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -6, 0.5, 0),
+		Size = UDim2.fromOffset(28, 28),
+		Text = "",
+		AutoButtonColor = false,
+		Corner = 7,
+		Theme = { BackgroundColor3 = "Tile" },
+		BackgroundTransparency = 0.45,
+		Parent = field,
+	})
+	local eyeIcon = Icons.Create("eye", {
+		Size = UDim2.fromOffset(14, 14),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Color = "SubText",
+		Parent = eyeBtn,
+	})
+
+	local function refreshMask()
+		local txt = keyBox.Text or ""
+		if masked and #txt > 0 then
+			keyBox.TextTransparency = 1
+			maskLabel.Text = string.rep("•", math.min(#txt, 40))
+			maskLabel.Visible = true
+		else
+			keyBox.TextTransparency = 0
+			maskLabel.Visible = false
+		end
+	end
+
+	maid:Give(keyBox:GetPropertyChangedSignal("Text"):Connect(refreshMask))
+	maid:Give(eyeBtn.Activated:Connect(function()
+		masked = not masked
+		Icons.SetColor(eyeIcon, masked and "Accent" or "SubText")
+		refreshMask()
+	end))
+
 	maid:Give(keyBox.Focused:Connect(function()
 		Theme.Bind(fieldStroke, { Color = "Accent" })
-		Tween.Play(fieldStroke, { Transparency = 0.25 }, Tween.Fast)
+		Tween.Play(fieldStroke, { Transparency = 0.2 }, Tween.Fast)
 	end))
 	maid:Give(keyBox.FocusLost:Connect(function()
 		Theme.Bind(fieldStroke, { Color = "Stroke", Transparency = "StrokeTransparency" })
 	end))
 
 	local feedbackLabel = Create.Text({
+		Position = UDim2.fromOffset(2, 140),
+		Size = UDim2.new(1, -4, 0, 16),
 		Text = "",
 		Font = "Medium",
-		TextSize = 12,
+		TextSize = 11,
 		Color = "Error",
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		TextWrapped = true,
 		Visible = false,
-		LayoutOrder = 3,
-		Parent = inner,
+		Parent = leftPane,
 	})
 
 	local function shakeError(msg)
@@ -18571,42 +19136,41 @@ function Loader.KeySystem(parentGui, options)
 		Theme.Bind(feedbackLabel, { TextColor3 = "Error" })
 		feedbackLabel.Visible = true
 		Theme.Bind(fieldStroke, { Color = "Error" })
-		fieldStroke.Transparency = 0.25
+		fieldStroke.Transparency = 0.2
 
 		task.spawn(function()
-			local offsets = { -10, 10, -7, 7, -3, 0 }
+			local offsets = { -9, 9, -6, 6, -3, 0 }
 			for _, offset in ipairs(offsets) do
 				if closed or not container.Parent then
 					return
 				end
-				Tween.Play(container, { Position = UDim2.new(0.5, offset, 0.5, 0) }, 0.045, Enum.EasingStyle.Quad)
-				task.wait(0.045)
+				Tween.Play(container, { Position = UDim2.new(0.5, offset, 0.5, 0) }, 0.04, Enum.EasingStyle.Quad)
+				task.wait(0.04)
 			end
 		end)
 	end
 
-	-- Action buttons row
 	local keyLink = options.KeyUrl or options.GetKeyUrl or options.Link or options.KeyLink
 	local hasGetKey = (keyLink ~= nil and keyLink ~= "") or type(options.OnGetKey) == "function"
 
 	local btnRow = Create.New("Frame", {
-		Size = UDim2.new(1, 0, 0, 36),
+		Position = UDim2.fromOffset(0, 164),
+		Size = UDim2.new(1, 0, 0, 40),
 		BackgroundTransparency = 1,
-		LayoutOrder = 4,
-		Parent = inner,
+		Parent = leftPane,
 	})
 	Create.List(btnRow, {
 		Direction = Enum.FillDirection.Horizontal,
-		Gap = 8,
+		Gap = 10,
 	})
 
 	if hasGetKey then
 		local getBtn = Create.New("TextButton", {
-			Size = UDim2.new(0.5, -4, 1, 0),
+			Size = UDim2.new(0.45, -5, 1, 0),
 			Text = "",
 			AutoButtonColor = false,
 			ClipsDescendants = true,
-			Corner = 9,
+			Corner = 10,
 			Theme = { BackgroundColor3 = "Tile", BackgroundTransparency = "TileTransparency" },
 			LayoutOrder = 1,
 			Parent = btnRow,
@@ -18650,7 +19214,7 @@ function Loader.KeySystem(parentGui, options)
 			if type(options.OnGetKey) == "function" then
 				Util.Spawn(options.OnGetKey)
 			end
-			getLabel.Text = "Copied Link!"
+			getLabel.Text = "Copied!"
 			task.delay(1.8, function()
 				if getLabel.Parent then
 					getLabel.Text = "Get Key"
@@ -18660,12 +19224,12 @@ function Loader.KeySystem(parentGui, options)
 	end
 
 	local verifyBtn = Create.New("TextButton", {
-		Size = hasGetKey and UDim2.new(0.5, -4, 1, 0) or UDim2.fromScale(1, 1),
+		Size = hasGetKey and UDim2.new(0.55, -5, 1, 0) or UDim2.fromScale(1, 1),
 		Text = "",
 		AutoButtonColor = false,
 		BackgroundTransparency = 0,
 		ClipsDescendants = true,
-		Corner = 9,
+		Corner = 10,
 		Theme = { BackgroundColor3 = "Accent" },
 		LayoutOrder = 2,
 		Parent = btnRow,
@@ -18690,13 +19254,13 @@ function Loader.KeySystem(parentGui, options)
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 	Icons.Create("shield-check", {
-		Size = UDim2.fromOffset(14, 14),
+		Size = UDim2.fromOffset(15, 15),
 		Color = "AccentText",
 		LayoutOrder = 1,
 		Parent = verifyInner,
 	})
 	local verifyLabel = Create.Text({
-		Text = "Check Key",
+		Text = "Verify Key",
 		Font = "SemiBold",
 		TextSize = 13,
 		Color = "AccentText",
@@ -18706,10 +19270,769 @@ function Loader.KeySystem(parentGui, options)
 		Parent = verifyInner,
 	})
 
+	-- Remember key toggle + Need help link
+	local remRow = Create.New("Frame", {
+		Position = UDim2.fromOffset(0, 218),
+		Size = UDim2.new(1, 0, 0, 26),
+		BackgroundTransparency = 1,
+		Parent = leftPane,
+	})
+	local remTrack = Create.New("TextButton", {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromScale(0, 0.5),
+		Size = UDim2.fromOffset(34, 18),
+		Text = "",
+		AutoButtonColor = false,
+		Corner = 99,
+		Theme = { BackgroundColor3 = rememberKey and "Accent" or "Tile" },
+		Parent = remRow,
+	})
+	local remKnob = Create.New("Frame", {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, rememberKey and 18 or 2, 0.5, 0),
+		Size = UDim2.fromOffset(14, 14),
+		Corner = 99,
+		Theme = { BackgroundColor3 = "Knob" },
+		Parent = remTrack,
+	})
+	Create.Text({
+		Position = UDim2.fromOffset(44, 0),
+		Size = UDim2.new(0.5, 0, 1, 0),
+		Text = "Remember key",
+		Font = "Medium",
+		TextSize = 12,
+		Color = "SubText",
+		Parent = remRow,
+	})
+	maid:Give(remTrack.Activated:Connect(function()
+		rememberKey = not rememberKey
+		runtimeOpts.SaveKey = rememberKey
+		Theme.Bind(remTrack, { BackgroundColor3 = rememberKey and "Accent" or "Tile" })
+		Tween.Spring(remKnob, { Position = UDim2.new(0, rememberKey and 18 or 2, 0.5, 0) }, Tween.Fast + 0.05)
+	end))
+
+	local helpBtn = Create.New("TextButton", {
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.fromOffset(80, 26),
+		Text = "Need help?",
+		AutoButtonColor = false,
+		BackgroundTransparency = 1,
+		Font = "SemiBold",
+		TextSize = 12,
+		Theme = { TextColor3 = "Accent" },
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Parent = remRow,
+	})
+
+	-- Footer on left column
+	local footer = Create.New("Frame", {
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, 28),
+		BackgroundTransparency = 1,
+		Parent = leftPane,
+	})
+	Create.New("Frame", {
+		Size = UDim2.new(1, 0, 0, 1),
+		Theme = {
+			BackgroundColor3 = "Divider",
+			BackgroundTransparency = "DividerTransparency",
+		},
+		Parent = footer,
+	})
+	local execName = Util.ExecutorName()
+	Create.Text({
+		Position = UDim2.fromOffset(0, 7),
+		Size = UDim2.new(0.6, 0, 0, 18),
+		Text = "Executor: " .. execName,
+		Font = "Medium",
+		TextSize = 11,
+		Color = "Muted",
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = footer,
+	})
+	Create.Text({
+		Position = UDim2.fromScale(0.6, 0),
+		Size = UDim2.new(0.4, 0, 1, 0),
+		Text = tostring(options.Version or "v2.0"),
+		Font = "Medium",
+		TextSize = 11,
+		Color = "Muted",
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Parent = footer,
+	})
+
+	-- ─── Right Column: Top Actions, Game Status Card, Discord Card, Info Card ─
+	local topActions = Create.New("Frame", {
+		Size = UDim2.new(1, 0, 0, 28),
+		BackgroundTransparency = 1,
+		Parent = rightPane,
+	})
+	Create.Text({
+		Text = "Detected game",
+		Font = "Medium",
+		TextSize = 11,
+		Color = "SubText",
+		Size = UDim2.new(0.55, 0, 1, 0),
+		Parent = topActions,
+	})
+	local actBtns = Create.New("Frame", {
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.fromOffset(100, 28),
+		BackgroundTransparency = 1,
+		Parent = topActions,
+	})
+	Create.List(actBtns, {
+		Direction = Enum.FillDirection.Horizontal,
+		Gap = 6,
+		HAlign = Enum.HorizontalAlignment.Right,
+		VAlign = Enum.VerticalAlignment.Center,
+	})
+
+	local function makeSmallAct(iconName, order)
+		local btn = Create.New("TextButton", {
+			Size = UDim2.fromOffset(26, 26),
+			Text = "",
+			AutoButtonColor = false,
+			Corner = 7,
+			Theme = { BackgroundColor3 = "Tile", BackgroundTransparency = "TileTransparency" },
+			LayoutOrder = order,
+			Parent = actBtns,
+		})
+		local st = Create.Stroke(btn, {
+			Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+		})
+		local ico = Icons.Create(iconName, {
+			Size = UDim2.fromOffset(14, 14),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Color = "Text",
+			Parent = btn,
+		})
+		Transition.Hover(btn, btn, "Tile", "TileHover", st)
+		if iconName ~= "x" then
+			maid:Give(btn.MouseEnter:Connect(function()
+				Icons.SetColor(ico, "Accent")
+			end))
+			maid:Give(btn.MouseLeave:Connect(function()
+				Icons.SetColor(ico, "Text")
+			end))
+		end
+		return btn, ico
+	end
+
+	local infoIconBtn = makeSmallAct("info", 1)
+	if options.Minimizable ~= false then
+		local minIconBtn = makeSmallAct("minus", 2)
+		maid:Give(minIconBtn.Activated:Connect(function()
+			setMinimized(true)
+		end))
+	end
+	if options.Closable ~= false then
+		local closeIconBtn, xIco = makeSmallAct("x", 3)
+		maid:Give(closeIconBtn.MouseEnter:Connect(function()
+			Icons.SetColor(xIco, "Error")
+		end))
+		maid:Give(closeIconBtn.MouseLeave:Connect(function()
+			Icons.SetColor(xIco, "Text")
+		end))
+		maid:Give(closeIconBtn.Activated:Connect(function()
+			controller:Close()
+			if type(options.OnCancel) == "function" then
+				Util.Spawn(options.OnCancel)
+			end
+		end))
+	end
+
+	-- Detected Game Card
+	local gameCard = Create.New("Frame", {
+		Position = UDim2.fromOffset(0, 34),
+		Size = UDim2.new(1, 0, 0, 68),
+		Corner = 12,
+		Theme = { BackgroundColor3 = "Tile" },
+		BackgroundTransparency = 0.25,
+		Parent = rightPane,
+	})
+	Create.Stroke(gameCard, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
+
+	local gameIconBg = Create.New("Frame", {
+		Position = UDim2.fromOffset(11, 13),
+		Size = UDim2.fromOffset(42, 42),
+		Corner = 10,
+		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.85,
+		ClipsDescendants = true,
+		Parent = gameCard,
+	})
+	local gameIdStr = tostring(game.GameId or game.PlaceId or 0)
+	Create.New("ImageLabel", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Image = "rbxthumb://type=GameIcon&id=" .. gameIdStr .. "&w=150&h=150",
+		Parent = gameIconBg,
+	})
+
+	local gameNameLabel = Create.Text({
+		Position = UDim2.fromOffset(63, 12),
+		Size = UDim2.new(1, -73, 0, 18),
+		Text = "Experience #" .. tostring(game.PlaceId or 0),
+		Font = "SemiBold",
+		TextSize = 13,
+		Color = "Text",
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = gameCard,
+	})
+
+	local supportedEntry = nil
+	if type(options.SupportedGames) == "table" then
+		supportedEntry = options.SupportedGames[game.PlaceId] or options.SupportedGames[game.GameId]
+	else
+		supportedEntry = options.DefaultSupported ~= false
+	end
+	local isSupported = supportedEntry ~= nil and supportedEntry ~= false
+	local statusColorKey = isSupported and "Success" or "Error"
+	local statusText = isSupported and "Supported" or "Not Supported"
+
+	local statusWrap = Create.New("Frame", {
+		Position = UDim2.fromOffset(63, 35),
+		Size = UDim2.new(1, -73, 0, 22),
+		BackgroundTransparency = 1,
+		Parent = gameCard,
+	})
+	createPillBadge(statusWrap, "Tile", statusColorKey, statusColorKey, statusText, 11, 1)
+
+	Util.Spawn(function()
+		local name = type(supportedEntry) == "string" and supportedEntry or nil
+		local ok, info = pcall(function()
+			return Services.MarketplaceService:GetProductInfo(game.PlaceId)
+		end)
+		if ok and type(info) == "table" and info.Name then
+			name = info.Name
+		end
+		if not closed and gameNameLabel.Parent and name then
+			gameNameLabel.Text = tostring(name)
+		end
+	end)
+
+	-- Discord Community Card
+	local inviteCode = Util.ExtractInviteCode(options.DiscordInvite or "")
+	local discordCard = Create.New("TextButton", {
+		Position = UDim2.fromOffset(0, 112),
+		Size = UDim2.new(1, 0, 0, 114),
+		Text = "",
+		AutoButtonColor = false,
+		Corner = 12,
+		Theme = { BackgroundColor3 = "Tile" },
+		BackgroundTransparency = 0.25,
+		Parent = rightPane,
+	})
+	local dcStroke = Create.Stroke(discordCard, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
+	Transition.Hover(discordCard, discordCard, "Tile", "TileHover", dcStroke)
+
+	local dcBadge = Create.New("Frame", {
+		Position = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(36, 36),
+		Corner = 10,
+		BackgroundColor3 = Color3.fromRGB(88, 101, 242),
+		ClipsDescendants = true,
+		Parent = discordCard,
+	})
+	local dcDefaultIco = Icons.Create("users", {
+		Size = UDim2.fromOffset(18, 18),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Color = "AccentText",
+		Parent = dcBadge,
+	})
+	local dcImg = Create.New("ImageLabel", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ScaleType = Enum.ScaleType.Fit,
+		Visible = false,
+		Parent = dcBadge,
+	})
+
+	local dcTitleLabel = Create.Text({
+		Position = UDim2.fromOffset(58, 12),
+		Size = UDim2.new(1, -68, 0, 17),
+		Text = tostring(options.DiscordName or options.Title or "Community"),
+		Font = "SemiBold",
+		TextSize = 13,
+		Color = "Text",
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = discordCard,
+	})
+	Create.Text({
+		Position = UDim2.fromOffset(58, 31),
+		Size = UDim2.new(1, -68, 0, 15),
+		Text = inviteCode ~= "" and ("discord.gg/" .. inviteCode) or "Community Server",
+		Font = "Regular",
+		TextSize = 11,
+		Color = "SubText",
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = discordCard,
+	})
+	Create.New("Frame", {
+		Position = UDim2.fromOffset(12, 58),
+		Size = UDim2.new(1, -24, 0, 1),
+		Theme = {
+			BackgroundColor3 = "Divider",
+			BackgroundTransparency = "DividerTransparency",
+		},
+		Parent = discordCard,
+	})
+
+	local function makeStatCol(xScale, titleStr, dotColorKey)
+		local valLbl = Create.Text({
+			Position = UDim2.new(xScale, 12, 0, 65),
+			Size = UDim2.new(0.5, -14, 0, 20),
+			Text = "—",
+			Font = "Bold",
+			TextSize = 16,
+			Color = "Text",
+			Parent = discordCard,
+		})
+		local dot = Create.New("Frame", {
+			Position = UDim2.new(xScale, 12, 0, 91),
+			Size = UDim2.fromOffset(6, 6),
+			Corner = 99,
+			Theme = { BackgroundColor3 = dotColorKey },
+			Parent = discordCard,
+		})
+		dot.BorderSizePixel = 0
+		Create.Text({
+			Position = UDim2.new(xScale, 23, 0, 86),
+			Size = UDim2.new(0.5, -24, 0, 16),
+			Text = titleStr,
+			Font = "Regular",
+			TextSize = 11,
+			Color = "SubText",
+			Parent = discordCard,
+		})
+		return valLbl
+	end
+
+	local dcOnlineLabel = makeStatCol(0, "Online", "Success")
+	local dcOfflineLabel = makeStatCol(0.5, "Offline", "Muted")
+
+	maid:Give(discordCard.Activated:Connect(function(input)
+		if inviteCode ~= "" then
+			Transition.Ripple(discordCard, input, "Accent")
+			Util.SetClipboard("https://discord.gg/" .. inviteCode)
+		end
+	end))
+
+	local function applyDiscordIcon(iconSrc)
+		if closed or not iconSrc or iconSrc == "" then
+			return
+		end
+		local str = tostring(iconSrc)
+		if tonumber(str) then
+			str = "rbxassetid://" .. str
+		end
+		if str:find("://") and not str:find("^https?://") then
+			dcImg.Image = str
+			dcImg.Visible = true
+			if dcDefaultIco then
+				dcDefaultIco.Visible = false
+			end
+			return
+		end
+		local getAsset = Util.Global("getcustomasset") or Util.Global("getsynasset")
+		if type(getAsset) == "function" and Util.FS.Supported() then
+			Util.Spawn(function()
+				local hash = str:match("icons/%d+/([%w%-_]+)%.png") or "bali_discord"
+				local path = (options.Folder or "Bali") .. "/discord_" .. hash .. ".png"
+				if not Util.FS.IsFile(path) and str:find("^https?://") then
+					local bytes = Util.HttpGet(str, false)
+					if bytes and #bytes > 0 then
+						Util.FS.MakeFolder(options.Folder or "Bali")
+						Util.FS.Write(path, bytes)
+					end
+				end
+				if not closed and Util.FS.IsFile(path) then
+					local ok, asset = pcall(getAsset, path)
+					if ok and asset and dcImg.Parent then
+						dcImg.Image = asset
+						dcImg.Visible = true
+						if dcDefaultIco then
+							dcDefaultIco.Visible = false
+						end
+					end
+				end
+			end)
+		end
+	end
+
+	if options.DiscordIcon and options.DiscordIcon ~= "" then
+		applyDiscordIcon(options.DiscordIcon)
+	end
+
+	if inviteCode ~= "" or (options.DiscordGuildId and options.DiscordGuildId ~= "") then
+		Util.Spawn(function()
+			local data = nil
+			if inviteCode ~= "" then
+				data = fetchJson("https://discord.com/api/v10/invites/" .. inviteCode .. "?with_counts=true&with_expiration=true")
+				if not (data and (data.approximate_member_count ~= nil or data.approximate_presence_count ~= nil)) then
+					data = fetchJson("https://discord.com/api/v9/invites/" .. inviteCode .. "?with_counts=true&with_expiration=true")
+				end
+			end
+			if closed or not dcOnlineLabel.Parent then
+				return
+			end
+			if type(data) == "table" and (data.approximate_member_count ~= nil or data.approximate_presence_count ~= nil) then
+				local online = tonumber(data.approximate_presence_count) or 0
+				local total = tonumber(data.approximate_member_count) or online
+				dcOnlineLabel.Text = Util.FormatNumber(online)
+				dcOfflineLabel.Text = Util.FormatNumber(math.max(total - online, 0))
+				if data.guild and data.guild.name and (not options.DiscordName or options.DiscordName == "") then
+					dcTitleLabel.Text = tostring(data.guild.name)
+				end
+				if (not options.DiscordIcon or options.DiscordIcon == "") and data.guild and data.guild.id and data.guild.icon then
+					applyDiscordIcon("https://cdn.discordapp.com/icons/" .. tostring(data.guild.id) .. "/" .. tostring(data.guild.icon) .. ".png?size=128")
+				end
+			elseif options.DiscordGuildId and options.DiscordGuildId ~= "" then
+				local w = fetchJson("https://discord.com/api/guilds/" .. tostring(options.DiscordGuildId) .. "/widget.json")
+				if not closed and w and (w.presence_count ~= nil or type(w.members) == "table") then
+					local online = tonumber(w.presence_count) or (type(w.members) == "table" and #w.members or 0)
+					dcOnlineLabel.Text = Util.FormatNumber(online)
+					dcOfflineLabel.Text = "—"
+				end
+			end
+		end)
+	end
+
+	-- Information / Changelog Card (opens Slide-In Information Drawer)
+	local infoCard = Create.New("TextButton", {
+		Position = UDim2.fromOffset(0, 236),
+		Size = UDim2.new(1, 0, 0, 74),
+		Text = "",
+		AutoButtonColor = false,
+		Corner = 12,
+		Theme = { BackgroundColor3 = "Tile" },
+		BackgroundTransparency = 0.25,
+		Visible = useWide,
+		Parent = rightPane,
+	})
+	local infoCardStroke = Create.Stroke(infoCard, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
+	Transition.Hover(infoCard, infoCard, "Tile", "TileHover", infoCardStroke)
+
+	local infoBadge = Create.New("Frame", {
+		Position = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(34, 34),
+		Corner = 9,
+		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.85,
+		Parent = infoCard,
+	})
+	Icons.Create("info", {
+		Size = UDim2.fromOffset(16, 16),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Color = "Accent",
+		Parent = infoBadge,
+	})
+	Create.Text({
+		Position = UDim2.fromOffset(55, 11),
+		Size = UDim2.new(1, -82, 0, 17),
+		Text = "Information",
+		Font = "SemiBold",
+		TextSize = 13,
+		Color = "Text",
+		Parent = infoCard,
+	})
+	Create.Text({
+		Position = UDim2.fromOffset(55, 29),
+		Size = UDim2.new(1, -82, 0, 15),
+		Text = "Tap to view guide & updates",
+		Font = "Regular",
+		TextSize = 11,
+		Color = "SubText",
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = infoCard,
+	})
+	Icons.Create("chevron-right", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -12, 0.5, -6),
+		Size = UDim2.fromOffset(14, 14),
+		Color = "SubText",
+		Parent = infoCard,
+	})
+	Create.Text({
+		Position = UDim2.fromOffset(12, 52),
+		Size = UDim2.new(1, -24, 0, 14),
+		Text = "●  What's new in " .. tostring(options.Version or "v2.0"),
+		Font = "Medium",
+		TextSize = 11,
+		Color = "Accent",
+		Parent = infoCard,
+	})
+
+	-- ─── Slide-In Information Drawer Overlay ──────────────────────────────────
+	local infoOverlay = Create.New("TextButton", {
+		Name = "InfoOverlay",
+		Size = UDim2.fromScale(1, 1),
+		Text = "",
+		AutoButtonColor = false,
+		Theme = { BackgroundColor3 = "Overlay" },
+		BackgroundTransparency = 1,
+		Visible = false,
+		ZIndex = 20,
+		Parent = mainCard,
+	})
+	local drawer = Create.New("Frame", {
+		Name = "InfoDrawer",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 340, 0, 10),
+		Size = UDim2.new(0, math.min(320, cardW - 24), 1, -20),
+		Corner = 13,
+		Theme = { BackgroundColor3 = "Card" },
+		BackgroundTransparency = 0,
+		ZIndex = 21,
+		Parent = infoOverlay,
+	})
+	Create.GlassStroke(drawer, 0.05)
+
+	Create.Text({
+		Position = UDim2.fromOffset(16, 14),
+		Size = UDim2.new(1, -60, 0, 20),
+		Text = "Information",
+		Font = "Bold",
+		TextSize = 15,
+		Color = "Text",
+		Parent = drawer,
+	})
+	local drawerClose = Create.New("TextButton", {
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -12, 0, 12),
+		Size = UDim2.fromOffset(26, 26),
+		Text = "",
+		AutoButtonColor = false,
+		Corner = 7,
+		Theme = { BackgroundColor3 = "Tile" },
+		Parent = drawer,
+	})
+	Create.Stroke(drawerClose, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
+	Icons.Create("x", {
+		Size = UDim2.fromOffset(13, 13),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Color = "SubText",
+		Parent = drawerClose,
+	})
+
+	local drawerScroll = Create.New("ScrollingFrame", {
+		Position = UDim2.fromOffset(0, 48),
+		Size = UDim2.new(1, 0, 1, -54),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 3,
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		Padding = { 4, 14, 10, 14 },
+		Parent = drawer,
+	})
+	Create.List(drawerScroll, { Gap = 8 })
+
+	local function addDrawerRow(labelText, valText, colorKey)
+		local row = Create.New("Frame", {
+			Size = UDim2.new(1, 0, 0, 34),
+			Corner = 9,
+			Theme = { BackgroundColor3 = "Tile" },
+			BackgroundTransparency = 0.2,
+			Padding = { 0, 10, 0, 10 },
+			Parent = drawerScroll,
+		})
+		Create.Stroke(row, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
+		Create.Text({
+			Text = labelText,
+			Font = "Regular",
+			TextSize = 12,
+			Color = "SubText",
+			Size = UDim2.new(0.5, 0, 1, 0),
+			Parent = row,
+		})
+		Create.Text({
+			Position = UDim2.fromScale(0.5, 0),
+			Size = UDim2.new(0.5, 0, 1, 0),
+			Text = tostring(valText),
+			Font = "SemiBold",
+			TextSize = 12,
+			Color = colorKey or "Text",
+			TextXAlignment = Enum.TextXAlignment.Right,
+			Parent = row,
+		})
+	end
+
+	Create.Text({
+		Text = "SESSION STATUS",
+		Font = "Bold",
+		TextSize = 11,
+		Color = "Accent",
+		Size = UDim2.new(1, 0, 0, 18),
+		Parent = drawerScroll,
+	})
+	addDrawerRow("Game Status", statusText, statusColorKey)
+	addDrawerRow("Executor", execName)
+	addDrawerRow("Place ID", tostring(game.PlaceId or 0))
+
+	local changelogList = type(options.Changelog) == "table" and options.Changelog or {
+		{ Version = tostring(options.Version or "v2.0"), Date = "Latest", Changes = { "Hardware-accelerated animations & Key System" } },
+	}
+	Create.Text({
+		Text = "CHANGELOG",
+		Font = "Bold",
+		TextSize = 11,
+		Color = "Accent",
+		Size = UDim2.new(1, 0, 0, 20),
+		Parent = drawerScroll,
+	})
+	for _, entry in ipairs(changelogList) do
+		local cFrame = Create.New("Frame", {
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Corner = 10,
+			Theme = { BackgroundColor3 = "Tile" },
+			BackgroundTransparency = 0.2,
+			Padding = { 9, 10, 9, 10 },
+			Parent = drawerScroll,
+		})
+		Create.Stroke(cFrame, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
+		Create.List(cFrame, { Gap = 4 })
+		Create.Text({
+			Text = tostring(entry.Version or "Release") .. "  ·  " .. tostring(entry.Date or ""),
+			Font = "SemiBold",
+			TextSize = 11,
+			Color = "Accent",
+			Size = UDim2.new(1, 0, 0, 16),
+			Parent = cFrame,
+		})
+		for _, ch in ipairs(entry.Changes or {}) do
+			Create.Text({
+				Text = "•  " .. tostring(ch),
+				Font = "Regular",
+				TextSize = 11,
+				Color = "SubText",
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				TextWrapped = true,
+				Parent = cFrame,
+			})
+		end
+	end
+
+	local infoOpen = false
+	local function openInfoDrawer()
+		if infoOpen then
+			return
+		end
+		infoOpen = true
+		infoOverlay.Visible = true
+		Tween.Play(infoOverlay, { BackgroundTransparency = 0.45 }, Tween.Fast)
+		drawer.Position = UDim2.new(1, 340, 0, 10)
+		Tween.Spring(drawer, { Position = UDim2.new(1, -10, 0, 10) }, 0.26)
+	end
+	local function closeInfoDrawer()
+		if not infoOpen then
+			return
+		end
+		infoOpen = false
+		Tween.Play(infoOverlay, { BackgroundTransparency = 1 }, Tween.Fast)
+		Tween.Play(drawer, { Position = UDim2.new(1, 340, 0, 10) }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		task.delay(0.2, function()
+			if not infoOpen and infoOverlay.Parent then
+				infoOverlay.Visible = false
+			end
+		end)
+	end
+
+	maid:Give(infoCard.Activated:Connect(openInfoDrawer))
+	maid:Give(infoIconBtn.Activated:Connect(openInfoDrawer))
+	maid:Give(helpBtn.Activated:Connect(openInfoDrawer))
+	maid:Give(drawerClose.Activated:Connect(closeInfoDrawer))
+	maid:Give(infoOverlay.Activated:Connect(closeInfoDrawer))
+
+	-- ─── Animated Access Granted Overlay ──────────────────────────────────────
+	local successView = Create.New("Frame", {
+		Name = "SuccessOverlay",
+		Size = UDim2.fromScale(1, 1),
+		Theme = { BackgroundColor3 = "Card" },
+		BackgroundTransparency = 0.02,
+		Corner = 16,
+		Visible = false,
+		ZIndex = 30,
+		Parent = mainCard,
+	})
+	local sCircle = Create.New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, -42),
+		Size = UDim2.fromOffset(66, 66),
+		Corner = 999,
+		Theme = { BackgroundColor3 = "Accent" },
+		Parent = successView,
+	})
+	local sGrad = Instance.new("UIGradient")
+	sGrad.Color = Theme.AccentSequence()
+	sGrad.Rotation = 40
+	sGrad.Parent = sCircle
+	Icons.Create("check", {
+		Size = UDim2.fromOffset(28, 28),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Color = "AccentText",
+		Parent = sCircle,
+	})
+	Create.Text({
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 6),
+		Size = UDim2.fromOffset(320, 26),
+		Text = "Access granted",
+		Font = "Bold",
+		TextSize = 20,
+		Color = "Text",
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Parent = successView,
+	})
+	Create.Text({
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 34),
+		Size = UDim2.fromOffset(340, 18),
+		Text = "Welcome — preparing " .. tostring(options.Title or "Bali"),
+		Font = "Regular",
+		TextSize = 12,
+		Color = "SubText",
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Parent = successView,
+	})
+	local sTrack = Create.New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 66),
+		Size = UDim2.fromOffset(220, 6),
+		Corner = 99,
+		Theme = { BackgroundColor3 = "Tile" },
+		ClipsDescendants = true,
+		Parent = successView,
+	})
+	local sFill = Create.New("Frame", {
+		Size = UDim2.fromScale(0, 1),
+		Corner = 99,
+		Theme = { BackgroundColor3 = "Accent" },
+		Parent = sTrack,
+	})
+
+	-- ─── Submit / Verify Handler ──────────────────────────────────────────────
 	local function submit(input)
 		if busy or closed then
 			return
 		end
+		if os.clock() < cooldownUntil then
+			shakeError(string.format("Too many attempts. Wait %.0fs.", math.ceil(cooldownUntil - os.clock())))
+			return
+		end
+
 		busy = true
 		if input then
 			Transition.Ripple(verifyBtn, input, "AccentText")
@@ -18728,19 +20051,32 @@ function Loader.KeySystem(parentGui, options)
 				finalKey = entered
 				controller.Verified = true
 				controller.Key = entered
-				writeSavedKey(options, entered)
+				writeSavedKey(runtimeOpts, entered)
 				verifyLabel.Text = "Verified"
 				feedbackLabel.Text = tostring(message or "Access granted.")
 				Theme.Bind(feedbackLabel, { TextColor3 = "Success" })
 				feedbackLabel.Visible = true
 				Theme.Bind(fieldStroke, { Color = "Success" })
-				task.wait(0.35)
+
+				successView.Visible = true
+				Tween.Play(sFill, { Size = UDim2.fromScale(1, 1) }, 0.34, Enum.EasingStyle.Exponential)
+				task.wait(0.38)
 				controller:Close()
 				if type(options.OnSuccess) == "function" then
 					Util.Spawn(options.OnSuccess, entered)
 				end
 			else
-				verifyLabel.Text = "Check Key"
+				if (tonumber(options.MaxAttempts) or 0) > 0 then
+					attemptsLeft = math.max(attemptsLeft - 1, 0)
+					if attemptsLeft <= 0 then
+						cooldownUntil = os.clock() + (tonumber(options.Cooldown) or 8)
+						attemptsLeft = tonumber(options.MaxAttempts) or 5
+						attemptsLabel.Text = "Cooldown..."
+					else
+						attemptsLabel.Text = tostring(attemptsLeft) .. " left"
+					end
+				end
+				verifyLabel.Text = "Verify Key"
 				shakeError(message)
 			end
 		end)
@@ -18789,18 +20125,28 @@ function MobileButton.new(parentLayer, window, options)
 	assert(typeof(parentLayer) == "Instance", "[Bali] MobileButton expects a parentLayer Instance")
 	options = Util.Options(options, {
 		Title = "Bali",
+		Subtitle = "Tap to show",
 		Icon = "sparkles",
 		Enabled = true,
 		AlwaysShow = false,
-		Position = UDim2.fromOffset(18, 18),
+		Centered = true,
+		Position = nil,
 	}, "Title")
 
 	local maid = Maid.new()
+	local userDragged = options.Position ~= nil
+
+	local function defaultCenteredPos()
+		local vpX = parentLayer.AbsoluteSize.X
+		local approxW = 168
+		local x = vpX > 0 and math.floor((vpX - approxW) * 0.5) or 18
+		return UDim2.fromOffset(math.max(8, x), 12)
+	end
 
 	local wrapper = Create.New("Frame", {
 		Name = "BaliMobileButton",
-		Position = options.Position or UDim2.fromOffset(18, 18),
-		Size = UDim2.fromOffset(0, 38),
+		Position = options.Position or defaultCenteredPos(),
+		Size = UDim2.fromOffset(0, 42),
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundTransparency = 1,
 		Visible = false,
@@ -18828,7 +20174,7 @@ function MobileButton.new(parentLayer, window, options)
 
 	local pill = Create.New("TextButton", {
 		Name = "Pill",
-		Size = UDim2.fromOffset(0, 38),
+		Size = UDim2.fromOffset(0, 42),
 		AutomaticSize = Enum.AutomaticSize.X,
 		Text = "",
 		AutoButtonColor = false,
@@ -18836,9 +20182,11 @@ function MobileButton.new(parentLayer, window, options)
 		Corner = 999,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = "CardTransparency",
+			BackgroundTransparency = function(t)
+				return math.min(t.CardTransparency, 0.04)
+			end,
 		},
-		Padding = { 0, 12, 0, 8 },
+		Padding = { 0, 14, 0, 10 },
 		ZIndex = 2,
 		Parent = wrapper,
 	})
@@ -18853,7 +20201,7 @@ function MobileButton.new(parentLayer, window, options)
 	})
 	Create.List(content, {
 		Direction = Enum.FillDirection.Horizontal,
-		Gap = 8,
+		Gap = 9,
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 
@@ -18880,15 +20228,38 @@ function MobileButton.new(parentLayer, window, options)
 		Parent = badge,
 	})
 
+	local textCol = Create.New("Frame", {
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+		Parent = content,
+	})
+	Create.List(textCol, {
+		Gap = 1,
+		VAlign = Enum.VerticalAlignment.Center,
+	})
+
 	local titleLabel = Create.Text({
 		Text = tostring(options.Title or "Bali"),
 		Font = "SemiBold",
 		TextSize = 12,
 		Color = "Text",
-		Size = UDim2.fromScale(0, 1),
+		Size = UDim2.fromOffset(0, 14),
+		AutomaticSize = Enum.AutomaticSize.X,
+		LayoutOrder = 1,
+		Parent = textCol,
+	})
+
+	local subLabel = Create.Text({
+		Text = tostring(options.Subtitle or "Tap to show"),
+		Font = "Regular",
+		TextSize = 10,
+		Color = "SubText",
+		Size = UDim2.fromOffset(0, 12),
 		AutomaticSize = Enum.AutomaticSize.X,
 		LayoutOrder = 2,
-		Parent = content,
+		Parent = textCol,
 	})
 
 	local statusDot = Create.New("Frame", {
@@ -18909,6 +20280,7 @@ function MobileButton.new(parentLayer, window, options)
 		Enabled = options.Enabled ~= false,
 		AlwaysShow = options.AlwaysShow == true,
 		_titleLabel = titleLabel,
+		_subLabel = subLabel,
 		_statusDot = statusDot,
 	}, MobileButton)
 
@@ -18924,6 +20296,18 @@ function MobileButton.new(parentLayer, window, options)
 		local maxX = math.max(8, vp.X - size.X - 8)
 		local maxY = math.max(8, vp.Y - size.Y - 8)
 		return Util.Clamp(x, 8, maxX), Util.Clamp(y, 8, maxY)
+	end
+
+	local function recenterIfAuto()
+		if userDragged then
+			return
+		end
+		local vpX = parentLayer.AbsoluteSize.X
+		local w = wrapper.AbsoluteSize.X > 0 and wrapper.AbsoluteSize.X or 168
+		if vpX > 0 then
+			local nx, ny = clampPosition(math.floor((vpX - w) * 0.5), 12)
+			wrapper.Position = UDim2.fromOffset(math.floor(nx), math.floor(ny))
+		end
 	end
 
 	maid:Give(pill.InputBegan:Connect(function(input)
@@ -18943,6 +20327,7 @@ function MobileButton.new(parentLayer, window, options)
 		local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStartMouse
 		if not moved and delta.Magnitude >= DRAG_THRESHOLD then
 			moved = true
+			userDragged = true
 		end
 		if moved then
 			local nx, ny = clampPosition(dragStartPos.X + delta.X, dragStartPos.Y + delta.Y)
@@ -18964,12 +20349,29 @@ function MobileButton.new(parentLayer, window, options)
 	end))
 
 	maid:Give(parentLayer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		local nx, ny = clampPosition(wrapper.Position.X.Offset, wrapper.Position.Y.Offset)
-		wrapper.Position = UDim2.fromOffset(math.floor(nx), math.floor(ny))
+		if not userDragged then
+			recenterIfAuto()
+		else
+			local nx, ny = clampPosition(wrapper.Position.X.Offset, wrapper.Position.Y.Offset)
+			wrapper.Position = UDim2.fromOffset(math.floor(nx), math.floor(ny))
+		end
 	end))
+	maid:Give(wrapper:GetPropertyChangedSignal("AbsoluteSize"):Connect(recenterIfAuto))
 
 	self:UpdateVisibility()
 	return self
+end
+
+function MobileButton:GetRect()
+	local w = self.Frame.AbsoluteSize.X > 0 and self.Frame.AbsoluteSize.X or 168
+	local h = self.Frame.AbsoluteSize.Y > 0 and self.Frame.AbsoluteSize.Y or 40
+	local vp = self.Frame.Parent and self.Frame.Parent.AbsoluteSize or Vector2.new(1280, 720)
+	local x = self.Frame.Position.X.Offset
+	if x <= 0 and vp.X > 0 then
+		x = math.floor((vp.X - w) * 0.5)
+	end
+	local y = self.Frame.Position.Y.Offset > 0 and self.Frame.Position.Y.Offset or 12
+	return x, y, w, h
 end
 
 function MobileButton:SetTitle(text)
@@ -19936,6 +21338,7 @@ function Tab:_setActiveVisual(active, instant)
 	if active and not instant then
 		local activeScroll = self.ActiveSubTab and self.ActiveSubTab.Scroll or self._defaultFlow.Scroll
 		Transition.SlideFade(activeScroll, 8)
+		Transition.Cascade(activeScroll, 0.022, 12)
 	end
 end
 
@@ -20028,6 +21431,7 @@ function Tab:SelectSubTab(subTab)
 
 	self.ActiveSubTab = subTab
 	Transition.SlideFade(subTab.Scroll, 0, dir * 16)
+	Transition.Cascade(subTab.Scroll, 0.02, 10)
 	self:_syncSubTabIndicator(false)
 
 	if self.Window and self.Window.ActiveTab == self then
@@ -20245,12 +21649,22 @@ local function createActionButton(parent, iconName, tooltipText, layoutOrder, ma
 		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
 	})
 	local iconInst = Icons.Create(iconName, {
-		Size = UDim2.fromOffset(14, 14),
+		Size = UDim2.fromOffset(15, 15),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "SubText",
+		Color = "Text",
 		Parent = btn,
 	})
+	maid:Give(btn.MouseEnter:Connect(function()
+		if iconName ~= "x" then
+			Icons.SetColor(iconInst, "Accent")
+		end
+	end))
+	maid:Give(btn.MouseLeave:Connect(function()
+		if iconName ~= "x" then
+			Icons.SetColor(iconInst, "Text")
+		end
+	end))
 	maid:Give(Transition.Hover(btn, btn, "Tile", "TileHover", stroke))
 	if tooltipText and tooltipText ~= "" then
 		maid:Give(Tooltip.Bind(btn, tooltipText))
@@ -21013,6 +22427,9 @@ function Window.new(screenGui, options)
 		_sidebarExpandedWidth = expandedWidth,
 		_sidebarCollapsed = isCollapsed,
 		_visible = true,
+		_visSeq = 0,
+		_morphing = false,
+		_mainCorner = main:FindFirstChildOfClass("UICorner"),
 		_destroyed = false,
 		_activePopup = nil,
 		_layoutChanged = Signal.new(),
@@ -21279,7 +22696,7 @@ function Window.new(screenGui, options)
 		Icons.SetColor(closeIcon, "Error")
 	end))
 	maid:Give(closeBtn.MouseLeave:Connect(function()
-		Icons.SetColor(closeIcon, "SubText")
+		Icons.SetColor(closeIcon, "Text")
 	end))
 	maid:Give(closeBtn.Activated:Connect(function(input)
 		Transition.Ripple(closeBtn, input, "Error")
@@ -21802,23 +23219,134 @@ function Window:SetVisible(visible)
 		return
 	end
 	self._visible = visible
+	self._visSeq = (self._visSeq or 0) + 1
+	local seq = self._visSeq
 
 	Blur.SetOpen(visible)
-	if not visible then
-		self:ClosePopup()
-		CommandPalette.Close()
-		Transition.Unmount(self.MainWrapper, 0.95, function()
-			if not self._visible and self.MainWrapper and self.MainWrapper.Parent then
-				self.MainWrapper.Visible = false
-			end
-		end)
-	else
-		self.MainWrapper.Visible = true
-		Transition.Mount(self.MainWrapper, 0.95)
-	end
+
+	local wrapper = self.MainWrapper
+	local mainCorner = self._mainCorner
+	local pill = self._mobileButton
 
 	if self._mobileButton then
 		self._mobileButton:UpdateVisibility()
+	end
+
+	if not visible then
+		self:ClosePopup()
+		CommandPalette.Close()
+
+		if not self._morphing then
+			self._restorePos = wrapper.Position
+			self._restoreSize = wrapper.Size
+		end
+
+		if pill and pill.Enabled and not Tween.Reduced then
+			self._morphing = true
+			local px, py, pw, ph = pill:GetRect()
+			local restorePos = self._restorePos
+			local restoreSize = self._restoreSize
+
+			self.Sidebar.Visible = false
+			self.BodyArea.Visible = false
+			wrapper.ZIndex = 20
+
+			Tween.Play(
+				wrapper,
+				{ Position = UDim2.fromOffset(px, py), Size = UDim2.fromOffset(pw, ph) },
+				0.21,
+				Enum.EasingStyle.Exponential,
+				Enum.EasingDirection.Out
+			)
+			if mainCorner then
+				Tween.Play(mainCorner, { CornerRadius = UDim.new(0, 22) }, 0.2, Enum.EasingStyle.Exponential)
+			end
+
+			task.delay(0.21, function()
+				if self._visSeq ~= seq or self._visible or not wrapper.Parent then
+					return
+				end
+				wrapper.Visible = false
+				wrapper.ZIndex = 2
+				if restorePos and restoreSize then
+					wrapper.Position = restorePos
+					wrapper.Size = restoreSize
+				end
+				if mainCorner then
+					mainCorner.CornerRadius = UDim.new(0, 14)
+				end
+				self.Sidebar.Visible = true
+				self.BodyArea.Visible = true
+				self._morphing = false
+			end)
+			return
+		end
+
+		Transition.Unmount(wrapper, 0.95, function()
+			if not self._visible and wrapper and wrapper.Parent then
+				wrapper.Visible = false
+			end
+		end)
+	else
+		if pill and pill.Enabled and not Tween.Reduced then
+			self._morphing = true
+			local px, py, pw, ph = pill:GetRect()
+			local restorePos = self._restorePos or wrapper.Position
+			local restoreSize = self._restoreSize or wrapper.Size
+
+			wrapper.Position = UDim2.fromOffset(px, py)
+			wrapper.Size = UDim2.fromOffset(pw, ph)
+			if mainCorner then
+				mainCorner.CornerRadius = UDim.new(0, 22)
+			end
+			self.Sidebar.Visible = false
+			self.BodyArea.Visible = false
+			wrapper.ZIndex = 20
+			wrapper.Visible = true
+
+			Tween.Play(
+				wrapper,
+				{ Position = restorePos, Size = restoreSize },
+				0.22,
+				Enum.EasingStyle.Exponential,
+				Enum.EasingDirection.Out
+			)
+			if mainCorner then
+				Tween.Play(mainCorner, { CornerRadius = UDim.new(0, 14) }, 0.22, Enum.EasingStyle.Exponential)
+			end
+
+			task.delay(0.09, function()
+				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
+					return
+				end
+				self.Sidebar.Visible = true
+				self.BodyArea.Visible = true
+				if self.ActiveTab then
+					local activeScroll = self.ActiveTab.ActiveSubTab and self.ActiveTab.ActiveSubTab.Scroll
+						or (self.ActiveTab._defaultFlow and self.ActiveTab._defaultFlow.Scroll)
+					if activeScroll then
+						Transition.Cascade(activeScroll, 0.022, 12)
+					end
+				end
+			end)
+
+			task.delay(0.23, function()
+				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
+					return
+				end
+				wrapper.ZIndex = 2
+				self._morphing = false
+			end)
+			return
+		end
+
+		self.Sidebar.Visible = true
+		self.BodyArea.Visible = true
+		if mainCorner then
+			mainCorner.CornerRadius = UDim.new(0, 14)
+		end
+		wrapper.Visible = true
+		Transition.Mount(wrapper, 0.95)
 	end
 end
 

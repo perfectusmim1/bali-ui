@@ -102,6 +102,12 @@ function Toggle.new(parent, opts, ctx)
 
 		if animate then
 			Tween.Spring(knob, { Position = targetPos }, Tween.Fast + 0.08)
+			Tween.Play(knob, { Size = UDim2.fromOffset(22, 18) }, 0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			task.delay(0.07, function()
+				if knob.Parent and not element._destroyed then
+					Tween.Spring(knob, { Size = UDim2.fromOffset(18, 18) }, 0.13)
+				end
+			end)
 			Tween.Play(accentFill, { BackgroundTransparency = targetAlpha }, Tween.Fast, Enum.EasingStyle.Quad)
 			Tween.Play(trackStroke, {
 				Color = targetStrokeColor,

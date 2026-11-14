@@ -71,10 +71,18 @@ local Base = {
 	NoiseTransparency = 0.965,
 }
 
+local function computeAccentHover(theme)
+	local target = (theme.Dark == false) and Color3.new(0, 0, 0) or Color3.new(1, 1, 1)
+	return theme.Accent:Lerp(target, 0.14)
+end
+
 local function preset(overrides)
 	local theme = table.clone(Base)
 	for key, value in pairs(overrides) do
 		theme[key] = value
+	end
+	if theme.AccentHover == nil then
+		theme.AccentHover = computeAccentHover(theme)
 	end
 	return theme
 end
@@ -308,6 +316,7 @@ function Theme.Set(name, animate)
 	if Theme.AccentOverride then
 		Theme.Current.Accent = Theme.AccentOverride
 		Theme.Current.Accent2 = Theme.AccentOverride:Lerp(source.Accent2, 0.45)
+		Theme.Current.AccentHover = computeAccentHover(Theme.Current)
 	end
 	refresh(animate ~= false)
 	return true
@@ -328,9 +337,11 @@ function Theme.SetAccent(color, animate)
 	if color then
 		Theme.Current.Accent = color
 		Theme.Current.Accent2 = color:Lerp(source.Accent2, 0.45)
+		Theme.Current.AccentHover = computeAccentHover(Theme.Current)
 	else
 		Theme.Current.Accent = source.Accent
 		Theme.Current.Accent2 = source.Accent2
+		Theme.Current.AccentHover = source.AccentHover or computeAccentHover(Theme.Current)
 	end
 	refresh(animate ~= false)
 end
