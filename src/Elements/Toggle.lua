@@ -7,6 +7,7 @@ local Util = require("Core/Util")
 local Tween = require("Core/Tween")
 local Theme = require("Core/Theme")
 local Create = require("Core/Create")
+local Assets = require("Core/Assets")
 local Icons = require("Core/Icons")
 local Transition = require("Core/Transition")
 local Input = require("Systems/Input")
@@ -32,7 +33,7 @@ function Toggle.new(parent, opts, ctx)
 
 	local hasKeybind = opts.Keybind ~= nil
 	element._hasKeybind = hasKeybind
-	local row = Base.Row(parent, rowOpts, hasKeybind and 86 or 44)
+	local row = Base.Row(parent, rowOpts, hasKeybind and 88 or 46)
 	element:BindUI(row)
 
 	Create.List(row.Right, {
@@ -42,10 +43,10 @@ function Toggle.new(parent, opts, ctx)
 		Gap = 6,
 	})
 
-	-- Pill switch (42x22)
+	-- Glass capsule switch (44x22)
 	local track = Create.New("Frame", {
 		Name = "Track",
-		Size = UDim2.fromOffset(42, 22),
+		Size = UDim2.fromOffset(44, 22),
 		Theme = {
 			BackgroundColor3 = function(t)
 				return state and t.Accent or t.Field
@@ -62,7 +63,7 @@ function Toggle.new(parent, opts, ctx)
 				return state and t.Accent or t.Stroke
 			end,
 			Transparency = function(t)
-				return state and 1 or math.min(0.48, t.StrokeTransparency)
+				return state and 0.45 or math.min(0.48, t.StrokeTransparency)
 			end,
 		},
 		Thickness = 1.2,
@@ -70,14 +71,49 @@ function Toggle.new(parent, opts, ctx)
 
 	local knob = Create.New("Frame", {
 		Name = "Knob",
-		Size = state and UDim2.fromOffset(18, 18) or UDim2.fromOffset(16, 16),
+		Size = state and UDim2.fromOffset(20, 16) or UDim2.fromOffset(16, 16),
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, state and 22 or 3, 0.5, 0),
+		Position = UDim2.new(0, state and 21 or 3, 0.5, 0),
 		BackgroundColor3 = state and Theme.Current.Knob or (Theme.Current.Dark and Color3.fromRGB(186, 192, 206) or Theme.Current.Knob),
 		Corner = UDim.new(1, 0),
 		ZIndex = 3,
 		Parent = track,
 	})
+
+	local knobStroke = Create.Stroke(knob, {
+		Theme = { Color = "Stroke" },
+		Transparency = state and 0.25 or 0.68,
+		Thickness = 1,
+	})
+
+	local glowAsset = Assets.Get("Glow")
+	local knobGlow
+	if glowAsset then
+		knobGlow = Create.New("ImageLabel", {
+			Name = "KnobGlow",
+			Size = UDim2.fromOffset(32, 32),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			BackgroundTransparency = 1,
+			Image = glowAsset,
+			Theme = { ImageColor3 = "Accent" },
+			ImageTransparency = state and 0.52 or 1,
+			ZIndex = 2,
+			Parent = knob,
+		})
+	else
+		knobGlow = Create.New("Frame", {
+			Name = "KnobGlow",
+			Size = UDim2.fromOffset(26, 26),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Corner = UDim.new(1, 0),
+			Theme = { BackgroundColor3 = "Accent" },
+			BackgroundTransparency = state and 0.68 or 1,
+			ZIndex = 2,
+			Parent = knob,
+		})
+	end
 
 	local inputHandle = nil
 	local currentKey = nil
@@ -85,35 +121,51 @@ function Toggle.new(parent, opts, ctx)
 	local stopPulse = nil
 	local syncKeybindList = nil
 	local keyChip, keyStroke, keyLabel
+	local trackHovered = false
+	local knobAnimToken = 0
 
 	local function applyVisual(animate)
-		local targetPos = UDim2.new(0, state and 22 or 3, 0.5, 0)
-		local targetSize = state and UDim2.fromOffset(18, 18) or UDim2.fromOffset(16, 16)
+		local targetPos = UDim2.new(0, state and 21 or 3, 0.5, 0)
+		local targetSize = state and UDim2.fromOffset(20, 16) or UDim2.fromOffset(16, 16)
 		local targetKnobColor = state and Theme.Current.Knob or (Theme.Current.Dark and Color3.fromRGB(186, 192, 206) or Theme.Current.Knob)
 		local targetTrackBg = state and Theme.Current.Accent or Theme.Current.Field
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
-		local targetStrokeTrans = state and 1 or math.min(0.48, Theme.Current.StrokeTransparency)
+		local restStrokeTrans = state and 0.45 or math.min(0.48, Theme.Current.StrokeTransparency)
+		local targetStrokeTrans = trackHovered and math.max(0.18, restStrokeTrans - 0.16) or restStrokeTrans
+		local targetKnobStrokeTrans = state and 0.25 or 0.68
+		local isImgGlow = knobGlow:IsA("ImageLabel")
+		local glowProp = isImgGlow and "ImageTransparency" or "BackgroundTransparency"
+		local targetGlowTrans = state and (isImgGlow and 0.52 or 0.68) or 1
+
+		knobAnimToken += 1
+		local myToken = knobAnimToken
 
 		if animate then
-			Tween.Spring(knob, { Position = targetPos }, Tween.Fast + 0.08)
 			Tween.Play(knob, {
-				Size = UDim2.fromOffset(22, state and 18 or 16),
+				Position = targetPos,
 				BackgroundColor3 = targetKnobColor,
-			}, 0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			task.delay(0.07, function()
-				if knob.Parent and not element._destroyed then
-					Tween.Spring(knob, { Size = state and UDim2.fromOffset(18, 18) or UDim2.fromOffset(16, 16) }, 0.13)
+			}, 0.38, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+			Tween.Play(knob, {
+				Size = UDim2.fromOffset(23, 16),
+			}, 0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			task.delay(0.08, function()
+				if knob.Parent and not element._destroyed and knobAnimToken == myToken then
+					Tween.Play(knob, { Size = targetSize }, 0.26, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 				end
 			end)
-			Tween.Play(track, { BackgroundColor3 = targetTrackBg }, Tween.Fast, Enum.EasingStyle.Quad)
+			Tween.Play(knobStroke, { Transparency = targetKnobStrokeTrans }, 0.32, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+			Tween.Play(knobGlow, { [glowProp] = targetGlowTrans }, 0.38, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+			Tween.Play(track, { BackgroundColor3 = targetTrackBg }, 0.34, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 			Tween.Play(trackStroke, {
 				Color = targetStrokeColor,
 				Transparency = targetStrokeTrans,
-			}, Tween.Fast, Enum.EasingStyle.Quad)
+			}, 0.34, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 		else
 			knob.Position = targetPos
 			knob.Size = targetSize
 			knob.BackgroundColor3 = targetKnobColor
+			knobStroke.Transparency = targetKnobStrokeTrans
+			knobGlow[glowProp] = targetGlowTrans
 			track.BackgroundColor3 = targetTrackBg
 			trackStroke.Color = targetStrokeColor
 			trackStroke.Transparency = targetStrokeTrans
@@ -177,7 +229,7 @@ function Toggle.new(parent, opts, ctx)
 				keyStroke.Transparency = 0.48
 			end
 			local chipW = math.max(28, math.ceil(keyChip.AbsoluteSize.X))
-			row:SetRightWidth(42 + 6 + chipW)
+			row:SetRightWidth(44 + 6 + chipW)
 		end
 
 		element.Maid:Give(keyChip:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncChip))
@@ -294,6 +346,21 @@ function Toggle.new(parent, opts, ctx)
 
 	element.Maid:Give(Transition.Hover(hitBtn, row.Frame, "Tile", "TileHover", row.Stroke))
 
+	element.Maid:Give(hitBtn.MouseEnter:Connect(function()
+		if element.Disabled or element.Locked or Util.IsTouchDevice() then
+			return
+		end
+		trackHovered = true
+		local restStrokeTrans = state and 0.45 or math.min(0.48, Theme.Current.StrokeTransparency)
+		Tween.Play(trackStroke, { Transparency = math.max(0.18, restStrokeTrans - 0.16) }, Tween.Fast, Enum.EasingStyle.Exponential)
+	end))
+
+	element.Maid:Give(hitBtn.MouseLeave:Connect(function()
+		trackHovered = false
+		local restStrokeTrans = state and 0.45 or math.min(0.48, Theme.Current.StrokeTransparency)
+		Tween.Play(trackStroke, { Transparency = restStrokeTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
+	end))
+
 	local lastPointerPos = nil
 	element.Maid:Give(hitBtn.InputBegan:Connect(function(input)
 		if element.Disabled or element.Locked then
@@ -310,6 +377,9 @@ function Toggle.new(parent, opts, ctx)
 			keyChip.Active = not disabled
 		end
 		track.BackgroundTransparency = disabled and 0.45 or 0
+		if disabled then
+			trackHovered = false
+		end
 	end
 
 	function element:Set(val, silent)
@@ -392,20 +462,21 @@ function Checkbox.new(parent, opts, ctx)
 		rowOpts.IconBadge = false
 	end
 
-	local row = Base.Row(parent, rowOpts, 24)
+	local row = Base.Row(parent, rowOpts, 26)
 	element:BindUI(row)
 
 	local box = Create.New("Frame", {
 		Name = "CheckBox",
-		Size = UDim2.fromOffset(20, 20),
-		Position = UDim2.fromScale(1, 0.5),
-		AnchorPoint = Vector2.new(1, 0.5),
+		Size = UDim2.fromOffset(22, 22),
+		Position = UDim2.new(1, -11, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		ClipsDescendants = false,
 		Theme = {
 			BackgroundColor3 = function(t)
 				return state and t.Accent or t.Field
 			end,
 		},
-		Corner = 6,
+		Corner = 7,
 		Parent = row.Right,
 	})
 
@@ -415,50 +486,136 @@ function Checkbox.new(parent, opts, ctx)
 				return state and t.Accent or t.Stroke
 			end,
 			Transparency = function(t)
-				return state and 1 or 0.38
+				return state and 0.4 or 0.38
 			end,
 		},
 		Thickness = 1.25,
 	})
 
+	local boxGlowAsset = Assets.Get("Glow")
+	local boxGlow
+	if boxGlowAsset then
+		boxGlow = Create.New("ImageLabel", {
+			Name = "BoxGlow",
+			Size = UDim2.fromOffset(36, 36),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			BackgroundTransparency = 1,
+			Image = boxGlowAsset,
+			Theme = { ImageColor3 = "Accent" },
+			ImageTransparency = state and 0.58 or 1,
+			ZIndex = 1,
+			Parent = box,
+		})
+	else
+		boxGlow = Create.New("Frame", {
+			Name = "BoxGlow",
+			Size = UDim2.fromOffset(30, 30),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Corner = 10,
+			Theme = { BackgroundColor3 = "Accent" },
+			BackgroundTransparency = state and 0.72 or 1,
+			ZIndex = 1,
+			Parent = box,
+		})
+	end
+
+	local innerFill = Create.New("Frame", {
+		Name = "InnerFill",
+		Size = state and UDim2.fromScale(1, 1) or UDim2.fromOffset(6, 6),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		BackgroundTransparency = state and 0 or 1,
+		Theme = { BackgroundColor3 = "Accent" },
+		Corner = 6,
+		ZIndex = 2,
+		Parent = box,
+	})
+
+	local innerGrad = Instance.new("UIGradient")
+	innerGrad.Rotation = 90
+	innerGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(1, 0.16),
+	})
+	innerGrad.Parent = innerFill
+
 	local checkIcon = Icons.Create("check", {
-		Size = UDim2.fromOffset(14, 14),
+		Size = state and UDim2.fromOffset(14, 14) or UDim2.fromOffset(6, 6),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Color = "AccentText",
 		Transparency = state and 0 or 1,
-		ZIndex = 3,
+		ZIndex = 4,
 		Parent = box,
 	})
+
+	local boxHovered = false
 
 	local function applyVisual(animate)
 		local targetAlpha = state and 0 or 1
 		local targetBg = state and Theme.Current.Accent or Theme.Current.Field
-		local targetSize = state and UDim2.fromOffset(14, 14) or UDim2.fromOffset(6, 6)
+		local targetBoxTrans = state and (element.Disabled and 0.5 or 0.15) or (element.Disabled and 0.5 or 0)
+		local targetFillSize = state and UDim2.fromScale(1, 1) or UDim2.fromOffset(6, 6)
+		local targetFillTrans = state and (element.Disabled and 0.5 or 0) or 1
+		local targetIconSize = state and UDim2.fromOffset(14, 14) or UDim2.fromOffset(6, 6)
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
-		local targetStrokeTrans = state and 1 or 0.38
+		local targetStrokeTrans = state and 0.4 or (boxHovered and 0.18 or 0.38)
+		local isImgGlow = boxGlow:IsA("ImageLabel")
+		local glowProp = isImgGlow and "ImageTransparency" or "BackgroundTransparency"
+		local targetGlowTrans = state and (isImgGlow and 0.58 or 0.72) or 1
 		local iconTarget = checkIcon and Icons.TransparencyTarget(checkIcon) or nil
 		local iconTransProp = iconTarget and Icons.TransparencyProperty(iconTarget) or "ImageTransparency"
 
 		if animate then
-			Tween.Play(box, { BackgroundColor3 = targetBg }, Tween.Fast, Enum.EasingStyle.Quad)
+			box.Size = UDim2.fromOffset(18, 18)
+			Tween.Play(box, {
+				Size = UDim2.fromOffset(22, 22),
+				BackgroundColor3 = targetBg,
+				BackgroundTransparency = targetBoxTrans,
+			}, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			Tween.Play(innerFill, {
+				Size = targetFillSize,
+				BackgroundTransparency = targetFillTrans,
+			}, 0.34, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+			Tween.Play(boxGlow, { [glowProp] = targetGlowTrans }, 0.38, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 			if checkIcon and iconTarget then
-				if iconTarget == checkIcon then
-					Tween.Play(checkIcon, { [iconTransProp] = targetAlpha, Size = targetSize }, Tween.Fast, Enum.EasingStyle.Exponential)
+				if state then
+					checkIcon.Size = UDim2.fromOffset(6, 6)
+					checkIcon.Rotation = -16
+					Tween.Play(checkIcon, {
+						Size = targetIconSize,
+						Rotation = 0,
+					}, 0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+					if iconTarget == checkIcon then
+						Tween.Play(checkIcon, { [iconTransProp] = targetAlpha }, 0.22, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+					else
+						Tween.Play(iconTarget, { [iconTransProp] = targetAlpha }, 0.22, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+					end
 				else
-					Tween.Play(iconTarget, { [iconTransProp] = targetAlpha }, Tween.Fast, Enum.EasingStyle.Exponential)
-					Tween.Play(checkIcon, { Size = targetSize }, Tween.Fast, Enum.EasingStyle.Exponential)
+					Tween.Play(checkIcon, {
+						Size = targetIconSize,
+						Rotation = 10,
+					}, 0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+					Tween.Play(iconTarget, { [iconTransProp] = targetAlpha }, 0.16, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 				end
 			end
 			Tween.Play(boxStroke, {
 				Color = targetStrokeColor,
 				Transparency = targetStrokeTrans,
-			}, Tween.Fast, Enum.EasingStyle.Quad)
+			}, 0.26, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 		else
+			box.Size = UDim2.fromOffset(22, 22)
 			box.BackgroundColor3 = targetBg
+			box.BackgroundTransparency = targetBoxTrans
+			innerFill.Size = targetFillSize
+			innerFill.BackgroundTransparency = targetFillTrans
+			boxGlow[glowProp] = targetGlowTrans
 			if checkIcon and iconTarget then
 				iconTarget[iconTransProp] = targetAlpha
-				checkIcon.Size = targetSize
+				checkIcon.Size = targetIconSize
+				checkIcon.Rotation = 0
 			end
 			boxStroke.Color = targetStrokeColor
 			boxStroke.Transparency = targetStrokeTrans
@@ -485,6 +642,23 @@ function Checkbox.new(parent, opts, ctx)
 
 	element.Maid:Give(Transition.Hover(hitBtn, row.Frame, "Tile", "TileHover", row.Stroke))
 
+	element.Maid:Give(hitBtn.MouseEnter:Connect(function()
+		if element.Disabled or element.Locked or Util.IsTouchDevice() then
+			return
+		end
+		boxHovered = true
+		if not state then
+			Tween.Play(boxStroke, { Transparency = 0.18 }, Tween.Fast, Enum.EasingStyle.Exponential)
+		end
+	end))
+
+	element.Maid:Give(hitBtn.MouseLeave:Connect(function()
+		boxHovered = false
+		if not state then
+			Tween.Play(boxStroke, { Transparency = 0.38 }, Tween.Fast, Enum.EasingStyle.Exponential)
+		end
+	end))
+
 	local lastPointerPos = nil
 	element.Maid:Give(hitBtn.InputBegan:Connect(function(input)
 		if element.Disabled or element.Locked then
@@ -497,7 +671,11 @@ function Checkbox.new(parent, opts, ctx)
 
 	element._onDisabled = function(disabled)
 		hitBtn.Visible = not disabled
-		box.BackgroundTransparency = disabled and 0.5 or 0
+		box.BackgroundTransparency = state and (disabled and 0.5 or 0.15) or (disabled and 0.5 or 0)
+		innerFill.BackgroundTransparency = state and (disabled and 0.5 or 0) or 1
+		if disabled then
+			boxHovered = false
+		end
 	end
 
 	function element:Set(val, silent)

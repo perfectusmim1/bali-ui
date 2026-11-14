@@ -2322,11 +2322,23 @@ flags["Controls_SmartAutomation"]:Set(false)
 assertEq(flags["Controls_SmartAutomation"]:Get(), false, "Controls_SmartAutomation Toggle:Set(false)")
 flags["Controls_SmartAutomation"]:Set(true)
 assertEq(flags["Controls_SmartAutomation"]:Get(), true, "Controls_SmartAutomation Toggle:Set(true)")
+do
+	local togTrack = flags["Controls_SmartAutomation"].Frame:FindFirstChild("Track", true)
+	local togKnob = togTrack and togTrack:FindFirstChild("Knob")
+	local knobGlow = togKnob and togKnob:FindFirstChild("KnobGlow")
+	assertTrue(togKnob ~= nil and knobGlow ~= nil, "Toggle Knob creates KnobGlow accent bloom")
+end
 
 flags["Controls_StrictValidation"]:Set(false)
 assertEq(flags["Controls_StrictValidation"]:Get(), false, "Checkbox:Set(false)")
 flags["Controls_StrictValidation"]:Set(true)
 assertEq(flags["Controls_StrictValidation"]:Get(), true, "Checkbox:Set(true)")
+do
+	local cbBox = flags["Controls_StrictValidation"].Frame:FindFirstChild("CheckBox", true)
+	local cbFill = cbBox and cbBox:FindFirstChild("InnerFill")
+	local cbGlow = cbBox and cbBox:FindFirstChild("BoxGlow")
+	assertTrue(cbBox ~= nil and cbFill ~= nil and cbGlow ~= nil, "Checkbox CheckBox creates InnerFill and BoxGlow")
+end
 
 flags["Controls_PollingHz"]:Set(180)
 assertEq(flags["Controls_PollingHz"]:Get(), 180, "Slider:Set(180)")
@@ -2505,6 +2517,7 @@ do
 	local nStack = nLayer and nLayer:FindFirstChild("BaliNotificationStack")
 	local firstCard = nStack and nStack:FindFirstChild("Card", true)
 	assertTrue(firstCard ~= nil and firstCard:FindFirstChild("GlassSheen") ~= nil, "Notification Card has obsidian GlassSheen layer")
+	assertTrue(firstCard ~= nil and firstCard:FindFirstChild("SurfaceGradient") ~= nil, "Notification Card has vertical SurfaceGradient layer")
 	local firstIcon = firstCard and firstCard:FindFirstChild("IconBadge", true)
 	assertTrue(firstIcon ~= nil and firstIcon.Size.X.Offset == 40, "Notification IconBadge uses 40x40 glass well")
 	local firstTitle = firstCard and firstCard:FindFirstChild("Title", true)

@@ -232,6 +232,12 @@ function Button.new(parent, opts, ctx)
 
 		if rightIcon then
 			Icons.SetColor(rightIcon, confirming and "Error" or (variant == "Primary" and "AccentText" or "Muted"))
+			local targetIconSize = pressed and UDim2.fromOffset(14, 14) or (hovered and UDim2.fromOffset(16, 16) or UDim2.fromOffset(15, 15))
+			if animate then
+				Tween.Play(rightIcon, { Size = targetIconSize }, Tween.Fast, Enum.EasingStyle.Exponential)
+			else
+				rightIcon.Size = targetIconSize
+			end
 		end
 
 		applyStateTransition(row.Frame, row.Stroke, variant, hovered, pressed, confirming, animate)
@@ -327,6 +333,10 @@ function Button.new(parent, opts, ctx)
 		end
 		local rippleColor = variant == "Primary" and "AccentText" or (variant == "Danger" and "Error" or "Accent")
 		Transition.Ripple(row.Frame, posOverride or lastPointerPos, rippleColor)
+		if row.Stroke and not Tween.Reduced then
+			row.Stroke.Thickness = 1.6
+			Tween.Play(row.Stroke, { Thickness = 1 }, 0.26, Enum.EasingStyle.Exponential)
+		end
 
 		if opts.Confirm then
 			if not confirming then

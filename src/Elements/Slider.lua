@@ -81,11 +81,17 @@ local function createThumb(track, zBase)
 	end
 
 	local function setActive(active)
-		Tween.Play(thumb, { Size = active and UDim2.fromOffset(17, 17) or UDim2.fromOffset(14, 14) }, Tween.Instant, Enum.EasingStyle.Quad)
+		Tween.Play(thumb, {
+			Size = active and UDim2.fromOffset(18, 18) or UDim2.fromOffset(14, 14),
+		}, 0.24, Enum.EasingStyle.Exponential)
+		Tween.Play(stroke, {
+			Thickness = active and 2.2 or 1.5,
+			Transparency = active and 0.05 or 0.25,
+		}, 0.24, Enum.EasingStyle.Exponential)
 		if glow:IsA("ImageLabel") then
-			Tween.Play(glow, { ImageTransparency = active and 0.42 or 0.72 }, Tween.Instant, Enum.EasingStyle.Quad)
+			Tween.Play(glow, { ImageTransparency = active and 0.32 or 0.72 }, 0.24, Enum.EasingStyle.Exponential)
 		else
-			Tween.Play(glow, { BackgroundTransparency = active and 0.52 or 0.78 }, Tween.Instant, Enum.EasingStyle.Quad)
+			Tween.Play(glow, { BackgroundTransparency = active and 0.45 or 0.78 }, 0.24, Enum.EasingStyle.Exponential)
 		end
 	end
 
@@ -445,6 +451,16 @@ function Slider.new(parent, opts, ctx)
 			setThumbActive(hovered)
 		end
 	end))
+
+	if Services.UserInputService.WindowFocusReleased then
+		element.Maid:Give(Services.UserInputService.WindowFocusReleased:Connect(function()
+			if dragging then
+				dragging = false
+				activeInput = nil
+				setThumbActive(false)
+			end
+		end))
+	end
 
 	element._onDisabled = function(disabled)
 		readoutBox.TextEditable = not disabled
@@ -807,6 +823,17 @@ function RangeSlider.new(parent, opts, ctx)
 			activeInput = nil
 		end
 	end))
+
+	if Services.UserInputService.WindowFocusReleased then
+		element.Maid:Give(Services.UserInputService.WindowFocusReleased:Connect(function()
+			if activeHandle then
+				setLowActive(false)
+				setHighActive(false)
+				activeHandle = nil
+				activeInput = nil
+			end
+		end))
+	end
 
 	element._onDisabled = function(disabled)
 		trackHit.Active = not disabled

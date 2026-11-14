@@ -195,6 +195,7 @@ function Notification.GetDefaultDuration()
 end
 
 function Notification.Notify(opts)
+	local rawDuration = type(opts) == "table" and opts.Duration or nil
 	opts = Util.Options(opts, {
 		Title = "Notification",
 		Duration = DEFAULT_DURATION,
@@ -207,6 +208,7 @@ function Notification.Notify(opts)
 	local titleText = tostring(opts.Title or "Notification")
 	local bodyText = opts.Content or opts.Description or ""
 	bodyText = bodyText ~= nil and tostring(bodyText) or ""
+	local hasActions = type(opts.Actions) == "table" and #opts.Actions > 0
 
 	local historyEntry = {
 		Id = noteId,
@@ -307,6 +309,12 @@ function Notification.Notify(opts)
 	cardMinConst.Parent = card
 	Create.GlassStroke(card, 0.12)
 
+	local surfaceGrad = Instance.new("UIGradient")
+	surfaceGrad.Name = "SurfaceGradient"
+	surfaceGrad.Rotation = 90
+	surfaceGrad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(232, 235, 242))
+	surfaceGrad.Parent = card
+
 	local glassSheen = Create.New("Frame", {
 		Name = "GlassSheen",
 		Parent = card,
@@ -397,7 +405,8 @@ function Notification.Notify(opts)
 		Name = "IconBadge",
 		Parent = body,
 		Size = UDim2.fromOffset(40, 40),
-		Position = UDim2.fromOffset(0, 2),
+		AnchorPoint = Vector2.new(0, hasActions and 0 or 0.5),
+		Position = hasActions and UDim2.fromOffset(0, 2) or UDim2.new(0, 0, 0.5, 0),
 		Corner = 11,
 		BackgroundTransparency = 0.83,
 		Theme = { BackgroundColor3 = typeMeta.ColorKey },
@@ -643,7 +652,9 @@ function Notification.Notify(opts)
 
 	-- Timer & hover-to-pause state
 	local totalDuration = tonumber(opts.Duration)
-	if totalDuration == nil then
+	if rawDuration == nil and math.abs(DEFAULT_DURATION - 4.5) < 1e-4 then
+		totalDuration = math.clamp(3.0 + (#titleText + #bodyText) * 0.035, 3.8, 8.0)
+	elseif totalDuration == nil then
 		totalDuration = opts.Duration == false and 0 or DEFAULT_DURATION
 	end
 	local remaining = totalDuration
@@ -694,16 +705,19 @@ function Notification.Notify(opts)
 		else
 			local isTop = currentPosition == "TopRight" or currentPosition == "TopLeft"
 			local isLeft = currentPosition == "BottomLeft" or currentPosition == "TopLeft"
-			local slideOutX = isLeft and -24 or 24
+			local slideOutX = isLeft and -28 or 28
 			local slideOutY = isTop and -10 or 10
+			local h = math.max(wrapper.AbsoluteSize.Y, card.AbsoluteSize.Y)
 			if wrapper and wrapper.Parent then
-				local h = math.max(wrapper.AbsoluteSize.Y, card.AbsoluteSize.Y)
 				wrapper.ClipsDescendants = true
 				wrapper.AutomaticSize = Enum.AutomaticSize.None
 				wrapper.Size = UDim2.new(1, 0, 0, h)
-				Tween.Play(wrapper, { Size = UDim2.new(1, 0, 0, 0) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				Tween.Play(wrapper, { Size = UDim2.new(1, 0, 0, 0) }, 0.32, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 			end
-			Tween.Play(cardShell, { Position = UDim2.fromOffset(slideOutX, slideOutY) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			Tween.Play(cardShell, {
+				Position = UDim2.fromOffset(slideOutX, slideOutY),
+				Size = UDim2.new(1, -28, 0, h),
+			}, 0.32, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 			Transition.Unmount(cardShell, 1, finalize, { NoPositionTween = true })
 		end
 	end
@@ -827,10 +841,14 @@ function Notification.Notify(opts)
 	toastMaid:Give(card.MouseEnter:Connect(function()
 		if not Util.IsTouchDevice() then
 			pauseTimer()
+			Tween.Play(accentBar, { BackgroundTransparency = 0.02 }, 0.2, Enum.EasingStyle.Exponential)
+			Tween.Play(iconStroke, { Transparency = 0.2 }, 0.2, Enum.EasingStyle.Exponential)
 		end
 	end))
 	toastMaid:Give(card.MouseLeave:Connect(function()
 		resumeTimer()
+		Tween.Play(accentBar, { BackgroundTransparency = 0.18 }, 0.2, Enum.EasingStyle.Exponential)
+		Tween.Play(iconStroke, { Transparency = 0.45 }, 0.2, Enum.EasingStyle.Exponential)
 	end))
 
 	toastMaid:Give(wrapper.Destroying:Connect(function()
@@ -849,8 +867,12 @@ function Notification.Notify(opts)
 	local isTop = currentPosition == "TopRight" or currentPosition == "TopLeft"
 	local isLeft = currentPosition == "BottomLeft" or currentPosition == "TopLeft"
 	local slideInY = isTop and -18 or 18
-	local slideInX = isLeft and -28 or 28
+	local slideInX = isLeft and -32 or 32
 	Transition.SlideFade(cardShell, slideInY, slideInX)
+	if not Tween.Reduced and iconObj then
+		iconObj.Size = UDim2.fromOffset(14, 14)
+		Tween.Play(iconObj, { Size = UDim2.fromOffset(20, 20) }, 0.38, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	end
 	startTimer(totalDuration)
 
 	return toast
