@@ -87,12 +87,12 @@ local function createActionButton(parent, iconName, tooltipText, layoutOrder, ma
 		Parent = btn,
 	})
 	maid:Give(btn.MouseEnter:Connect(function()
-		if iconName ~= "x" then
+		if iconName ~= "x" and not Transition.IsHiddenOrUnmounting(btn) then
 			Icons.SetColor(iconInst, "Accent")
 		end
 	end))
 	maid:Give(btn.MouseLeave:Connect(function()
-		if iconName ~= "x" then
+		if iconName ~= "x" and not Transition.IsHiddenOrUnmounting(btn) then
 			Icons.SetColor(iconInst, "Text")
 		end
 	end))
@@ -1221,8 +1221,8 @@ function Window.new(screenGui, options)
 		end
 	end))
 
-	maid:Give(minBtn.Activated:Connect(function(input)
-		Transition.Ripple(minBtn, input, "Accent")
+	maid:Give(minBtn.Activated:Connect(function()
+		Tooltip.Hide()
 		self:SetVisible(false)
 	end))
 
@@ -1854,6 +1854,7 @@ function Window:SetVisible(visible)
 	end
 
 	if not visible then
+		Tooltip.Hide()
 		self:ClosePopup()
 		CommandPalette.Close()
 		if self.ActiveTab then
@@ -1893,7 +1894,7 @@ function Window:SetVisible(visible)
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
-			Transition.Unmount(wrapper, 1, function()
+			local function finalizeHide()
 				if self._visSeq ~= seq or self._visible or not wrapper.Parent then
 					return
 				end
@@ -1905,7 +1906,9 @@ function Window:SetVisible(visible)
 				self.BodyArea.Visible = true
 				self:_setAmbientChromeVisible(true)
 				self._morphing = false
-			end, { NoPositionTween = true, Duration = morphDur })
+			end
+			Transition.Unmount(wrapper, 1, finalizeHide, { NoPositionTween = true, Duration = morphDur })
+			task.delay(math.max(morphDur * Tween.Speed, 0.01) + 0.05, finalizeHide)
 			return
 		end
 
@@ -1935,6 +1938,14 @@ function Window:SetVisible(visible)
 			wrapper.ZIndex = 2
 			wrapper.Visible = true
 
+			local function finalizeShow()
+				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
+					return
+				end
+				wrapper.Position = restorePos
+				wrapper.Size = restoreSize
+				self._morphing = false
+			end
 			local restoreTw = Tween.Play(
 				wrapper,
 				{ Position = restorePos },
@@ -1944,14 +1955,8 @@ function Window:SetVisible(visible)
 			)
 			Transition.Mount(wrapper, 1, { NoPositionTween = true, Duration = morphDur })
 
-			Tween.Then(restoreTw, function()
-				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
-					return
-				end
-				wrapper.Position = restorePos
-				wrapper.Size = restoreSize
-				self._morphing = false
-			end)
+			Tween.Then(restoreTw, finalizeShow)
+			task.delay(math.max(morphDur * Tween.Speed, 0.01) + 0.05, finalizeShow)
 			return
 		end
 

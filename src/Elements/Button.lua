@@ -169,6 +169,9 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 end
 
 local function applyStateTransition(frame, stroke, variant, hovered, pressed, confirming, animate, customColor)
+	if animate and Transition.IsHiddenOrUnmounting(frame) then
+		return
+	end
 	local theme = Theme.Current
 	local targetBg = frame.BackgroundColor3
 	local targetTrans = frame.BackgroundTransparency
@@ -349,7 +352,7 @@ function Button.new(parent, opts, ctx)
 	end
 
 	element.Maid:Give(hitBtn.MouseEnter:Connect(function()
-		if element.Disabled or element.Locked or Util.IsTouchDevice() then
+		if element.Disabled or element.Locked or Util.IsTouchDevice() or Transition.IsHiddenOrUnmounting(row.Frame) then
 			return
 		end
 		hovered = true
@@ -359,12 +362,15 @@ function Button.new(parent, opts, ctx)
 	element.Maid:Give(hitBtn.MouseLeave:Connect(function()
 		hovered = false
 		pressed = false
+		if Transition.IsHiddenOrUnmounting(row.Frame) then
+			return
+		end
 		refreshVisual(true)
 	end))
 
 	local lastPointerPos = nil
 	element.Maid:Give(hitBtn.InputBegan:Connect(function(input)
-		if element.Disabled or element.Locked then
+		if element.Disabled or element.Locked or Transition.IsHiddenOrUnmounting(row.Frame) then
 			return
 		end
 		if Util.IsPointer(input) then
@@ -377,6 +383,9 @@ function Button.new(parent, opts, ctx)
 	element.Maid:Give(hitBtn.InputEnded:Connect(function(input)
 		if Util.IsPointer(input) then
 			pressed = false
+			if Transition.IsHiddenOrUnmounting(row.Frame) then
+				return
+			end
 			refreshVisual(true)
 		end
 	end))
@@ -685,7 +694,7 @@ function ButtonGroup.new(parent, opts, ctx)
 		end
 
 		element.Maid:Give(btn.MouseEnter:Connect(function()
-			if element.Disabled or element.Locked or itemDisabled or Util.IsTouchDevice() then
+			if element.Disabled or element.Locked or itemDisabled or Util.IsTouchDevice() or Transition.IsHiddenOrUnmounting(btn) then
 				return
 			end
 			isHovered = true
@@ -695,12 +704,15 @@ function ButtonGroup.new(parent, opts, ctx)
 		element.Maid:Give(btn.MouseLeave:Connect(function()
 			isHovered = false
 			isPressed = false
+			if Transition.IsHiddenOrUnmounting(btn) then
+				return
+			end
 			refreshBtn(true)
 		end))
 
 		local lastPos = nil
 		element.Maid:Give(btn.InputBegan:Connect(function(input)
-			if element.Disabled or element.Locked or itemDisabled then
+			if element.Disabled or element.Locked or itemDisabled or Transition.IsHiddenOrUnmounting(btn) then
 				return
 			end
 			if Util.IsPointer(input) then
@@ -713,6 +725,9 @@ function ButtonGroup.new(parent, opts, ctx)
 		element.Maid:Give(btn.InputEnded:Connect(function(input)
 			if Util.IsPointer(input) then
 				isPressed = false
+				if Transition.IsHiddenOrUnmounting(btn) then
+					return
+				end
 				refreshBtn(true)
 			end
 		end))

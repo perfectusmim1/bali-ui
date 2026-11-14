@@ -347,7 +347,7 @@ function Toggle.new(parent, opts, ctx)
 	element.Maid:Give(Transition.Hover(hitBtn, row.Frame, "Tile", "TileHover", row.Stroke))
 
 	element.Maid:Give(hitBtn.MouseEnter:Connect(function()
-		if element.Disabled or element.Locked or Util.IsTouchDevice() then
+		if element.Disabled or element.Locked or Util.IsTouchDevice() or Transition.IsHiddenOrUnmounting(row.Frame) then
 			return
 		end
 		trackHovered = true
@@ -357,6 +357,9 @@ function Toggle.new(parent, opts, ctx)
 
 	element.Maid:Give(hitBtn.MouseLeave:Connect(function()
 		trackHovered = false
+		if Transition.IsHiddenOrUnmounting(row.Frame) then
+			return
+		end
 		local restStrokeTrans = state and 0.45 or math.min(0.48, Theme.Current.StrokeTransparency)
 		Tween.Play(trackStroke, { Transparency = restStrokeTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
 	end))
@@ -643,7 +646,7 @@ function Checkbox.new(parent, opts, ctx)
 	element.Maid:Give(Transition.Hover(hitBtn, row.Frame, "Tile", "TileHover", row.Stroke))
 
 	element.Maid:Give(hitBtn.MouseEnter:Connect(function()
-		if element.Disabled or element.Locked or Util.IsTouchDevice() then
+		if element.Disabled or element.Locked or Util.IsTouchDevice() or Transition.IsHiddenOrUnmounting(row.Frame) then
 			return
 		end
 		boxHovered = true
@@ -654,6 +657,9 @@ function Checkbox.new(parent, opts, ctx)
 
 	element.Maid:Give(hitBtn.MouseLeave:Connect(function()
 		boxHovered = false
+		if Transition.IsHiddenOrUnmounting(row.Frame) then
+			return
+		end
 		if not state then
 			Tween.Play(boxStroke, { Transparency = 0.38 }, Tween.Fast, Enum.EasingStyle.Exponential)
 		end

@@ -2114,10 +2114,16 @@ local function invalidateCascadeTree(root)
 end
 
 local function isAncestorHidden(inst, stopAt)
+	if not inst or typeof(inst) ~= "Instance" then
+		return true
+	end
 	local cur = inst
 	while cur and cur ~= game do
 		if cur:IsA("GuiObject") then
-			if not cur.Visible or cur:GetAttribute("_BaliUnmounted") == true then
+			if not cur.Visible
+				or cur:GetAttribute("_BaliUnmounted") == true
+				or (cur:GetAttribute("_BaliFading") == true and cur:GetAttribute("_BaliFadingIn") ~= true)
+			then
 				return true
 			end
 		elseif cur:IsA("LayerCollector") then
@@ -2133,6 +2139,7 @@ local function isAncestorHidden(inst, stopAt)
 	end
 	return false
 end
+Transition.IsHiddenOrUnmounting = isAncestorHidden
 
 local function hasLayoutSiblingController(frame)
 	local parent = frame and frame.Parent
@@ -2214,20 +2221,25 @@ function Transition.Mount(frame, _scaleFrom, opts)
 		end
 	end
 
-	if mainTween then
-		Tween.Then(mainTween, function()
-			if frame.Parent and frame:GetAttribute("_BaliAnimId") == animId then
-				frame:SetAttribute("_BaliFading", nil)
-				frame:SetAttribute("_BaliFadingIn", false)
-				frame:SetAttribute("_BaliMountTargetPos", nil)
-				activeFadeEntries[frame] = nil
-			end
-		end)
-	else
-		frame:SetAttribute("_BaliFading", nil)
-		frame:SetAttribute("_BaliFadingIn", false)
-		frame:SetAttribute("_BaliMountTargetPos", nil)
+	local mountFinished = false
+	local function finishMount()
+		if mountFinished or frame:GetAttribute("_BaliAnimId") ~= animId then
+			return
+		end
+		mountFinished = true
+		if frame.Parent then
+			frame:SetAttribute("_BaliFading", nil)
+			frame:SetAttribute("_BaliFadingIn", false)
+			frame:SetAttribute("_BaliMountTargetPos", nil)
+		end
 		activeFadeEntries[frame] = nil
+	end
+
+	if mainTween then
+		mainTween.Completed:Connect(finishMount)
+		task.delay(math.max(dur * Tween.Speed, 0.01) + 0.02, finishMount)
+	else
+		finishMount()
 	end
 
 	return mainTween
@@ -2261,10 +2273,12 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 	frame:SetAttribute("_BaliFadingIn", false)
 	frame:SetAttribute("_BaliUnmounted", true)
 
+	local unmountFinished = false
 	local function finishUnmount()
-		if frame:GetAttribute("_BaliAnimId") ~= animId then
+		if unmountFinished or frame:GetAttribute("_BaliAnimId") ~= animId then
 			return
 		end
+		unmountFinished = true
 		if not onDone and frame.Parent then
 			frame.Visible = false
 		end
@@ -2316,16 +2330,15 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 		if inst and inst.Parent then
 			local entryDur = entry.IsContent and contentDur or dur
 			local t = Tween.Play(inst, { [entry.Prop] = 1 }, entryDur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-			if not entry.IsContent then
-				mainTween = t
-			elseif not mainTween then
+			if not mainTween then
 				mainTween = t
 			end
 		end
 	end
 
 	if mainTween then
-		Tween.Then(mainTween, finishUnmount)
+		mainTween.Completed:Connect(finishUnmount)
+		task.delay(math.max(dur * Tween.Speed, 0.01) + 0.02, finishUnmount)
 	else
 		finishUnmount()
 	end
@@ -2334,7 +2347,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 end
 
 function Transition.Ripple(btn, _inputOrPos, colorKey)
-	if not btn or Tween.Reduced then
+	if not btn or Tween.Reduced or isAncestorHidden(btn) then
 		return nil
 	end
 
@@ -2466,10 +2479,20 @@ function Transition.Hover(hit, surface, normalKey, hoverKey, strokeObj)
 		if baseStrokeTrans ~= nil then
 			return baseStrokeTrans
 		end
-		return strokeObj.Transparency
+		local saved = strokeObj:GetAttribute("_BaliRestStr")
+		if type(saved) == "number" and saved < 0.99 then
+			return saved
+		end
+		if strokeObj.Transparency < 0.99 then
+			return strokeObj.Transparency
+		end
+		return Theme.Current and Theme.Current.StrokeTransparency or nil
 	end
 
 	local function applyHoverState(isHover, animate)
+		if isAncestorHidden(hit) then
+			return
+		end
 		local targetColor = resolveColor(isHover and hoverKey or normalKey)
 		if targetColor then
 			if animate then
@@ -2502,11 +2525,14 @@ function Transition.Hover(hit, surface, normalKey, hoverKey, strokeObj)
 	local connections = {}
 
 	table.insert(connections, hit.MouseEnter:Connect(function()
-		if cleaned or Util.IsTouchDevice() or Transition.IsOverlayBlocking(hit) then
+		if cleaned or Util.IsTouchDevice() or isAncestorHidden(hit) or Transition.IsOverlayBlocking(hit) then
 			return
 		end
-		if strokeObj and baseStrokeTrans == nil then
-			baseStrokeTrans = strokeObj.Transparency
+		if strokeObj and baseStrokeTrans == nil and not isAncestorHidden(hit) then
+			local curTrans = strokeObj.Transparency
+			if curTrans < 0.99 then
+				baseStrokeTrans = curTrans
+			end
 		end
 		hovered = true
 		applyHoverState(true, true)
@@ -2517,6 +2543,9 @@ function Transition.Hover(hit, surface, normalKey, hoverKey, strokeObj)
 			return
 		end
 		hovered = false
+		if isAncestorHidden(hit) then
+			return
+		end
 		applyHoverState(false, true)
 	end))
 
@@ -12484,6 +12513,9 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 end
 
 local function applyStateTransition(frame, stroke, variant, hovered, pressed, confirming, animate, customColor)
+	if animate and Transition.IsHiddenOrUnmounting(frame) then
+		return
+	end
 	local theme = Theme.Current
 	local targetBg = frame.BackgroundColor3
 	local targetTrans = frame.BackgroundTransparency
@@ -12664,7 +12696,7 @@ function Button.new(parent, opts, ctx)
 	end
 
 	element.Maid:Give(hitBtn.MouseEnter:Connect(function()
-		if element.Disabled or element.Locked or Util.IsTouchDevice() then
+		if element.Disabled or element.Locked or Util.IsTouchDevice() or Transition.IsHiddenOrUnmounting(row.Frame) then
 			return
 		end
 		hovered = true
@@ -12674,12 +12706,15 @@ function Button.new(parent, opts, ctx)
 	element.Maid:Give(hitBtn.MouseLeave:Connect(function()
 		hovered = false
 		pressed = false
+		if Transition.IsHiddenOrUnmounting(row.Frame) then
+			return
+		end
 		refreshVisual(true)
 	end))
 
 	local lastPointerPos = nil
 	element.Maid:Give(hitBtn.InputBegan:Connect(function(input)
-		if element.Disabled or element.Locked then
+		if element.Disabled or element.Locked or Transition.IsHiddenOrUnmounting(row.Frame) then
 			return
 		end
 		if Util.IsPointer(input) then
@@ -12692,6 +12727,9 @@ function Button.new(parent, opts, ctx)
 	element.Maid:Give(hitBtn.InputEnded:Connect(function(input)
 		if Util.IsPointer(input) then
 			pressed = false
+			if Transition.IsHiddenOrUnmounting(row.Frame) then
+				return
+			end
 			refreshVisual(true)
 		end
 	end))
@@ -13000,7 +13038,7 @@ function ButtonGroup.new(parent, opts, ctx)
 		end
 
 		element.Maid:Give(btn.MouseEnter:Connect(function()
-			if element.Disabled or element.Locked or itemDisabled or Util.IsTouchDevice() then
+			if element.Disabled or element.Locked or itemDisabled or Util.IsTouchDevice() or Transition.IsHiddenOrUnmounting(btn) then
 				return
 			end
 			isHovered = true
@@ -13010,12 +13048,15 @@ function ButtonGroup.new(parent, opts, ctx)
 		element.Maid:Give(btn.MouseLeave:Connect(function()
 			isHovered = false
 			isPressed = false
+			if Transition.IsHiddenOrUnmounting(btn) then
+				return
+			end
 			refreshBtn(true)
 		end))
 
 		local lastPos = nil
 		element.Maid:Give(btn.InputBegan:Connect(function(input)
-			if element.Disabled or element.Locked or itemDisabled then
+			if element.Disabled or element.Locked or itemDisabled or Transition.IsHiddenOrUnmounting(btn) then
 				return
 			end
 			if Util.IsPointer(input) then
@@ -13028,6 +13069,9 @@ function ButtonGroup.new(parent, opts, ctx)
 		element.Maid:Give(btn.InputEnded:Connect(function(input)
 			if Util.IsPointer(input) then
 				isPressed = false
+				if Transition.IsHiddenOrUnmounting(btn) then
+					return
+				end
 				refreshBtn(true)
 			end
 		end))
@@ -21176,7 +21220,7 @@ function Toggle.new(parent, opts, ctx)
 	element.Maid:Give(Transition.Hover(hitBtn, row.Frame, "Tile", "TileHover", row.Stroke))
 
 	element.Maid:Give(hitBtn.MouseEnter:Connect(function()
-		if element.Disabled or element.Locked or Util.IsTouchDevice() then
+		if element.Disabled or element.Locked or Util.IsTouchDevice() or Transition.IsHiddenOrUnmounting(row.Frame) then
 			return
 		end
 		trackHovered = true
@@ -21186,6 +21230,9 @@ function Toggle.new(parent, opts, ctx)
 
 	element.Maid:Give(hitBtn.MouseLeave:Connect(function()
 		trackHovered = false
+		if Transition.IsHiddenOrUnmounting(row.Frame) then
+			return
+		end
 		local restStrokeTrans = state and 0.45 or math.min(0.48, Theme.Current.StrokeTransparency)
 		Tween.Play(trackStroke, { Transparency = restStrokeTrans }, Tween.Fast, Enum.EasingStyle.Exponential)
 	end))
@@ -21472,7 +21519,7 @@ function Checkbox.new(parent, opts, ctx)
 	element.Maid:Give(Transition.Hover(hitBtn, row.Frame, "Tile", "TileHover", row.Stroke))
 
 	element.Maid:Give(hitBtn.MouseEnter:Connect(function()
-		if element.Disabled or element.Locked or Util.IsTouchDevice() then
+		if element.Disabled or element.Locked or Util.IsTouchDevice() or Transition.IsHiddenOrUnmounting(row.Frame) then
 			return
 		end
 		boxHovered = true
@@ -21483,6 +21530,9 @@ function Checkbox.new(parent, opts, ctx)
 
 	element.Maid:Give(hitBtn.MouseLeave:Connect(function()
 		boxHovered = false
+		if Transition.IsHiddenOrUnmounting(row.Frame) then
+			return
+		end
 		if not state then
 			Tween.Play(boxStroke, { Transparency = 0.38 }, Tween.Fast, Enum.EasingStyle.Exponential)
 		end
@@ -26275,12 +26325,12 @@ local function createActionButton(parent, iconName, tooltipText, layoutOrder, ma
 		Parent = btn,
 	})
 	maid:Give(btn.MouseEnter:Connect(function()
-		if iconName ~= "x" then
+		if iconName ~= "x" and not Transition.IsHiddenOrUnmounting(btn) then
 			Icons.SetColor(iconInst, "Accent")
 		end
 	end))
 	maid:Give(btn.MouseLeave:Connect(function()
-		if iconName ~= "x" then
+		if iconName ~= "x" and not Transition.IsHiddenOrUnmounting(btn) then
 			Icons.SetColor(iconInst, "Text")
 		end
 	end))
@@ -27409,8 +27459,8 @@ function Window.new(screenGui, options)
 		end
 	end))
 
-	maid:Give(minBtn.Activated:Connect(function(input)
-		Transition.Ripple(minBtn, input, "Accent")
+	maid:Give(minBtn.Activated:Connect(function()
+		Tooltip.Hide()
 		self:SetVisible(false)
 	end))
 
@@ -28042,6 +28092,7 @@ function Window:SetVisible(visible)
 	end
 
 	if not visible then
+		Tooltip.Hide()
 		self:ClosePopup()
 		CommandPalette.Close()
 		if self.ActiveTab then
@@ -28081,7 +28132,7 @@ function Window:SetVisible(visible)
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
-			Transition.Unmount(wrapper, 1, function()
+			local function finalizeHide()
 				if self._visSeq ~= seq or self._visible or not wrapper.Parent then
 					return
 				end
@@ -28093,7 +28144,9 @@ function Window:SetVisible(visible)
 				self.BodyArea.Visible = true
 				self:_setAmbientChromeVisible(true)
 				self._morphing = false
-			end, { NoPositionTween = true, Duration = morphDur })
+			end
+			Transition.Unmount(wrapper, 1, finalizeHide, { NoPositionTween = true, Duration = morphDur })
+			task.delay(math.max(morphDur * Tween.Speed, 0.01) + 0.05, finalizeHide)
 			return
 		end
 
@@ -28123,6 +28176,14 @@ function Window:SetVisible(visible)
 			wrapper.ZIndex = 2
 			wrapper.Visible = true
 
+			local function finalizeShow()
+				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
+					return
+				end
+				wrapper.Position = restorePos
+				wrapper.Size = restoreSize
+				self._morphing = false
+			end
 			local restoreTw = Tween.Play(
 				wrapper,
 				{ Position = restorePos },
@@ -28132,14 +28193,8 @@ function Window:SetVisible(visible)
 			)
 			Transition.Mount(wrapper, 1, { NoPositionTween = true, Duration = morphDur })
 
-			Tween.Then(restoreTw, function()
-				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
-					return
-				end
-				wrapper.Position = restorePos
-				wrapper.Size = restoreSize
-				self._morphing = false
-			end)
+			Tween.Then(restoreTw, finalizeShow)
+			task.delay(math.max(morphDur * Tween.Speed, 0.01) + 0.05, finalizeShow)
 			return
 		end
 

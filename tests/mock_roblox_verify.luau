@@ -3418,6 +3418,88 @@ if okLib and type(Bali2) == "table" then
 		assertTrue(winClose._destroyed == true and (sgClose._destroyed or sgClose.Parent == nil), "Window defaults to DestroyOnClose=true and unloads on Close")
 	end)()
 
+	-- Regression: Minimize cleanly unmounts MainWrapper even with pointer Hover/Leave mid-unmount & while minimized
+	;(function()
+		local prevReduced = Bali2.Tween.Reduced
+		Bali2.Tween.Reduced = false
+		local winMin = Bali2:CreateWindow({ Title = "MinGhostTest", ConfirmClose = false })
+		local minTab = winMin:AddTab({ Title = "Main" })
+		local minSec = minTab:AddSection({ Title = "Actions", Side = "Left" })
+		local dBtn = minSec:AddButton({
+			Title = "Reset Progress",
+			Variant = "Danger",
+			Callback = function() end,
+		})
+		local tBtn = minSec:AddToggle({ Title = "Auto Quest", Default = false })
+		stepClock(0.2, true)
+
+		local dHit = dBtn.Frame and dBtn.Frame:FindFirstChild("HitButton")
+		local tHit = tBtn.Frame and tBtn.Frame:FindFirstChild("HitButton")
+		assertTrue(dHit ~= nil and tHit ~= nil, "MinGhostTest Button and Toggle expose HitButton")
+
+		local actionsWrap = winMin.Main and winMin.Main:FindFirstChild("QuickActions", true)
+		local minBtnInst = nil
+		if actionsWrap then
+			for _, ch in ipairs(actionsWrap:GetChildren()) do
+				if ch:IsA("TextButton") and ch.LayoutOrder == 5 then
+					minBtnInst = ch
+				end
+			end
+		end
+		assertTrue(minBtnInst ~= nil, "Window QuickActions contains Minimize button")
+
+		if minBtnInst and dHit and tHit then
+			dHit.MouseEnter:Fire()
+			minBtnInst.MouseEnter:Fire()
+			minBtnInst.Activated:Fire()
+
+			-- Mid-unmount before tween defers/timers settle
+			assertTrue(Bali2.Transition.IsHiddenOrUnmounting(dBtn.Frame), "IsHiddenOrUnmounting returns true mid-unmount")
+			minBtnInst.MouseLeave:Fire()
+			dHit.MouseEnter:Fire()
+			dHit.MouseLeave:Fire()
+			tHit.MouseEnter:Fire()
+			tHit.MouseLeave:Fire()
+
+			stepClock(0.05, true)
+			minBtnInst.MouseLeave:Fire()
+			dHit.MouseEnter:Fire()
+			dHit.MouseLeave:Fire()
+			tHit.MouseEnter:Fire()
+			tHit.MouseLeave:Fire()
+
+			stepClock(0.3, true)
+			assertEq(winMin:IsVisible(), false, "Window:IsVisible() is false after minimize")
+			assertEq(winMin.MainWrapper.Visible, false, "MainWrapper.Visible is false after minimize even with hover/leave mid-unmount")
+
+			-- Pointer moves while minimized must never re-show MainWrapper or restore ghost button/stroke visuals
+			local bgTransWhileHidden = dBtn.Frame.BackgroundTransparency
+			local tStroke = tBtn.Frame and tBtn.Frame:FindFirstChildOfClass("UIStroke")
+			local strokeTransWhileHidden = tStroke and tStroke.Transparency
+			dHit.MouseEnter:Fire()
+			dHit.MouseLeave:Fire()
+			tHit.MouseEnter:Fire()
+			tHit.MouseLeave:Fire()
+			stepClock(0.1, true)
+			assertEq(winMin.MainWrapper.Visible, false, "MainWrapper.Visible remains false on pointer hover while minimized")
+			assertEq(dBtn.Frame.BackgroundTransparency, bgTransWhileHidden, "Button BackgroundTransparency stays unchanged on ghost hover while minimized")
+			if tStroke then
+				assertEq(tStroke.Transparency, strokeTransWhileHidden, "Toggle UIStroke Transparency stays unchanged on ghost hover while minimized")
+			end
+
+			winMin:SetVisible(true)
+			stepClock(0.3, true)
+			assertEq(winMin:IsVisible(), true, "Window:IsVisible() is true after SetVisible(true)")
+			assertEq(winMin.MainWrapper.Visible, true, "MainWrapper.Visible is true after SetVisible(true)")
+			assertEq(winMin._morphing, false, "Window._morphing resets to false after restore")
+			assertEq(Bali2.Transition.IsHiddenOrUnmounting(dBtn.Frame), false, "IsHiddenOrUnmounting returns false after restore")
+		end
+
+		winMin:Destroy()
+		stepClock(0.15, true)
+		Bali2.Tween.Reduced = prevReduced
+	end)()
+
 	-- CreateWindow with integrated KeySystem gate (non-blocking test)
 	local winKey = Bali2:CreateWindow({
 		Title = "KeyTest",

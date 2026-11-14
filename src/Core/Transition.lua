@@ -247,10 +247,16 @@ local function invalidateCascadeTree(root)
 end
 
 local function isAncestorHidden(inst, stopAt)
+	if not inst or typeof(inst) ~= "Instance" then
+		return true
+	end
 	local cur = inst
 	while cur and cur ~= game do
 		if cur:IsA("GuiObject") then
-			if not cur.Visible or cur:GetAttribute("_BaliUnmounted") == true then
+			if not cur.Visible
+				or cur:GetAttribute("_BaliUnmounted") == true
+				or (cur:GetAttribute("_BaliFading") == true and cur:GetAttribute("_BaliFadingIn") ~= true)
+			then
 				return true
 			end
 		elseif cur:IsA("LayerCollector") then
@@ -266,6 +272,7 @@ local function isAncestorHidden(inst, stopAt)
 	end
 	return false
 end
+Transition.IsHiddenOrUnmounting = isAncestorHidden
 
 local function hasLayoutSiblingController(frame)
 	local parent = frame and frame.Parent
@@ -347,20 +354,25 @@ function Transition.Mount(frame, _scaleFrom, opts)
 		end
 	end
 
-	if mainTween then
-		Tween.Then(mainTween, function()
-			if frame.Parent and frame:GetAttribute("_BaliAnimId") == animId then
-				frame:SetAttribute("_BaliFading", nil)
-				frame:SetAttribute("_BaliFadingIn", false)
-				frame:SetAttribute("_BaliMountTargetPos", nil)
-				activeFadeEntries[frame] = nil
-			end
-		end)
-	else
-		frame:SetAttribute("_BaliFading", nil)
-		frame:SetAttribute("_BaliFadingIn", false)
-		frame:SetAttribute("_BaliMountTargetPos", nil)
+	local mountFinished = false
+	local function finishMount()
+		if mountFinished or frame:GetAttribute("_BaliAnimId") ~= animId then
+			return
+		end
+		mountFinished = true
+		if frame.Parent then
+			frame:SetAttribute("_BaliFading", nil)
+			frame:SetAttribute("_BaliFadingIn", false)
+			frame:SetAttribute("_BaliMountTargetPos", nil)
+		end
 		activeFadeEntries[frame] = nil
+	end
+
+	if mainTween then
+		mainTween.Completed:Connect(finishMount)
+		task.delay(math.max(dur * Tween.Speed, 0.01) + 0.02, finishMount)
+	else
+		finishMount()
 	end
 
 	return mainTween
@@ -394,10 +406,12 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 	frame:SetAttribute("_BaliFadingIn", false)
 	frame:SetAttribute("_BaliUnmounted", true)
 
+	local unmountFinished = false
 	local function finishUnmount()
-		if frame:GetAttribute("_BaliAnimId") ~= animId then
+		if unmountFinished or frame:GetAttribute("_BaliAnimId") ~= animId then
 			return
 		end
+		unmountFinished = true
 		if not onDone and frame.Parent then
 			frame.Visible = false
 		end
@@ -449,16 +463,15 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 		if inst and inst.Parent then
 			local entryDur = entry.IsContent and contentDur or dur
 			local t = Tween.Play(inst, { [entry.Prop] = 1 }, entryDur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-			if not entry.IsContent then
-				mainTween = t
-			elseif not mainTween then
+			if not mainTween then
 				mainTween = t
 			end
 		end
 	end
 
 	if mainTween then
-		Tween.Then(mainTween, finishUnmount)
+		mainTween.Completed:Connect(finishUnmount)
+		task.delay(math.max(dur * Tween.Speed, 0.01) + 0.02, finishUnmount)
 	else
 		finishUnmount()
 	end
@@ -467,7 +480,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 end
 
 function Transition.Ripple(btn, _inputOrPos, colorKey)
-	if not btn or Tween.Reduced then
+	if not btn or Tween.Reduced or isAncestorHidden(btn) then
 		return nil
 	end
 
@@ -599,10 +612,20 @@ function Transition.Hover(hit, surface, normalKey, hoverKey, strokeObj)
 		if baseStrokeTrans ~= nil then
 			return baseStrokeTrans
 		end
-		return strokeObj.Transparency
+		local saved = strokeObj:GetAttribute("_BaliRestStr")
+		if type(saved) == "number" and saved < 0.99 then
+			return saved
+		end
+		if strokeObj.Transparency < 0.99 then
+			return strokeObj.Transparency
+		end
+		return Theme.Current and Theme.Current.StrokeTransparency or nil
 	end
 
 	local function applyHoverState(isHover, animate)
+		if isAncestorHidden(hit) then
+			return
+		end
 		local targetColor = resolveColor(isHover and hoverKey or normalKey)
 		if targetColor then
 			if animate then
@@ -635,11 +658,14 @@ function Transition.Hover(hit, surface, normalKey, hoverKey, strokeObj)
 	local connections = {}
 
 	table.insert(connections, hit.MouseEnter:Connect(function()
-		if cleaned or Util.IsTouchDevice() or Transition.IsOverlayBlocking(hit) then
+		if cleaned or Util.IsTouchDevice() or isAncestorHidden(hit) or Transition.IsOverlayBlocking(hit) then
 			return
 		end
-		if strokeObj and baseStrokeTrans == nil then
-			baseStrokeTrans = strokeObj.Transparency
+		if strokeObj and baseStrokeTrans == nil and not isAncestorHidden(hit) then
+			local curTrans = strokeObj.Transparency
+			if curTrans < 0.99 then
+				baseStrokeTrans = curTrans
+			end
 		end
 		hovered = true
 		applyHoverState(true, true)
@@ -650,6 +676,9 @@ function Transition.Hover(hit, surface, normalKey, hoverKey, strokeObj)
 			return
 		end
 		hovered = false
+		if isAncestorHidden(hit) then
+			return
+		end
 		applyHoverState(false, true)
 	end))
 
