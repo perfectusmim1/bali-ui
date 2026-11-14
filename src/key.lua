@@ -200,8 +200,11 @@ local function initOnDeviceFont()
 		if not okW then return false end
 		local okFam, famId = pcall(getAsset, jsonPath)
 		if okFam and type(famId) == "string" and famId ~= "" then
-			FONT = famId
-			return true
+			local okF, testF = pcall(function() return Font.new(famId, R) end)
+			if okF and testF then
+				FONT = famId
+				return true
+			end
 		end
 		return false
 	end
@@ -1407,6 +1410,27 @@ local function sanitizeKeyInput(text, maxLen)
 	return s
 end
 
+local _corePrims = { _pcall, _rawequal, _tostring, _byte, _bxor, _clock }
+local _baselineMeta = {}
+do
+	for idx, fn in ipairs(_corePrims) do
+		local meta = {}
+		if type(islclosure) == "function" then
+			local ok, res = _pcall(islclosure, fn)
+			if ok then meta.isL = res end
+		end
+		if type(iscclosure) == "function" then
+			local ok, res = _pcall(iscclosure, fn)
+			if ok then meta.isC = res end
+		end
+		if type(debug) == "table" and type(debug.info) == "function" then
+			local ok, src = _pcall(debug.info, fn, "s")
+			if ok then meta.src = src end
+		end
+		_baselineMeta[idx] = meta
+	end
+end
+
 local function verifyIntegrity()
 	if not _rawequal(pcall, _pcall)
 		or not _rawequal(rawequal, _rawequal)
@@ -1417,18 +1441,22 @@ local function verifyIntegrity()
 	then
 		return false, "Runtime primitive tampered"
 	end
-	for _, fn in ipairs({ _pcall, _rawequal, _tostring, _byte, _bxor, _clock }) do
-		if type(islclosure) == "function" then
+	if _bxor(0x5A, 0xA5) ~= 0xFF or _byte("A") ~= 65 or _tostring(42) ~= "42" then
+		return false, "Runtime primitive behavior mismatch"
+	end
+	for idx, fn in ipairs(_corePrims) do
+		local base = _baselineMeta[idx] or {}
+		if base.isL ~= nil and type(islclosure) == "function" then
 			local ok, hooked = _pcall(islclosure, fn)
-			if ok and hooked == true then return false, "Hooked core primitive detected" end
+			if ok and hooked ~= base.isL then return false, "Hooked core primitive detected" end
 		end
-		if type(iscclosure) == "function" then
+		if base.isC ~= nil and type(iscclosure) == "function" then
 			local ok, native = _pcall(iscclosure, fn)
-			if ok and native == false then return false, "Non-C core primitive detected" end
+			if ok and native ~= base.isC then return false, "Non-baseline core primitive detected" end
 		end
-		if type(debug) == "table" and type(debug.info) == "function" then
+		if base.src ~= nil and type(debug) == "table" and type(debug.info) == "function" then
 			local ok, src = _pcall(debug.info, fn, "s")
-			if ok and src ~= nil and src ~= "[C]" then return false, "Tampered primitive source" end
+			if ok and src ~= base.src then return false, "Tampered primitive source" end
 		end
 	end
 	return true

@@ -305,8 +305,13 @@ function Assets.MaterializeFontFamily(familyName, facesData)
 
 	local okFam, familyAsset = pcall(getAsset, jsonPath)
 	if okFam and verify(jsonPath, familyAsset) then
-		Assets.Fonts[familyName] = familyAsset
-		return familyAsset
+		local okFont, testFont = pcall(function()
+			return Font.new(familyAsset, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+		end)
+		if okFont and testFont then
+			Assets.Fonts[familyName] = familyAsset
+			return familyAsset
+		end
 	end
 	return nil
 end

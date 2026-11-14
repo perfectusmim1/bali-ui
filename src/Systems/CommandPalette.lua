@@ -349,14 +349,21 @@ end
 local function updateSelectionVisuals(ensureVisible)
 	for idx, view in ipairs(rowViews) do
 		local selected = idx == selectedIndex
-		view.Indicator.Visible = selected
 		if selected then
 			Theme.Bind(view.Button, { BackgroundColor3 = "TileHover" })
 			view.Button.BackgroundTransparency = 0.08
+			if view.Stroke then
+				Theme.Bind(view.Stroke, { Color = "Accent" })
+				view.Stroke.Transparency = 0.55
+			end
 			Theme.Bind(view.Title, { TextColor3 = "Text" })
 		else
 			Theme.Bind(view.Button, { BackgroundColor3 = "Tile" })
 			view.Button.BackgroundTransparency = 0.65
+			if view.Stroke then
+				Theme.Bind(view.Stroke, { Color = "Stroke" })
+				view.Stroke.Transparency = 0.9
+			end
 			Theme.Bind(view.Title, { TextColor3 = "Text" })
 		end
 	end
@@ -412,23 +419,17 @@ local function rebuildResults(query)
 			ZIndex = 312,
 		})
 
-		local indicator = Create.New("Frame", {
-			Name = "ActiveBar",
-			Parent = row,
-			Visible = false,
-			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 4, 0.5, 0),
-			Size = UDim2.fromOffset(2, 18),
-			Corner = UDim.new(1, 0),
-			Theme = { BackgroundColor3 = "Accent" },
-			ZIndex = 314,
+		local rowStroke = Create.Stroke(row, {
+			Theme = { Color = "Stroke" },
+			Transparency = 0.9,
+			Thickness = 1,
 		})
 
 		local iconBox = Create.New("Frame", {
 			Name = "IconBox",
 			Parent = row,
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 8, 0.5, 0),
+			Position = UDim2.new(0, 2, 0.5, 0),
 			Size = UDim2.fromOffset(26, 26),
 			Corner = 7,
 			BackgroundTransparency = 0.25,
@@ -448,8 +449,8 @@ local function rebuildResults(query)
 			Name = "TextGroup",
 			Parent = row,
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 44, 0.5, 0),
-			Size = UDim2.new(1, -112, 1, 0),
+			Position = UDim2.new(0, 38, 0.5, 0),
+			Size = UDim2.new(1, -106, 1, 0),
 			BackgroundTransparency = 1,
 			ZIndex = 313,
 		})
@@ -522,7 +523,7 @@ local function rebuildResults(query)
 
 		rowViews[idx] = {
 			Button = row,
-			Indicator = indicator,
+			Stroke = rowStroke,
 			Title = titleLabel,
 		}
 	end

@@ -2341,10 +2341,31 @@ assertEq(flags["Controls_WorkerThreads"]:Get(), 12, "Stepper:Set(12)")
 
 flags["Pickers_Strategy"]:Set("High Throughput")
 assertEq(flags["Pickers_Strategy"]:Get(), "High Throughput", "Dropdown single Set")
+do
+	local stratTrigger = flags["Pickers_Strategy"].Frame:FindFirstChild("Trigger", true)
+	local trigIcon = stratTrigger and stratTrigger:FindFirstChild("TriggerIcon")
+	local trigRight = stratTrigger and stratTrigger:FindFirstChild("TriggerRightText")
+	local trigBadge = stratTrigger and stratTrigger:FindFirstChild("TriggerBadge")
+	assertTrue(trigIcon ~= nil and trigIcon.Visible == true, "Dropdown Trigger renders selected item TriggerIcon")
+	assertTrue(trigRight ~= nil and trigRight.Visible == true and trigRight.Text == "10k/s", "Dropdown Trigger renders selected item TriggerRightText")
+	flags["Pickers_Strategy"]:Set("Balanced")
+	assertTrue(trigIcon ~= nil and trigIcon.Visible == true, "Dropdown Trigger updates TriggerIcon on selection change")
+	assertTrue(trigBadge ~= nil and trigBadge.Visible == true, "Dropdown Trigger renders selected item TriggerBadge")
+	local bTxt = trigBadge and trigBadge:FindFirstChild("BadgeText")
+	assertEq(bTxt and bTxt.Text, "Auto", "Dropdown TriggerBadge displays badge text")
+	flags["Pickers_Strategy"]:Set("High Throughput")
+end
 
 flags["Pickers_Clusters"]:Set({ "US-West (Oregon)", "AP-Northeast (Tokyo)" })
 local multiVal = flags["Pickers_Clusters"]:Get()
 assertTrue(type(multiVal) == "table" and #multiVal == 2, "Dropdown multi Set")
+do
+	local multiTrigger = flags["Pickers_Clusters"].Frame:FindFirstChild("Trigger", true)
+	local mIcon = multiTrigger and multiTrigger:FindFirstChild("TriggerIcon")
+	local mBadge = multiTrigger and multiTrigger:FindFirstChild("TriggerBadge")
+	assertTrue(mIcon == nil or mIcon.Visible == false, "Multi-select hides single-item TriggerIcon when 2+ options active")
+	assertTrue(mBadge == nil or mBadge.Visible == false, "Multi-select hides single-item TriggerBadge when 2+ options active")
+end
 
 flags["Pickers_SamplingWindow"]:Set("Burst")
 assertEq(flags["Pickers_SamplingWindow"]:Get(), "Burst", "Segmented:Set('Burst')")
@@ -2429,6 +2450,11 @@ log("--- Exercising Systems (CommandPalette, Dialog, Notify, Theme, HUD) ---")
 Bali.CommandPalette.Open()
 stepClock(0.05, true)
 assertEq(Bali.CommandPalette.IsOpen(), true, "CommandPalette:Open()")
+do
+	local paletteRoot = screenGui:FindFirstChild("BaliCommandPaletteBackdrop", true)
+	assertTrue(paletteRoot ~= nil, "CommandPalette backdrop mounted")
+	assertEq(paletteRoot and paletteRoot:FindFirstChild("ActiveBar", true), nil, "CommandPalette rows do not create vertical ActiveBar")
+end
 -- Search via searchBox if present
 local paletteBackdrop = screenGui:FindFirstChild("BaliPopupLayer"):FindFirstChild("CommandPaletteBackdrop")
 if paletteBackdrop then

@@ -229,11 +229,29 @@ end
 function Theme.Font(weight)
 	local family = Theme.GetFontAsset(Theme.FontFamily)
 	local enumWeight = Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular
-	return Font.new(family, enumWeight, Enum.FontStyle.Normal)
+	local ok, f = pcall(Font.new, family, enumWeight, Enum.FontStyle.Normal)
+	if ok and f then
+		return f
+	end
+	local fbFamily = Theme.BuiltInFonts[Theme.FontFamily] or Theme.BuiltInFonts.Gotham
+	local okFb, fFb = pcall(Font.new, fbFamily, enumWeight, Enum.FontStyle.Normal)
+	if okFb and fFb then
+		return fFb
+	end
+	return Font.fromEnum(Enum.Font.Gotham)
 end
 
 function Theme.Mono(weight)
-	return Font.new(Theme.GetFontAsset("Mono"), Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular)
+	local enumWeight = Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular
+	local ok, f = pcall(Font.new, Theme.GetFontAsset("Mono"), enumWeight, Enum.FontStyle.Normal)
+	if ok and f then
+		return f
+	end
+	local okFb, fFb = pcall(Font.new, Theme.BuiltInFonts.Mono, enumWeight, Enum.FontStyle.Normal)
+	if okFb and fFb then
+		return fFb
+	end
+	return Font.fromEnum(Enum.Font.Code)
 end
 
 function Theme.Resolve(key)

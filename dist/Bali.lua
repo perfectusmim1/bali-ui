@@ -530,8 +530,13 @@ function Assets.MaterializeFontFamily(familyName, facesData)
 
 	local okFam, familyAsset = pcall(getAsset, jsonPath)
 	if okFam and verify(jsonPath, familyAsset) then
-		Assets.Fonts[familyName] = familyAsset
-		return familyAsset
+		local okFont, testFont = pcall(function()
+			return Font.new(familyAsset, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+		end)
+		if okFont and testFont then
+			Assets.Fonts[familyName] = familyAsset
+			return familyAsset
+		end
 	end
 	return nil
 end
@@ -1600,11 +1605,29 @@ end
 function Theme.Font(weight)
 	local family = Theme.GetFontAsset(Theme.FontFamily)
 	local enumWeight = Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular
-	return Font.new(family, enumWeight, Enum.FontStyle.Normal)
+	local ok, f = pcall(Font.new, family, enumWeight, Enum.FontStyle.Normal)
+	if ok and f then
+		return f
+	end
+	local fbFamily = Theme.BuiltInFonts[Theme.FontFamily] or Theme.BuiltInFonts.Gotham
+	local okFb, fFb = pcall(Font.new, fbFamily, enumWeight, Enum.FontStyle.Normal)
+	if okFb and fFb then
+		return fFb
+	end
+	return Font.fromEnum(Enum.Font.Gotham)
 end
 
 function Theme.Mono(weight)
-	return Font.new(Theme.GetFontAsset("Mono"), Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular)
+	local enumWeight = Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular
+	local ok, f = pcall(Font.new, Theme.GetFontAsset("Mono"), enumWeight, Enum.FontStyle.Normal)
+	if ok and f then
+		return f
+	end
+	local okFb, fFb = pcall(Font.new, Theme.BuiltInFonts.Mono, enumWeight, Enum.FontStyle.Normal)
+	if okFb and fFb then
+		return fFb
+	end
+	return Font.fromEnum(Enum.Font.Code)
 end
 
 function Theme.Resolve(key)
@@ -3482,6 +3505,35 @@ local _coreByte = string.byte
 local _coreBxor = bit32.bxor
 local _coreClock = os.clock
 
+local _corePrims = { _corePcall, _coreRawequal, _coreTostring, _coreByte, _coreBxor, _coreClock }
+local _baselineMeta = {}
+do
+	local isLuaFn = Util.Global("islclosure")
+	local isCFn = Util.Global("iscclosure")
+	for idx, fn in ipairs(_corePrims) do
+		local meta = {}
+		if type(isLuaFn) == "function" then
+			local ok, res = _corePcall(isLuaFn, fn)
+			if ok then
+				meta.isL = res
+			end
+		end
+		if type(isCFn) == "function" then
+			local ok, res = _corePcall(isCFn, fn)
+			if ok then
+				meta.isC = res
+			end
+		end
+		if type(debug) == "table" and type(debug.info) == "function" then
+			local ok, src = _corePcall(debug.info, fn, "s")
+			if ok then
+				meta.src = src
+			end
+		end
+		_baselineMeta[idx] = meta
+	end
+end
+
 function Util.VerifyIntegrity()
 	if not _coreRawequal(pcall, _corePcall)
 		or not _coreRawequal(rawequal, _coreRawequal)
@@ -3493,25 +3545,29 @@ function Util.VerifyIntegrity()
 		return false, "Runtime primitive mismatch detected"
 	end
 
+	if _coreBxor(0x5A, 0xA5) ~= 0xFF or _coreByte("A") ~= 65 or _coreTostring(42) ~= "42" then
+		return false, "Runtime primitive behavior check failed"
+	end
+
 	local isLuaFn = Util.Global("islclosure")
 	local isCFn = Util.Global("iscclosure")
-	local coreList = { _corePcall, _coreRawequal, _coreTostring, _coreByte, _coreBxor, _coreClock }
-	for _, fn in ipairs(coreList) do
-		if type(isLuaFn) == "function" then
+	for idx, fn in ipairs(_corePrims) do
+		local base = _baselineMeta[idx] or {}
+		if base.isL ~= nil and type(isLuaFn) == "function" then
 			local ok, hooked = _corePcall(isLuaFn, fn)
-			if ok and hooked == true then
+			if ok and hooked ~= base.isL then
 				return false, "Hooked core primitive detected"
 			end
 		end
-		if type(isCFn) == "function" then
+		if base.isC ~= nil and type(isCFn) == "function" then
 			local ok, native = _corePcall(isCFn, fn)
-			if ok and native == false then
-				return false, "Non-C core primitive detected"
+			if ok and native ~= base.isC then
+				return false, "Non-baseline core primitive detected"
 			end
 		end
-		if type(debug) == "table" and type(debug.info) == "function" then
+		if base.src ~= nil and type(debug) == "table" and type(debug.info) == "function" then
 			local ok, src = _corePcall(debug.info, fn, "s")
-			if ok and src ~= nil and src ~= "[C]" then
+			if ok and src ~= base.src then
 				return false, "Tampered primitive source detected"
 			end
 		end
@@ -4085,14 +4141,21 @@ end
 local function updateSelectionVisuals(ensureVisible)
 	for idx, view in ipairs(rowViews) do
 		local selected = idx == selectedIndex
-		view.Indicator.Visible = selected
 		if selected then
 			Theme.Bind(view.Button, { BackgroundColor3 = "TileHover" })
 			view.Button.BackgroundTransparency = 0.08
+			if view.Stroke then
+				Theme.Bind(view.Stroke, { Color = "Accent" })
+				view.Stroke.Transparency = 0.55
+			end
 			Theme.Bind(view.Title, { TextColor3 = "Text" })
 		else
 			Theme.Bind(view.Button, { BackgroundColor3 = "Tile" })
 			view.Button.BackgroundTransparency = 0.65
+			if view.Stroke then
+				Theme.Bind(view.Stroke, { Color = "Stroke" })
+				view.Stroke.Transparency = 0.9
+			end
 			Theme.Bind(view.Title, { TextColor3 = "Text" })
 		end
 	end
@@ -4148,23 +4211,17 @@ local function rebuildResults(query)
 			ZIndex = 312,
 		})
 
-		local indicator = Create.New("Frame", {
-			Name = "ActiveBar",
-			Parent = row,
-			Visible = false,
-			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 4, 0.5, 0),
-			Size = UDim2.fromOffset(2, 18),
-			Corner = UDim.new(1, 0),
-			Theme = { BackgroundColor3 = "Accent" },
-			ZIndex = 314,
+		local rowStroke = Create.Stroke(row, {
+			Theme = { Color = "Stroke" },
+			Transparency = 0.9,
+			Thickness = 1,
 		})
 
 		local iconBox = Create.New("Frame", {
 			Name = "IconBox",
 			Parent = row,
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 8, 0.5, 0),
+			Position = UDim2.new(0, 2, 0.5, 0),
 			Size = UDim2.fromOffset(26, 26),
 			Corner = 7,
 			BackgroundTransparency = 0.25,
@@ -4184,8 +4241,8 @@ local function rebuildResults(query)
 			Name = "TextGroup",
 			Parent = row,
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 44, 0.5, 0),
-			Size = UDim2.new(1, -112, 1, 0),
+			Position = UDim2.new(0, 38, 0.5, 0),
+			Size = UDim2.new(1, -106, 1, 0),
 			BackgroundTransparency = 1,
 			ZIndex = 313,
 		})
@@ -4258,7 +4315,7 @@ local function rebuildResults(query)
 
 		rowViews[idx] = {
 			Button = row,
-			Indicator = indicator,
+			Stroke = rowStroke,
 			Title = titleLabel,
 		}
 	end
@@ -13826,6 +13883,76 @@ function Dropdown.new(parent, opts, ctx)
 		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
 	})
 
+	local triggerThumb = Create.New("ImageLabel", {
+		Name = "TriggerThumb",
+		Size = UDim2.fromOffset(18, 18),
+		Position = UDim2.new(0, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundTransparency = 1,
+		ScaleType = Enum.ScaleType.Crop,
+		Corner = 5,
+		Visible = false,
+		Parent = trigger,
+	})
+	Create.Stroke(triggerThumb, {
+		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+		Thickness = 1,
+	})
+
+	local triggerIconHolder = Create.New("Frame", {
+		Name = "TriggerIcon",
+		Size = UDim2.fromOffset(16, 16),
+		Position = UDim2.new(0, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundTransparency = 1,
+		Visible = false,
+		Parent = trigger,
+	})
+
+	local triggerBadge = Create.New("Frame", {
+		Name = "TriggerBadge",
+		Size = UDim2.fromOffset(0, 18),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Position = UDim2.new(1, -20, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Corner = 99,
+		Padding = { 0, 7, 0, 7 },
+		BackgroundTransparency = 0.82,
+		Visible = false,
+		Parent = trigger,
+	})
+	local triggerBadgeStroke = Create.Stroke(triggerBadge, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.55,
+		Thickness = 1,
+	})
+	local triggerBadgeText = Create.Text({
+		Name = "BadgeText",
+		Size = UDim2.fromOffset(0, 18),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Text = "",
+		Font = "SemiBold",
+		TextSize = 10,
+		Color = "Accent",
+		TextYAlignment = Enum.TextYAlignment.Center,
+		Parent = triggerBadge,
+	})
+
+	local triggerRightText = Create.Text({
+		Name = "TriggerRightText",
+		Size = UDim2.fromOffset(0, 16),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Position = UDim2.new(1, -20, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Text = "",
+		Font = "Medium",
+		TextSize = 11,
+		Color = "Muted",
+		TextYAlignment = Enum.TextYAlignment.Center,
+		Visible = false,
+		Parent = trigger,
+	})
+
 	local summaryLabel = Create.Text({
 		Name = "Summary",
 		Size = UDim2.new(1, -20, 1, 0),
@@ -14118,35 +14245,128 @@ function Dropdown.new(parent, opts, ctx)
 		return selectedSingle and selectedSingle.Value or nil
 	end
 
+	local function clearTriggerIcon()
+		for _, child in ipairs(triggerIconHolder:GetChildren()) do
+			child:Destroy()
+		end
+		triggerIconHolder.Visible = false
+	end
+
+	local function applyColorOrToken(inst, prop, col, token, fallbackToken)
+		if col then
+			Theme.Unbind(inst, prop)
+			inst[prop] = col
+		else
+			Theme.Bind(inst, { [prop] = token or fallbackToken })
+		end
+	end
+
 	local function updateSummary()
+		local previewItem = nil
+		local titles = nil
 		if multi then
-			local titles = {}
+			local selectedItems = {}
+			titles = {}
 			for _, item in ipairs(items) do
 				if selectedMap[item] then
+					table.insert(selectedItems, item)
 					table.insert(titles, item.Title)
 				end
 			end
-			if #titles == 0 then
-				summaryLabel.Text = "None"
-				Theme.Bind(summaryLabel, { TextColor3 = "Muted" })
-			else
-				summaryLabel.Text = table.concat(titles, ", ")
-				Theme.Bind(summaryLabel, { TextColor3 = "Text" })
+			if #selectedItems == 1 then
+				previewItem = selectedItems[1]
 			end
 		else
-			if selectedSingle then
-				summaryLabel.Text = selectedSingle.Title
-				local customCol, customToken = resolveCustomColor(selectedSingle.Color)
-				if customCol then
-					Theme.Unbind(summaryLabel, "TextColor3")
-					summaryLabel.TextColor3 = customCol
-				else
-					Theme.Bind(summaryLabel, { TextColor3 = customToken or "Text" })
-				end
+			previewItem = selectedSingle
+		end
+
+		if previewItem then
+			local leftReserve = 0
+			local imgAsset = normalizeImageAsset(previewItem.Image)
+			if imgAsset then
+				clearTriggerIcon()
+				triggerThumb.Image = imgAsset
+				triggerThumb.Visible = true
+				leftReserve = 26
+			elseif previewItem.Icon then
+				triggerThumb.Visible = false
+				clearTriggerIcon()
+				local iconCol, iconToken = resolveCustomColor(previewItem.IconColor or previewItem.Color)
+				Icons.Create(previewItem.Icon, {
+					Size = UDim2.fromOffset(15, 15),
+					Position = UDim2.fromScale(0.5, 0.5),
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Color = iconCol or iconToken or "Accent",
+					Parent = triggerIconHolder,
+				})
+				triggerIconHolder.Visible = true
+				leftReserve = 22
 			else
-				summaryLabel.Text = "Select..."
-				Theme.Bind(summaryLabel, { TextColor3 = "Muted" })
+				triggerThumb.Visible = false
+				clearTriggerIcon()
 			end
+
+			local rightReserve = 20
+			if previewItem.Badge ~= nil and previewItem.Badge ~= "" then
+				local badgeStr = tostring(previewItem.Badge)
+				local badgeCol, badgeToken = resolveCustomColor(previewItem.BadgeColor)
+				triggerBadgeText.Text = badgeStr
+				applyColorOrToken(triggerBadge, "BackgroundColor3", badgeCol, badgeToken, "Accent")
+				applyColorOrToken(triggerBadgeStroke, "Color", badgeCol, badgeToken, "Accent")
+				applyColorOrToken(triggerBadgeText, "TextColor3", badgeCol, badgeToken, "Accent")
+				triggerBadge.Visible = true
+				triggerRightText.Visible = false
+				local badgeW = math.clamp(#badgeStr * 6 + 18, 34, 72)
+				rightReserve = 24 + badgeW
+			elseif previewItem.RightText ~= nil and previewItem.RightText ~= "" then
+				local hintStr = tostring(previewItem.RightText)
+				local hintCol, hintToken = resolveCustomColor(previewItem.BadgeColor)
+				triggerRightText.Text = hintStr
+				applyColorOrToken(triggerRightText, "TextColor3", hintCol, hintToken, "Muted")
+				triggerRightText.Visible = true
+				triggerBadge.Visible = false
+				local hintW = math.clamp(#hintStr * 6 + 6, 26, 68)
+				rightReserve = 24 + hintW
+			else
+				triggerBadge.Visible = false
+				triggerRightText.Visible = false
+			end
+
+			summaryLabel.Position = UDim2.fromOffset(leftReserve, 0)
+			summaryLabel.Size = UDim2.new(1, -(leftReserve + rightReserve), 1, 0)
+			summaryLabel.Text = previewItem.Title
+			local customCol, customToken = resolveCustomColor(previewItem.Color)
+			if customCol then
+				Theme.Unbind(summaryLabel, "TextColor3")
+				Theme.Bind(summaryLabel, { FontFace = "@SemiBold" })
+				summaryLabel.TextColor3 = customCol
+			else
+				Theme.Bind(summaryLabel, {
+					TextColor3 = customToken or "Text",
+					FontFace = "@SemiBold",
+				})
+			end
+			return
+		end
+
+		triggerThumb.Visible = false
+		clearTriggerIcon()
+		triggerBadge.Visible = false
+		triggerRightText.Visible = false
+		summaryLabel.Position = UDim2.fromOffset(0, 0)
+		summaryLabel.Size = UDim2.new(1, -20, 1, 0)
+
+		if multi then
+			if not titles or #titles == 0 then
+				summaryLabel.Text = "None"
+				Theme.Bind(summaryLabel, { TextColor3 = "Muted", FontFace = "@Medium" })
+			else
+				summaryLabel.Text = table.concat(titles, ", ")
+				Theme.Bind(summaryLabel, { TextColor3 = "Text", FontFace = "@Medium" })
+			end
+		else
+			summaryLabel.Text = "Select..."
+			Theme.Bind(summaryLabel, { TextColor3 = "Muted", FontFace = "@Medium" })
 		end
 	end
 

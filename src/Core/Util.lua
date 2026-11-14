@@ -477,6 +477,35 @@ local _coreByte = string.byte
 local _coreBxor = bit32.bxor
 local _coreClock = os.clock
 
+local _corePrims = { _corePcall, _coreRawequal, _coreTostring, _coreByte, _coreBxor, _coreClock }
+local _baselineMeta = {}
+do
+	local isLuaFn = Util.Global("islclosure")
+	local isCFn = Util.Global("iscclosure")
+	for idx, fn in ipairs(_corePrims) do
+		local meta = {}
+		if type(isLuaFn) == "function" then
+			local ok, res = _corePcall(isLuaFn, fn)
+			if ok then
+				meta.isL = res
+			end
+		end
+		if type(isCFn) == "function" then
+			local ok, res = _corePcall(isCFn, fn)
+			if ok then
+				meta.isC = res
+			end
+		end
+		if type(debug) == "table" and type(debug.info) == "function" then
+			local ok, src = _corePcall(debug.info, fn, "s")
+			if ok then
+				meta.src = src
+			end
+		end
+		_baselineMeta[idx] = meta
+	end
+end
+
 function Util.VerifyIntegrity()
 	if not _coreRawequal(pcall, _corePcall)
 		or not _coreRawequal(rawequal, _coreRawequal)
@@ -488,25 +517,29 @@ function Util.VerifyIntegrity()
 		return false, "Runtime primitive mismatch detected"
 	end
 
+	if _coreBxor(0x5A, 0xA5) ~= 0xFF or _coreByte("A") ~= 65 or _coreTostring(42) ~= "42" then
+		return false, "Runtime primitive behavior check failed"
+	end
+
 	local isLuaFn = Util.Global("islclosure")
 	local isCFn = Util.Global("iscclosure")
-	local coreList = { _corePcall, _coreRawequal, _coreTostring, _coreByte, _coreBxor, _coreClock }
-	for _, fn in ipairs(coreList) do
-		if type(isLuaFn) == "function" then
+	for idx, fn in ipairs(_corePrims) do
+		local base = _baselineMeta[idx] or {}
+		if base.isL ~= nil and type(isLuaFn) == "function" then
 			local ok, hooked = _corePcall(isLuaFn, fn)
-			if ok and hooked == true then
+			if ok and hooked ~= base.isL then
 				return false, "Hooked core primitive detected"
 			end
 		end
-		if type(isCFn) == "function" then
+		if base.isC ~= nil and type(isCFn) == "function" then
 			local ok, native = _corePcall(isCFn, fn)
-			if ok and native == false then
-				return false, "Non-C core primitive detected"
+			if ok and native ~= base.isC then
+				return false, "Non-baseline core primitive detected"
 			end
 		end
-		if type(debug) == "table" and type(debug.info) == "function" then
+		if base.src ~= nil and type(debug) == "table" and type(debug.info) == "function" then
 			local ok, src = _corePcall(debug.info, fn, "s")
-			if ok and src ~= nil and src ~= "[C]" then
+			if ok and src ~= base.src then
 				return false, "Tampered primitive source detected"
 			end
 		end
