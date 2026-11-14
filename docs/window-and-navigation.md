@@ -22,7 +22,7 @@ local window = Bali:CreateWindow({
 	SidebarCollapsed = false,
 	Theme = "Midnight",
 	Accent = nil,
-	Font = "Builder",
+	Font = "Montserrat",
 	ToggleKey = Enum.KeyCode.RightShift,
 	Blur = true,
 	BlurIntensity = 12,
@@ -33,7 +33,7 @@ local window = Bali:CreateWindow({
 	ConfigFolder = "BaliSuite",
 	AutoLoadConfig = true,
 	ConfirmClose = true,
-	DestroyOnClose = false,
+	DestroyOnClose = true,
 	OnClose = function() end,
 	OnDestroy = function() end,
 })
@@ -56,6 +56,7 @@ local window = Bali:CreateWindow({
 | `window:Dialog(opts)` | Displays a centered modal confirmation or prompt dialog. |
 | `window:Notify(opts)` | Dispatches a toast notification linked to this window's bell history. |
 | `window:Unload()` | Smoothly animates (`0.22s` `Quint Out` fade + glide) and tears down the UI and owned cleanup tasks. |
+| `window:Close()` | Executes the close action (`Dialog` if `ConfirmClose = true`, otherwise `Unload()` or minimize based on `DestroyOnClose`). |
 | `window:Destroy(instant?)` | Destroys the window with an exit transition by default, or immediately when `instant == true`. |
 
 ---
@@ -106,6 +107,8 @@ local leftSec = interactiveSub:AddSection({
 	Title = "Actions & Toggles",
 	Subtitle = "Animated controls with optional confirm & keybinds.",
 	Icon = "zap",
+	IconColor = "Accent", -- pass "Original" (or OriginalIconColor = true) for untinted icons
+	Color = nil, -- optional card Color3 / "#RRGGBB" / theme token tint
 	Side = "Left", -- "Auto" | "Left" | "Right" | "Full"
 	Collapsible = true,
 	DefaultOpen = true,
@@ -114,6 +117,7 @@ local leftSec = interactiveSub:AddSection({
 
 - `"Auto"` balances sections alternately between `Left` and `Right` columns.
 - `"Full"` spans `100%` of the content width for wide widgets like `Table`, `CardGrid`, or full-width banners.
+- Customize card surface & header tinting via `Color` / `Tint` (`Color3`, `"#RRGGBB"`, or token name) or `:SetColor(color)` / `:SetIconColor(color)` at runtime.
 - Narrow viewports (`< 560px` canvas width) automatically stack dual columns vertically so controls stay touch-friendly and readable on mobile screens.
 
 ---

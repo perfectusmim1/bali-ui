@@ -70,7 +70,7 @@ local FONT_SOURCES = {
 	},
 	Montserrat = {
 		Regular = {
-			"https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Ew-.ttf",
+			"https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtZ6Ew-.ttf",
 			"https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
 		},
 		Medium = {
@@ -353,7 +353,7 @@ function Assets.LoadFontsAsync(priorityList)
 	Util.Spawn(function()
 		pcall(function()
 			Util.FS.MakeFolder(Assets.FontsFolder)
-			local order = priorityList or { "Builder", "Gotham", "Mono", "Montserrat", "Ubuntu", "Nunito" }
+			local order = priorityList or { "Montserrat", "Gotham", "Builder", "Mono", "Ubuntu", "Nunito" }
 			for _, familyName in ipairs(order) do
 				if not Assets.Fonts[familyName] and FONT_SOURCES[familyName] then
 					local facesData = {}

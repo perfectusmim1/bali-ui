@@ -967,6 +967,7 @@ local LAYOUT_PROPS = {
 	MinSize = true,
 	MaxSize = true,
 	Scale = true,
+	CanvasPosition = true,
 }
 
 local function invalidateLayoutDown(inst)
@@ -1085,7 +1086,9 @@ computeLayout = function(inst, depth)
 		padT, padR, padB, padL = computePadding(parent, parentSize)
 	end
 
-	local innerPos = MockVector2.new(parentPos.X + padL, parentPos.Y + padT)
+	local canvasOffsetX = (parent and parent._className == "ScrollingFrame" and parent._props.CanvasPosition) and parent._props.CanvasPosition.X or 0
+	local canvasOffsetY = (parent and parent._className == "ScrollingFrame" and parent._props.CanvasPosition) and parent._props.CanvasPosition.Y or 0
+	local innerPos = MockVector2.new(parentPos.X + padL - canvasOffsetX, parentPos.Y + padT - canvasOffsetY)
 	local innerSize = MockVector2.new(math.max(0, parentSize.X - padL - padR), math.max(0, parentSize.Y - padT - padB))
 
 	if parent and GUI_CLASSES[parent._className] and not parent._computingListChildren and not inst._assignedListPos and inst._props.Visible ~= false then
@@ -3254,11 +3257,166 @@ if okLib and type(Bali2) == "table" then
 		assertTrue(paraScroll.Size.Y.Offset <= 64 and paraScroll.CanvasSize.Y.Offset > paraScroll.Size.Y.Offset, "ParagraphScroll configures scrollable bounds when text exceeds MaxHeight")
 	end
 
+	-- Regression: UI/UX & Customization Enhancements (Typography, ButtonGroup fit, Badge contrast, Tint, Original Icons, Table checkboxes, Dropdown RightIcon + scroll-track, DestroyOnClose)
+	;(function()
+		assertEq(Bali2.Theme.FontFamily, "Montserrat", "Default Theme.FontFamily is Montserrat")
+		assertEq(Bali2.Theme.Font("Regular").Weight, Enum.FontWeight.Medium, "Theme.Font('Regular') maps to Medium (500) for crisp legibility")
+
+		local grpFit = v4Sec:AddButtonGroup({
+			Buttons = {
+				{ Title = "Equip Best", Variant = "Primary", Icon = "sparkles" },
+				{ Title = "Fuse Safe", Color = MockColor3.fromRGB(16, 185, 129), Icon = "shield" },
+				{ Title = "Unequip All", Variant = "Danger", Icon = "flame" },
+			},
+		})
+		stepClock(0.05, true)
+		local b1 = grpFit:GetButton(1)
+		local lbl1 = b1 and b1.Label
+		local c1 = lbl1 and lbl1:FindFirstChild("LabelConstraint")
+		assertTrue(c1 ~= nil and c1:IsA("UISizeConstraint"), "ButtonGroup creates LabelConstraint UISizeConstraint on labels")
+		if b1 and b1.Frame and c1 then
+			b1.Frame.Size = MockUDim2.fromOffset(96, 34)
+			b1.Frame:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+			stepClock(0.02, true)
+			assertTrue(c1.MaxSize.X > 0 and c1.MaxSize.X < 96, "ButtonGroup LabelConstraint clamps MaxSize.X cleanly inside button width (" .. tostring(c1.MaxSize.X) .. ")")
+		end
+
+		local badgeBtn = v4Sec:AddButton({
+			Title = "Equipped Gear",
+			Variant = "Primary",
+			Badge = "9 Passives",
+			Color = MockColor3.fromRGB(37, 99, 235),
+		})
+		local badgePill = badgeBtn.Frame:FindFirstChild("Badge", true)
+		local badgeLbl = badgePill and badgePill:FindFirstChild("Label")
+		assertTrue(badgePill ~= nil and badgeLbl ~= nil, "Primary Button renders Badge pill and Label")
+		if badgePill and badgeLbl then
+			assertTrue(badgePill.BackgroundColor3 ~= badgeBtn.Frame.BackgroundColor3, "Primary Button badge pill contrasts against Primary button surface")
+			assertEq(badgeLbl.TextColor3, Bali2.Theme.Current.AccentText, "Primary Button badge text uses high-contrast AccentText")
+		end
+
+		local tintedSec = win2.Tabs[1]:AddSection({
+			Title = "Tinted Original Section",
+			Icon = "sparkles",
+			IconColor = "Original",
+			Color = "#10B981",
+		})
+		local secBadge = tintedSec.Frame:FindFirstChild("IconBadge", true)
+		local secIcon = secBadge and secBadge:FindFirstChild("Icon", true)
+		assertTrue(secIcon ~= nil and secIcon:GetAttribute("_BaliOriginalColor") == true, "Section IconColor='Original' marks icon with _BaliOriginalColor attribute")
+		if secIcon and secIcon:IsA("ImageLabel") then
+			assertEq(secIcon.ImageColor3, MockColor3.new(1, 1, 1), "Section IconColor='Original' keeps untinted ImageColor3 (1,1,1)")
+		end
+
+		local worldTbl = tintedSec:AddTable({
+			Title = "Worlds Overview",
+			Selectable = true,
+			Columns = {
+				{ Key = "World", Title = "World", Width = 0.5 },
+				{ Key = "Cost", Title = "Cost", Width = 0.5 },
+			},
+			Rows = {
+				{ World = "1. Super Island", Cost = "80 Yen" },
+				{ World = "2. Plant Town", Cost = "300 Yen" },
+			},
+			Action = { Title = "Travel", Icon = "navigation", Variant = "Primary" },
+		})
+		stepClock(0.05, true)
+		local tblRow1 = worldTbl.Frame:FindFirstChild("Row_1", true)
+		assertTrue(tblRow1 ~= nil and tblRow1:FindFirstChild("Checkbox") == nil, "Table with Action button omits row Checkbox by default")
+		worldTbl:SetCheckboxes(true)
+		stepClock(0.05, true)
+		local tblRow1After = worldTbl.Frame:FindFirstChild("Row_1", true)
+		assertTrue(tblRow1After ~= nil and tblRow1After:FindFirstChild("Checkbox") ~= nil, "Table:SetCheckboxes(true) enables row Checkbox dynamically")
+
+		local ddYen = tintedSec:AddDropdown({
+			Title = "Island Travel",
+			Values = {
+				{ Title = "1. Super Island", Icon = "globe", RightText = "80 Yen" },
+				{ Title = "2. Crystal Cave", Icon = "sparkles", RightText = "500 Gems" },
+			},
+			Default = "1. Super Island",
+		})
+		stepClock(0.05, true)
+		local yenTrig = ddYen.Frame:FindFirstChild("Trigger", true)
+		local yenTrigRightIcon = yenTrig and yenTrig:FindFirstChild("TriggerRightIcon", true)
+		assertTrue(yenTrigRightIcon ~= nil and yenTrigRightIcon.Visible, "Dropdown closed Trigger shows inferred RightIcon for '80 Yen'")
+		local yenTrigIconChild = yenTrigRightIcon and yenTrigRightIcon:FindFirstChild("Icon")
+		assertTrue(yenTrigIconChild ~= nil and (yenTrigIconChild:IsA("ImageLabel") or yenTrigIconChild:IsA("TextLabel")), "Dropdown TriggerRightIcon renders currency icon")
+		if yenTrigIconChild then
+			local iconCol = yenTrigIconChild:IsA("TextLabel") and yenTrigIconChild.TextColor3 or yenTrigIconChild.ImageColor3
+			assertEq(iconCol, MockColor3.fromRGB(251, 191, 36), "Dropdown TriggerRightIcon '80 Yen' uses gold coin tint")
+		end
+
+		win2:SelectTab(win2.Tabs[1], true)
+		stepClock(0.05, true)
+		ddYen:Open()
+		stepClock(0.1, true)
+		local yenPopup = nil
+		for _, ch in ipairs(win2.PopupLayer:GetChildren()) do
+			if ch.Name ~= "PopupBackdrop" and ch.Name ~= "BaliCommandPaletteBackdrop" and ch.Visible then
+				yenPopup = ch
+			end
+		end
+		local optYen1 = yenPopup and yenPopup:FindFirstChild("Opt_1", true)
+		assertTrue(optYen1 ~= nil and optYen1:FindFirstChild("RightIcon", true) ~= nil, "Dropdown popup Opt_1 creates inferred RightIcon for '80 Yen'")
+		if yenPopup and yenTrig then
+			local popPosBefore = yenPopup.Position
+			local origMainPos = win2.MainWrapper.Position
+			win2.MainWrapper.Position = MockUDim2.fromOffset(origMainPos.X.Offset + 40, origMainPos.Y.Offset + 25)
+			yenTrig:GetPropertyChangedSignal("AbsolutePosition"):Fire()
+			stepClock(0.02, true)
+			assertTrue(yenPopup.Position.X.Offset ~= popPosBefore.X.Offset, "Dropdown open popup tracks trigger AbsolutePosition changes")
+			local ancScroller = yenTrig:FindFirstAncestorOfClass("ScrollingFrame")
+			if ancScroller then
+				local origCanvas = ancScroller.CanvasPosition
+				ancScroller.CanvasPosition = MockVector2.new(0, 5000)
+				ancScroller:GetPropertyChangedSignal("CanvasPosition"):Fire()
+				stepClock(0.25, true)
+				assertTrue(win2._activePopup == nil, "Dropdown auto-closes when trigger scrolls outside ancestor ScrollingFrame viewport")
+				ancScroller.CanvasPosition = origCanvas
+			else
+				ddYen:Close()
+				stepClock(0.2, true)
+			end
+			win2.MainWrapper.Position = origMainPos
+		end
+	end)()
+
 	-- Re-execution test in Studio mode
 	local sg2 = Bali2._screenGui
 	win2:Destroy()
 	stepClock(0.3, true)
 	assertTrue(sg2._destroyed or sg2.Parent == nil, "Studio ScreenGui destroyed cleanly on win2:Destroy()")
+
+	-- Regression: Window DestroyOnClose=true default unloads on Close button instead of minimizing
+	;(function()
+		local closeFired = false
+		local winClose = Bali2:CreateWindow({
+			Title = "CloseUnloadTest",
+			ConfirmClose = false,
+			OnClose = function()
+				closeFired = true
+			end,
+		})
+		local sgClose = Bali2._screenGui
+		local actionsWrap = winClose.Main and winClose.Main:FindFirstChild("QuickActions", true)
+		local closeBtnInst = nil
+		if actionsWrap then
+			for _, ch in ipairs(actionsWrap:GetChildren()) do
+				if ch:IsA("TextButton") and ch.LayoutOrder == 6 then
+					closeBtnInst = ch
+				end
+			end
+		end
+		assertTrue(closeBtnInst ~= nil, "Window QuickActions contains Close button")
+		if closeBtnInst then
+			closeBtnInst.Activated:Fire()
+			stepClock(0.35, true)
+		end
+		assertTrue(closeFired, "Window Close button invokes OnClose when ConfirmClose=false")
+		assertTrue(winClose._destroyed == true and (sgClose._destroyed or sgClose.Parent == nil), "Window defaults to DestroyOnClose=true and unloads on Close")
+	end)()
 
 	-- CreateWindow with integrated KeySystem gate (non-blocking test)
 	local winKey = Bali2:CreateWindow({

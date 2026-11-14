@@ -11,6 +11,7 @@ local Theme = require("Core/Theme")
 local Transition = require("Core/Transition")
 local Tween = require("Core/Tween")
 local Util = require("Core/Util")
+local Base = require("Elements/Base")
 local Container = require("Window/Container")
 
 local Section = {}
@@ -23,6 +24,10 @@ function Section.new(parent, options, tab, window, subTab)
 		Description = nil,
 		Desc = nil,
 		Icon = nil,
+		Color = nil,
+		Tint = nil,
+		IconColor = nil,
+		OriginalIconColor = false,
 		Side = "Auto",
 		Collapsible = false,
 		DefaultOpen = true,
@@ -34,6 +39,7 @@ function Section.new(parent, options, tab, window, subTab)
 	local hasSubtitle = subtitleText ~= nil and subtitleText ~= ""
 	local hasHeader = hasTitle or hasSubtitle or options.Icon ~= nil or options.Collapsible == true
 	local isOpen = options.Open ~= nil and (options.Open ~= false) or (options.DefaultOpen ~= false)
+	local sectionTint = options.Tint or options.Color
 
 	local maid = Maid.new()
 
@@ -51,7 +57,10 @@ function Section.new(parent, options, tab, window, subTab)
 		Parent = parent,
 	})
 	maid:Give(card)
-	Create.GlassStroke(card, 0.03)
+	local cardStroke = Create.GlassStroke(card, 0.03)
+	if sectionTint ~= nil then
+		Base.ApplyTint(card, cardStroke, sectionTint, "Card", "Card", "CardTransparency")
+	end
 	Create.List(card, { Gap = 10 })
 
 	local headerBtn
@@ -59,7 +68,36 @@ function Section.new(parent, options, tab, window, subTab)
 	local subtitleLabel
 	local chevronIcon
 	local chevronWrap
+	local iconBadge
+	local iconInst
 	local baseChevronRot = 0
+
+	local function applyHeaderIconColor(colorSpec)
+		if not iconBadge and not iconInst then
+			return
+		end
+		local spec = colorSpec or sectionTint or "Accent"
+		local isOrig = Icons.IsOriginalColor(spec)
+		if iconBadge then
+			local wellSpec = isOrig and "Elevated" or spec
+			iconBadge.BackgroundTransparency = isOrig and 0.45 or 0.88
+			if typeof(wellSpec) == "Color3" then
+				Theme.Unbind(iconBadge, "BackgroundColor3")
+				iconBadge.BackgroundColor3 = wellSpec
+			elseif type(wellSpec) == "string" and string.sub(wellSpec, 1, 1) == "#" then
+				local ok, c = pcall(Color3.fromHex, wellSpec)
+				if ok and typeof(c) == "Color3" then
+					Theme.Unbind(iconBadge, "BackgroundColor3")
+					iconBadge.BackgroundColor3 = c
+				end
+			else
+				Theme.Bind(iconBadge, { BackgroundColor3 = wellSpec })
+			end
+		end
+		if iconInst then
+			Icons.SetColor(iconInst, isOrig and "Original" or spec, false, true)
+		end
+	end
 
 	if hasHeader then
 		headerBtn = Create.New("TextButton", {
@@ -89,7 +127,12 @@ function Section.new(parent, options, tab, window, subTab)
 
 		local hasIcon = false
 		if options.Icon then
-			local iconBadge = Create.New("Frame", {
+			local iconDesc = Icons.Resolve(options.Icon)
+			local isOrigIcon = (options.OriginalIconColor == true)
+				or Icons.IsOriginalColor(options.IconColor)
+				or (iconDesc and iconDesc.Kind == "Asset" and not iconDesc.IsBrand and options.IconColor == nil and sectionTint == nil)
+			local initIconColor = isOrigIcon and "Original" or (options.IconColor or sectionTint or "Accent")
+			iconBadge = Create.New("Frame", {
 				Name = "IconBadge",
 				Size = UDim2.fromOffset(24, 24),
 				Corner = 7,
@@ -98,17 +141,19 @@ function Section.new(parent, options, tab, window, subTab)
 				LayoutOrder = 1,
 				Parent = titleBlock,
 			})
-			local iconInst = Icons.Create(options.Icon, {
+			iconInst = Icons.Create(options.Icon, {
 				Size = UDim2.fromOffset(14, 14),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
-				Color = "Accent",
+				Color = initIconColor,
 				Parent = iconBadge,
 			})
 			if iconInst then
 				hasIcon = true
+				applyHeaderIconColor(initIconColor)
 			else
 				iconBadge:Destroy()
+				iconBadge = nil
 			end
 		end
 
@@ -206,7 +251,12 @@ function Section.new(parent, options, tab, window, subTab)
 		Window = window,
 		Maid = maid,
 		Frame = card,
+		Stroke = cardStroke,
 		_header = headerBtn,
+		_iconBadge = iconBadge,
+		_iconInst = iconInst,
+		_applyHeaderIconColor = applyHeaderIconColor,
+		_hasExplicitIconColor = (options.IconColor ~= nil or options.OriginalIconColor == true),
 		ContentHolder = contentHolder,
 		Content = content,
 		_contentLayout = contentLayout,
@@ -271,6 +321,22 @@ Section.SetDesc = Section.SetSubtitle
 function Section:SetVisible(visible)
 	if self.Frame then
 		self.Frame.Visible = visible == true
+	end
+end
+
+function Section:SetColor(colorSpec)
+	if self.Frame then
+		Base.ApplyTint(self.Frame, self.Stroke, colorSpec, "Card", "Card", "CardTransparency")
+	end
+	if not self._hasExplicitIconColor and self._applyHeaderIconColor then
+		self._applyHeaderIconColor(colorSpec or "Accent")
+	end
+end
+
+function Section:SetIconColor(colorSpec)
+	self._hasExplicitIconColor = (colorSpec ~= nil)
+	if self._applyHeaderIconColor then
+		self._applyHeaderIconColor(colorSpec or "Accent")
 	end
 end
 

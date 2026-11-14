@@ -1,12 +1,12 @@
 # Interactive Controls
 
-Every control can be constructed on a `Section`, `Accordion`, `Tab`, or `SubTab`. All elements share unified base methods (`:SetTitle()`, `:SetDesc()`, `:SetVisible()`, `:SetDisabled()`, `:Lock()`, `:Unlock()`, `:Flash()`, `:OnChanged()`, `:Destroy()`) and expose flags via `window.Flags[flagName]`.
+Every control can be constructed on a `Section`, `Accordion`, `Tab`, or `SubTab`. All elements share unified base methods (`:SetTitle()`, `:SetDesc()`, `:SetColor()`, `:SetIconColor()`, `:SetVisible()`, `:SetDisabled()`, `:Lock()`, `:Unlock()`, `:Flash()`, `:OnChanged()`, `:Destroy()`) and customization options (`Color`/`Tint`, `IconColor = "Original"`, `OriginalIconColor = true`), and expose flags via `window.Flags[flagName]`.
 
 ---
 
 ## `AddButton` & `AddButtonGroup`
 
-Buttons support four surface variants (`"Default"`, `"Primary"`, `"Danger"`, `"Ghost"`), Lucide icons, badges, trailing chevrons (`ShowArrow`), and a two-step `Confirm` safety guard.
+Buttons support semantic surface variants (`"Default"`, `"Primary"`, `"Success"`, `"Warning"`, `"Info"`, `"Danger"`, `"Ghost"`), custom `Color` / `Tint` overrides, Lucide/asset icons (`IconColor = "Original"` for untinted assets), contrast-safe badges, trailing chevrons (`ShowArrow`), automatic ellipsis clamping + hover tooltips on overflow, and a two-step `Confirm` safety guard.
 
 ```lua
 section:AddButton({
@@ -29,7 +29,7 @@ section:AddButtonGroup({
 })
 ```
 
-- **Methods**: `btn:SetText(str)`, `btn:SetVariant(variant)`, `btn:Fire()` (programmatic trigger), `group:GetButton(index)`.
+- **Methods**: `btn:SetText(str)`, `btn:SetVariant(variant)`, `btn:SetColor(color)`, `btn:SetIconColor(color)`, `btn:Fire()` (programmatic trigger), `group:GetButton(index)` (supports `:SetText()`, `:SetVariant()`, `:SetColor()`).
 
 ---
 
@@ -187,14 +187,17 @@ Plain string values and rich option tables can be mixed freely:
 
 - `Label` / `Title` / `Name` / `Text` — Display label shown in the menu and summary trigger.
 - `Value` — Stored return value (defaults to the display label).
-- `Icon` / `IconColor` — Lucide icon name and optional custom `Color3` tint.
+- `Icon` / `IconColor` / `OriginalIconColor` — Lucide icon or asset ID with optional custom color or `"Original"` untinted preservation.
 - `Image` / `Thumbnail` / `Avatar` — Rounded `18x18` thumbnail asset displayed on the left of the option row.
-- `Color` / `TextColor` — Custom `Color3` for the option label (and selected summary on single-select triggers).
-- `Badge` / `Tag` & `BadgeColor` / `TagColor` — Compact pill badge rendered on the right side.
-- `RightText` / `Hint` — Secondary right-aligned hint text.
+- `Color` / `TextColor` — Custom `Color3` or `"#RRGGBB"` hex for the option label (and selected summary on single-select triggers).
+- `Badge` / `Tag` & `BadgeColor` / `TagColor` — Compact pill badge (or `{ Text, Icon, Color }` table) rendered on the right side.
+- `RightText` / `Hint` — Secondary right-aligned text (or `{ Text, Icon, Color }` table), rendered in both menu rows and the closed summary trigger.
+- `RightIcon` / `RightIconColor` / `BadgeIcon` — Optional icon rendered beside `RightText` or inside `Badge` in both rows and the closed trigger. Common currencies and units (e.g. `"80 Yen"`, `"500 Gems"`, `"$250"`, `"100 Stars"`) auto-resolve matching tinted icons unless `RightIcon = false` or `AutoRightIcon = false`.
 - `Disabled` — Grays out and locks an option against selection.
 
-- **Methods**: `:Open()`, `:Close()`, `:Set(valueOrTable, silent?)`, `:Get()`, `:SetValues(list)`, `:SetMode("Popup" | "Inline")`, `:GetMode()`.
+Floating `Popup` dropdowns track trigger position during window drag/scroll and auto-close when scrolled out of the page viewport.
+
+- **Methods**: `:Open()`, `:Close()`, `:Set(valueOrTable, silent?)`, `:Get()`, `:SelectAll(silent?)`, `:Clear(silent?)`, `:SetValues(list)`, `:SetMode("Popup" | "Inline")`, `:GetMode()`.
 
 ---
 

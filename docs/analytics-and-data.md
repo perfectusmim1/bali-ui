@@ -78,13 +78,14 @@ alloc:Set(82.0, 100, "9.12% APR")
 
 ## `AddTable`
 
-Searchable multi-column data table with proportional (`Scale`) or pixel column widths, crisp status pills, optional row selection checkboxes, hover feedback, and inline row action buttons.
+Searchable multi-column data table with proportional (`Scale`) or pixel column widths, crisp status pills, optional row selection checkboxes (`Checkboxes = true | false`, automatically omitted when an inline `Action` button is defined unless `Checkboxes = true`), hover tooltips on truncated cells, and colored inline row action buttons.
 
 ```lua
 local endpoints = section:AddTable({
 	Title = "Cluster Endpoints",
 	Searchable = true,
 	Selectable = true,
+	Checkboxes = true, -- defaults to `Selectable` unless `Action` is present (defaults to false then)
 	MaxHeight = 240,
 	Columns = {
 		{ Title = "Endpoint", Key = "Endpoint", Scale = 0.34 },
@@ -104,6 +105,8 @@ local endpoints = section:AddTable({
 	Action = {
 		Text = "Inspect",
 		Icon = "external-link",
+		Variant = "Primary", -- "Default" | "Primary" | "Success" | "Warning" | "Danger"
+		Color = nil, -- optional custom Color3 / "#RRGGBB" / token
 		Callback = function(row)
 			print("Inspecting:", row.Endpoint.Text)
 		end,
@@ -112,7 +115,7 @@ local endpoints = section:AddTable({
 })
 ```
 
-- **Methods**: `:SetRows(rowsTbl)`, `:GetSelected()`, `:SetTitle(str)`.
+- **Methods**: `:SetRows(rowsTbl)`, `:SetCheckboxes(enabled)`, `:GetSelected()`, `:SetTitle(str)`.
 
 ---
 

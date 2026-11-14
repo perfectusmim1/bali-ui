@@ -520,6 +520,7 @@ telemetryTable = matrixSection:AddTable({
 	},
 	Rows = currentRows,
 	Selectable = true,
+	Checkboxes = true,
 	Searchable = true,
 	MaxHeight = 230,
 	OnRowClick = function(row, idx)

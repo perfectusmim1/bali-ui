@@ -14,7 +14,47 @@ local Base = require("Elements/Base")
 
 local ButtonModule = {}
 
-local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, variant, isConfirming, isHovered)
+local SEMANTIC_VARIANTS = {
+	Danger = "Error",
+	Error = "Error",
+	Success = "Success",
+	Warning = "Warning",
+	Info = "Info",
+}
+
+local function resolveButtonColor(t, spec)
+	if typeof(spec) == "Color3" then
+		return spec
+	elseif type(spec) == "string" then
+		if string.sub(spec, 1, 1) == "#" then
+			local ok, c = pcall(Color3.fromHex, spec)
+			if ok and typeof(c) == "Color3" then
+				return c
+			end
+		end
+		return t[spec]
+	end
+	return nil
+end
+
+local function bindColorProp(inst, prop, spec)
+	if typeof(spec) == "Color3" then
+		Theme.Unbind(inst, prop)
+		inst[prop] = spec
+	elseif type(spec) == "string" and string.sub(spec, 1, 1) == "#" then
+		local ok, c = pcall(Color3.fromHex, spec)
+		if ok and typeof(c) == "Color3" then
+			Theme.Unbind(inst, prop)
+			inst[prop] = c
+			return
+		end
+		Theme.Bind(inst, { [prop] = "Accent" })
+	else
+		Theme.Bind(inst, { [prop] = spec })
+	end
+end
+
+local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, variant, isConfirming, isHovered, customColor, iconColor)
 	if isConfirming then
 		if grad then
 			grad.Enabled = false
@@ -33,48 +73,57 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 			})
 		end
 		if iconObj then
-			Icons.SetColor(iconObj, "Error")
+			Icons.SetColor(iconObj, iconColor or "Error")
 		end
 		return
 	end
 
-	if variant == "Primary" then
+	local tintSpec = customColor or SEMANTIC_VARIANTS[variant]
+	if variant == "Primary" or variant == "Filled" then
 		Theme.Unbind(btnFrame, "BackgroundColor3")
-		btnFrame.BackgroundColor3 = Color3.new(1, 1, 1)
-		btnFrame.BackgroundTransparency = isHovered and 0.08 or 0
-		if grad then
-			grad.Color = Theme.AccentSequence()
-			grad.Enabled = true
+		if customColor then
+			if grad then
+				grad.Enabled = false
+			end
+			bindColorProp(btnFrame, "BackgroundColor3", customColor)
+		else
+			btnFrame.BackgroundColor3 = Color3.new(1, 1, 1)
+			if grad then
+				grad.Color = Theme.AccentSequence()
+				grad.Enabled = true
+			end
 		end
+		btnFrame.BackgroundTransparency = isHovered and 0.08 or 0
 		if stroke then
-			Theme.Bind(stroke, { Color = "Accent" })
+			bindColorProp(stroke, "Color", customColor or "Accent")
 			stroke.Transparency = isHovered and 0.25 or 0.45
 		end
 		if label then
 			Theme.Bind(label, { TextColor3 = "AccentText" })
 		end
 		if iconObj then
-			Icons.SetColor(iconObj, "AccentText")
+			Icons.SetColor(iconObj, iconColor or "AccentText")
 		end
-	elseif variant == "Danger" then
+	elseif tintSpec then
 		if grad then
 			grad.Enabled = false
 		end
-		Theme.Bind(btnFrame, { BackgroundColor3 = "Error" })
+		bindColorProp(btnFrame, "BackgroundColor3", tintSpec)
 		btnFrame.BackgroundTransparency = isHovered and 0.72 or 0.84
 		if stroke then
-			Theme.Bind(stroke, { Color = "Error" })
+			bindColorProp(stroke, "Color", tintSpec)
 			stroke.Transparency = isHovered and 0.35 or 0.55
 		end
 		if label then
 			Theme.Bind(label, {
 				TextColor3 = function(t)
-					return Util.LerpColor(t.Error, Color3.new(1, 1, 1), 0.42)
+					local c = resolveButtonColor(t, tintSpec) or t.Error
+					return Util.LerpColor(c, Color3.new(1, 1, 1), 0.42)
 				end,
 			})
 		end
 		if iconObj then
-			Icons.SetColor(iconObj, "Error")
+			Icons.SetColor(iconObj, iconColor or tintSpec)
 		end
 	elseif variant == "Ghost" then
 		if grad then
@@ -90,7 +139,7 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 			Theme.Bind(label, { TextColor3 = isHovered and "Text" or "SubText" })
 		end
 		if iconObj then
-			Icons.SetColor(iconObj, isHovered and "Text" or "SubText")
+			Icons.SetColor(iconObj, iconColor or (isHovered and "Text" or "SubText"))
 		end
 	else
 		-- "Default"
@@ -114,28 +163,33 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 			Theme.Bind(label, { TextColor3 = "Text" })
 		end
 		if iconObj then
-			Icons.SetColor(iconObj, "Accent")
+			Icons.SetColor(iconObj, iconColor or "Accent")
 		end
 	end
 end
 
-local function applyStateTransition(frame, stroke, variant, hovered, pressed, confirming, animate)
+local function applyStateTransition(frame, stroke, variant, hovered, pressed, confirming, animate, customColor)
 	local theme = Theme.Current
 	local targetBg = frame.BackgroundColor3
 	local targetTrans = frame.BackgroundTransparency
 	local targetStroke = stroke.Transparency
 	local tileHover = theme.TileHover or theme.Tile
 	local accentHover = theme.AccentHover or theme.Accent
+	local tintSpec = customColor or SEMANTIC_VARIANTS[variant]
 
-	if not confirming and variant == "Default" then
+	if not confirming and variant == "Default" and not tintSpec then
 		targetBg = pressed and Util.LerpColor(tileHover, theme.Accent, 0.08) or (hovered and tileHover or theme.Tile)
 		targetTrans = pressed and math.max(0.06, theme.TileTransparency - 0.14)
 			or (hovered and math.max(0.12, theme.TileTransparency - 0.08) or theme.TileTransparency)
 		targetStroke = pressed and 0.42 or (hovered and 0.56 or theme.StrokeTransparency)
-	elseif variant == "Primary" and not confirming then
-		targetBg = pressed and Util.LerpColor(accentHover, Color3.new(1, 1, 1), 0.08)
-			or (hovered and accentHover or theme.Accent)
-		targetTrans = pressed and 0.02 or (hovered and 0.06 or 0.14)
+	elseif not confirming and (variant == "Primary" or variant == "Filled") then
+		local baseCol = (customColor and resolveButtonColor(theme, customColor)) or accentHover
+		targetBg = pressed and Util.LerpColor(baseCol, Color3.new(1, 1, 1), 0.08)
+			or (hovered and Util.LerpColor(baseCol, Color3.new(1, 1, 1), 0.05) or (customColor and baseCol or theme.Accent))
+		targetTrans = pressed and 0.02 or (hovered and 0.06 or (customColor and 0 or 0.14))
+	elseif not confirming and tintSpec then
+		targetTrans = pressed and 0.66 or (hovered and 0.72 or 0.84)
+		targetStroke = pressed and 0.25 or (hovered and 0.35 or 0.55)
 	end
 
 	if animate then
@@ -159,8 +213,11 @@ function Button.new(parent, opts, ctx)
 	if rowOpts.IconBadge == nil then
 		rowOpts.IconBadge = false
 	end
+	rowOpts._ColorIsAccentOnly = true
 
 	local variant = opts.Variant or "Default"
+	local customColor = opts.Color or opts.Tint
+	local customIconColor = (opts.OriginalIconColor == true or Icons.IsOriginalColor(opts.IconColor)) and "Original" or opts.IconColor
 	local row = Base.Row(parent, rowOpts, 0)
 	element:BindUI(row)
 
@@ -171,7 +228,9 @@ function Button.new(parent, opts, ctx)
 	grad.Parent = row.Frame
 
 	local rightIcon = nil
-	if opts.ShowArrow ~= false then
+	local badgeObj = nil
+	local explicitBadgeColor = type(opts.Badge) == "table" and (opts.Badge.Color or opts.Badge[2]) or opts.BadgeColor
+	if opts.ShowArrow ~= false or opts.Badge then
 		Create.List(row.Right, {
 			Direction = Enum.FillDirection.Horizontal,
 			VAlign = Enum.VerticalAlignment.Center,
@@ -180,16 +239,17 @@ function Button.new(parent, opts, ctx)
 		})
 		if opts.Badge then
 			local bText = type(opts.Badge) == "table" and (opts.Badge.Text or opts.Badge[1]) or tostring(opts.Badge)
-			local bColor = type(opts.Badge) == "table" and (opts.Badge.Color or opts.Badge[2]) or "Accent"
-			local b = Base.Badge(row.Right, bText, bColor)
-			b.Frame.LayoutOrder = 1
+			badgeObj = Base.Badge(row.Right, bText, explicitBadgeColor or "Accent")
+			badgeObj.Frame.LayoutOrder = 1
 		end
-		rightIcon = Icons.Create(opts.RightIcon or "chevron-right", {
-			Size = UDim2.fromOffset(15, 15),
-			Color = "Muted",
-			LayoutOrder = 2,
-			Parent = row.Right,
-		})
+		if opts.ShowArrow ~= false then
+			rightIcon = Icons.Create(opts.RightIcon or "chevron-right", {
+				Size = UDim2.fromOffset(15, 15),
+				Color = "Muted",
+				LayoutOrder = 2,
+				Parent = row.Right,
+			})
+		end
 	end
 
 	local hitBtn = Create.New("TextButton", {
@@ -213,12 +273,13 @@ function Button.new(parent, opts, ctx)
 	local baseTitle = element.Title
 
 	local function refreshVisual(animate)
-		applyButtonVariant(row.Frame, row.Stroke, row.TitleLabel, row.IconObj, grad, variant, confirming, hovered or pressed)
+		applyButtonVariant(row.Frame, row.Stroke, row.TitleLabel, row.IconObj, grad, variant, confirming, hovered or pressed, customColor, customIconColor)
+		local filledMode = (variant == "Primary" or variant == "Filled")
 
 		if row.DescLabel then
 			if confirming then
 				Theme.Bind(row.DescLabel, { TextColor3 = "Error" })
-			elseif variant == "Primary" then
+			elseif filledMode then
 				Theme.Bind(row.DescLabel, { TextColor3 = "AccentText" })
 				row.DescLabel.TextTransparency = 0.18
 			elseif variant == "Danger" then
@@ -230,8 +291,27 @@ function Button.new(parent, opts, ctx)
 			end
 		end
 
+		if badgeObj then
+			if confirming then
+				badgeObj.Frame.BackgroundTransparency = 0.84
+				badgeObj.Stroke.Transparency = 0.72
+				badgeObj:SetColor("Error")
+			elseif filledMode and (explicitBadgeColor == nil or explicitBadgeColor == "Accent") then
+				Theme.Unbind(badgeObj.Frame, "BackgroundColor3")
+				badgeObj.Frame.BackgroundColor3 = Theme.Current.Dark == false and Color3.new(1, 1, 1) or Color3.new(0, 0, 0)
+				badgeObj.Frame.BackgroundTransparency = 0.68
+				Theme.Bind(badgeObj.Stroke, { Color = "AccentText" })
+				badgeObj.Stroke.Transparency = 0.55
+				Theme.Bind(badgeObj.Label, { TextColor3 = "AccentText" })
+			else
+				badgeObj.Frame.BackgroundTransparency = 0.84
+				badgeObj.Stroke.Transparency = 0.72
+				badgeObj:SetColor(explicitBadgeColor or customColor or SEMANTIC_VARIANTS[variant] or "Accent")
+			end
+		end
+
 		if rightIcon then
-			Icons.SetColor(rightIcon, confirming and "Error" or (variant == "Primary" and "AccentText" or "Muted"))
+			Icons.SetColor(rightIcon, confirming and "Error" or (filledMode and "AccentText" or "Muted"))
 			local targetIconSize = pressed and UDim2.fromOffset(14, 14) or (hovered and UDim2.fromOffset(16, 16) or UDim2.fromOffset(15, 15))
 			if animate then
 				Tween.Play(rightIcon, { Size = targetIconSize }, Tween.Fast, Enum.EasingStyle.Exponential)
@@ -240,7 +320,7 @@ function Button.new(parent, opts, ctx)
 			end
 		end
 
-		applyStateTransition(row.Frame, row.Stroke, variant, hovered, pressed, confirming, animate)
+		applyStateTransition(row.Frame, row.Stroke, variant, hovered, pressed, confirming, animate, customColor)
 	end
 
 	refreshVisual(false)
@@ -257,6 +337,15 @@ function Button.new(parent, opts, ctx)
 			pressed = false
 		end
 		refreshVisual(false)
+	end
+
+	if Tooltip and Tooltip.Bind and not opts.Tooltip then
+		pcall(Tooltip.Bind, hitBtn, function()
+			if row.TitleLabel and row.TitleLabel.TextFits == false then
+				return element.Title
+			end
+			return nil
+		end)
 	end
 
 	element.Maid:Give(hitBtn.MouseEnter:Connect(function()
@@ -391,6 +480,18 @@ function Button.new(parent, opts, ctx)
 		refreshVisual(true)
 	end
 
+	function element:SetColor(newColor)
+		customColor = newColor
+		refreshVisual(true)
+	end
+
+	function element:SetIconColor(newColor)
+		customIconColor = newColor
+		if row.IconObj then
+			Icons.SetColor(row.IconObj, newColor or "Accent", false, true)
+		end
+	end
+
 	function element:Fire()
 		if self.Disabled or self.Locked then
 			return
@@ -454,11 +555,15 @@ function ButtonGroup.new(parent, opts, ctx)
 
 	local buttonsList = opts.Buttons or {}
 	local count = math.max(#buttonsList, 1)
+	local pillPadX = (count >= 3) and 8 or 12
+	local innerGap = (count >= 3) and 5 or 6
 	local createdButtons = {}
 
 	for index, item in ipairs(buttonsList) do
 		local bOpts = type(item) == "table" and item or { Title = tostring(item) }
 		local bVariant = bOpts.Variant or "Default"
+		local bCustomColor = bOpts.Color or bOpts.Tint
+		local bIconColor = (bOpts.OriginalIconColor == true or Icons.IsOriginalColor(bOpts.IconColor)) and "Original" or bOpts.IconColor
 		local widthOffset = -((count - 1) * gap) / count
 
 		local btn = Create.New("TextButton", {
@@ -466,7 +571,7 @@ function ButtonGroup.new(parent, opts, ctx)
 			Size = UDim2.new(1 / count, widthOffset, 0, 38),
 			Theme = { BackgroundColor3 = "Tile" },
 			Corner = UDim.new(1, 0),
-			Padding = { 0, 12, 0, 12 },
+			Padding = { 0, pillPadX, 0, pillPadX },
 			Text = "",
 			AutoButtonColor = false,
 			LayoutOrder = index,
@@ -492,14 +597,14 @@ function ButtonGroup.new(parent, opts, ctx)
 			Direction = Enum.FillDirection.Horizontal,
 			HAlign = Enum.HorizontalAlignment.Center,
 			VAlign = Enum.VerticalAlignment.Center,
-			Gap = 6,
+			Gap = innerGap,
 		})
 
 		local iconObj = nil
 		if bOpts.Icon and bOpts.Icon ~= "" and bOpts.Icon ~= false then
 			iconObj = Icons.Create(bOpts.Icon, {
 				Size = UDim2.fromOffset(14, 14),
-				Color = "Text",
+				Color = bIconColor or "Text",
 				LayoutOrder = 1,
 				Parent = content,
 			})
@@ -519,19 +624,41 @@ function ButtonGroup.new(parent, opts, ctx)
 			Parent = content,
 		})
 
+		local labelConstraint = Instance.new("UISizeConstraint")
+		labelConstraint.Name = "LabelConstraint"
+		labelConstraint.MaxSize = Vector2.new(9999, 38)
+		labelConstraint.Parent = lbl
+
+		local function syncLabelFit()
+			local btnW = btn.AbsoluteSize.X
+			local iconSpace = iconObj and (14 + innerGap) or 0
+			if btnW > 0 then
+				local availW = math.max(16, btnW - (pillPadX * 2) - iconSpace)
+				labelConstraint.MaxSize = Vector2.new(availW, 38)
+				local needSmall = (count >= 3) and (#lbl.Text >= 10 or availW < (#lbl.Text * 6.8))
+				lbl.TextSize = needSmall and 11 or 12
+			else
+				labelConstraint.MaxSize = Vector2.new(9999, 38)
+				lbl.TextSize = (count >= 3 and #lbl.Text >= 12) and 11 or 12
+			end
+		end
+		syncLabelFit()
+		element.Maid:Give(btn:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncLabelFit))
+		element.Maid:Give(lbl:GetPropertyChangedSignal("Text"):Connect(syncLabelFit))
+
 		local isHovered = false
 		local isPressed = false
 		local itemDisabled = (bOpts.Disabled == true)
 
 		local function refreshBtn(animate)
-			applyButtonVariant(btn, stroke, lbl, iconObj, grad, bVariant, false, isHovered or isPressed)
+			applyButtonVariant(btn, stroke, lbl, iconObj, grad, bVariant, false, isHovered or isPressed, bCustomColor, bIconColor)
 			local dim = (element.Disabled or itemDisabled) and 0.48 or 0
 			lbl.TextTransparency = dim
 			if iconObj then
 				Icons.SetTransparency(iconObj, dim)
 			end
 
-			applyStateTransition(btn, stroke, bVariant, isHovered, isPressed, false, animate)
+			applyStateTransition(btn, stroke, bVariant, isHovered, isPressed, false, animate, bCustomColor)
 		end
 
 		refreshBtn(false)
@@ -541,8 +668,20 @@ function ButtonGroup.new(parent, opts, ctx)
 			end
 		end))
 
-		if bOpts.Tooltip then
-			pcall(Tooltip.Bind, btn, bOpts.Tooltip)
+		if Tooltip and Tooltip.Bind then
+			pcall(Tooltip.Bind, btn, function()
+				if bOpts.Tooltip and bOpts.Tooltip ~= "" then
+					return bOpts.Tooltip
+				end
+				local btnW = btn.AbsoluteSize.X
+				local iconSpace = iconObj and (14 + innerGap) or 0
+				local availW = btnW > 0 and (btnW - (pillPadX * 2) - iconSpace) or 9999
+				local estW = #lbl.Text * (lbl.TextSize * 0.56)
+				if lbl.TextFits == false or (btnW > 0 and estW > availW) then
+					return lbl.Text
+				end
+				return nil
+			end)
 		end
 
 		element.Maid:Give(btn.MouseEnter:Connect(function()
@@ -599,6 +738,10 @@ function ButtonGroup.new(parent, opts, ctx)
 			end,
 			SetVariant = function(_, v)
 				bVariant = v or "Default"
+				refreshBtn()
+			end,
+			SetColor = function(_, c)
+				bCustomColor = c
 				refreshBtn()
 			end,
 			SetDisabled = function(_, d)

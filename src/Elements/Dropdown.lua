@@ -48,23 +48,115 @@ local function normalizeImageAsset(val)
 	return nil
 end
 
-local function normalizeItem(entry)
+local function inferRightIcon(text, autoEnabled)
+	if autoEnabled == false or type(text) ~= "string" or text == "" then
+		return nil, nil
+	end
+	local lower = string.lower(text)
+	if string.find(lower, "%f[%a]yen%f[%A]")
+		or string.find(lower, "%f[%a]coins?%f[%A]")
+		or string.find(lower, "%f[%a]gold%f[%A]")
+		or string.find(lower, "%f[%a]gp%f[%A]")
+		or string.find(lower, "%f[%a]beli%f[%A]")
+		or string.find(lower, "%f[%a]ryo%f[%A]")
+		or string.find(lower, "%f[%a]zeni%f[%A]")
+	then
+		return "coins", Color3.fromRGB(251, 191, 36)
+	end
+	if string.find(lower, "%f[%a]robux%f[%A]") or string.find(lower, "r%$") then
+		return "coins", Color3.fromRGB(52, 211, 153)
+	end
+	if string.find(lower, "%f[%a]gems?%f[%A]")
+		or string.find(lower, "%f[%a]diamonds?%f[%A]")
+		or string.find(lower, "%f[%a]crystals?%f[%A]")
+		or string.find(lower, "%f[%a]rubies%f[%A]")
+		or string.find(lower, "%f[%a]ruby%f[%A]")
+		or string.find(lower, "%f[%a]jade%f[%A]")
+	then
+		return "gem", Color3.fromRGB(56, 189, 248)
+	end
+	if string.find(lower, "%$")
+		or string.find(lower, "%f[%a]cash%f[%A]")
+		or string.find(lower, "%f[%a]money%f[%A]")
+		or string.find(lower, "%f[%a]usd%f[%A]")
+		or string.find(lower, "%f[%a]bucks?%f[%A]")
+	then
+		return "wallet", Color3.fromRGB(52, 211, 153)
+	end
+	if string.find(lower, "%f[%a]stars?%f[%A]") then
+		return "star", Color3.fromRGB(251, 191, 36)
+	end
+	if string.find(lower, "%f[%a]souls?%f[%A]")
+		or string.find(lower, "%f[%a]skulls?%f[%A]")
+		or string.find(lower, "%f[%a]kills?%f[%A]")
+	then
+		return "skull", Color3.fromRGB(248, 113, 113)
+	end
+	if string.find(lower, "%f[%a]energy%f[%A]")
+		or string.find(lower, "%f[%a]chakra%f[%A]")
+		or string.find(lower, "%f[%a]mana%f[%A]")
+		or string.find(lower, "%f[%a]reiatsu%f[%A]")
+		or string.find(lower, "%f[%a]ki%f[%A]")
+	then
+		return "zap", Color3.fromRGB(56, 189, 248)
+	end
+	return nil, nil
+end
+
+local function unwrapAccessory(raw)
+	if type(raw) == "table" then
+		local txt = raw.Text or raw.Title or raw.Name or raw[1]
+		return txt ~= nil and tostring(txt) or nil, raw.Icon, raw.Color
+	end
+	return raw, nil, nil
+end
+
+local function normalizeItem(entry, autoRightIcon)
 	if type(entry) == "table" then
 		local title = tostring(entry.Title or entry.Name or entry.Text or entry.Value or "")
 		local value = entry.Value
 		if value == nil then
 			value = entry.Title or entry.Name or entry.Text or title
 		end
+		local origIcon = (entry.OriginalIconColor == true) or Icons.IsOriginalColor(entry.IconColor)
+		local badgeText, badgeTblIcon, badgeTblCol = unwrapAccessory(entry.Badge or entry.Tag)
+		local rightText, rightTblIcon, rightTblCol = unwrapAccessory(entry.RightText or entry.Hint)
+		local explicitRightIcon = entry.RightIcon
+		if explicitRightIcon == nil then
+			explicitRightIcon = entry.BadgeIcon
+		end
+		if explicitRightIcon == nil then
+			explicitRightIcon = rightTblIcon or badgeTblIcon
+		end
+		local rightIcon = explicitRightIcon
+		local inferredCol = nil
+		if rightIcon == nil and autoRightIcon ~= false then
+			local sourceText = rightText or badgeText
+			rightIcon, inferredCol = inferRightIcon(sourceText, autoRightIcon)
+		elseif rightIcon == false then
+			rightIcon = nil
+		end
+		local badgeColor = badgeTblCol or entry.BadgeColor or entry.TagColor or entry.Color
+		local rightTextColor = rightTblCol or entry.RightTextColor or badgeColor
+		local rightIconColor = entry.RightIconColor or rightTblCol or badgeTblCol or inferredCol
+		local rightOrigIcon = (entry.OriginalRightIconColor == true)
+			or (entry.RightOriginalIconColor == true)
+			or Icons.IsOriginalColor(rightIconColor)
 		return {
 			Title = title,
 			Desc = entry.Desc or entry.Description,
 			Icon = entry.Icon,
 			Image = entry.Image or entry.Thumbnail or entry.Avatar,
 			Color = entry.Color or entry.TextColor,
-			IconColor = entry.IconColor or entry.Color or entry.TextColor,
-			Badge = entry.Badge or entry.Tag,
-			BadgeColor = entry.BadgeColor or entry.TagColor or entry.Color,
-			RightText = entry.RightText or entry.Hint,
+			IconColor = origIcon and "Original" or (entry.IconColor or entry.Color or entry.TextColor),
+			OriginalIconColor = origIcon,
+			Badge = badgeText,
+			BadgeColor = badgeColor,
+			RightText = rightText,
+			RightTextColor = rightTextColor,
+			RightIcon = rightIcon,
+			RightIconColor = rightOrigIcon and "Original" or (rightIconColor or badgeColor),
+			OriginalRightIconColor = rightOrigIcon,
 			Disabled = entry.Disabled == true,
 			Value = value,
 		}
@@ -77,21 +169,26 @@ local function normalizeItem(entry)
 		Image = nil,
 		Color = nil,
 		IconColor = nil,
+		OriginalIconColor = false,
 		Badge = nil,
 		BadgeColor = nil,
 		RightText = nil,
+		RightTextColor = nil,
+		RightIcon = nil,
+		RightIconColor = nil,
+		OriginalRightIconColor = false,
 		Disabled = false,
 		Value = entry,
 	}
 end
 
-local function normalizeList(values)
+local function normalizeList(values, autoRightIcon)
 	local items = {}
 	if type(values) ~= "table" then
 		return items
 	end
 	for _, entry in ipairs(values) do
-		table.insert(items, normalizeItem(entry))
+		table.insert(items, normalizeItem(entry, autoRightIcon))
 	end
 	return items
 end
@@ -137,6 +234,7 @@ function Dropdown.new(parent, opts, ctx)
 		MaxVisible = 7,
 		Mode = nil,
 		Inline = nil,
+		AutoRightIcon = true,
 		Callback = nil,
 		Flag = nil,
 		Tooltip = nil,
@@ -217,7 +315,8 @@ function Dropdown.new(parent, opts, ctx)
 		pcall(Tooltip.Bind, row.Frame, opts.Tooltip)
 	end
 
-	local items = normalizeList(opts.Values)
+	local autoRightIcon = opts.AutoRightIcon ~= false
+	local items = normalizeList(opts.Values, autoRightIcon)
 	local multi = opts.Multi == true
 	local allowNull = opts.AllowNull == true
 	local searchable = opts.Searchable ~= false
@@ -309,10 +408,23 @@ function Dropdown.new(parent, opts, ctx)
 		Visible = false,
 		Parent = trigger,
 	})
+	Create.List(triggerBadge, {
+		Direction = Enum.FillDirection.Horizontal,
+		Gap = 4,
+		VAlign = Enum.VerticalAlignment.Center,
+	})
 	local triggerBadgeStroke = Create.Stroke(triggerBadge, {
 		Theme = { Color = "Accent" },
 		Transparency = 0.55,
 		Thickness = 1,
+	})
+	local triggerBadgeIconHolder = Create.New("Frame", {
+		Name = "TriggerBadgeIcon",
+		Size = UDim2.fromOffset(11, 11),
+		BackgroundTransparency = 1,
+		LayoutOrder = 1,
+		Visible = false,
+		Parent = triggerBadge,
 	})
 	local triggerBadgeText = Create.Text({
 		Name = "BadgeText",
@@ -323,7 +435,18 @@ function Dropdown.new(parent, opts, ctx)
 		TextSize = 10,
 		Color = "Accent",
 		TextYAlignment = Enum.TextYAlignment.Center,
+		LayoutOrder = 2,
 		Parent = triggerBadge,
+	})
+
+	local triggerRightIconHolder = Create.New("Frame", {
+		Name = "TriggerRightIcon",
+		Size = UDim2.fromOffset(14, 14),
+		Position = UDim2.new(1, -20, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		BackgroundTransparency = 1,
+		Visible = false,
+		Parent = trigger,
 	})
 
 	local triggerRightText = Create.Text({
@@ -761,11 +884,29 @@ function Dropdown.new(parent, opts, ctx)
 		return selectedSingle and selectedSingle.Value or nil
 	end
 
-	local function clearTriggerIcon()
-		for _, child in ipairs(triggerIconHolder:GetChildren()) do
+	local function clearIconHolder(holder)
+		for _, child in ipairs(holder:GetChildren()) do
 			child:Destroy()
 		end
-		triggerIconHolder.Visible = false
+		holder.Visible = false
+	end
+
+	local function renderIconInto(holder, iconName, colSpec, isOrig, sizePx, fallbackToken)
+		clearIconHolder(holder)
+		local col, tok = resolveCustomColor(colSpec)
+		local useOrig = (isOrig == true) or Icons.IsOriginalColor(colSpec)
+		if not useOrig and not col and not tok and Icons.Resolve(iconName).Kind == "Asset" then
+			useOrig = true
+		end
+		Icons.Create(iconName, {
+			Size = UDim2.fromOffset(sizePx, sizePx),
+			Position = UDim2.fromScale(0.5, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			OriginalColor = useOrig,
+			Color = (not useOrig) and (col or tok or fallbackToken) or nil,
+			Parent = holder,
+		})
+		holder.Visible = true
 	end
 
 	local function applyColorOrToken(inst, prop, col, token, fallbackToken)
@@ -800,29 +941,28 @@ function Dropdown.new(parent, opts, ctx)
 			local leftReserve = 0
 			local imgAsset = normalizeImageAsset(previewItem.Image)
 			if imgAsset then
-				clearTriggerIcon()
+				clearIconHolder(triggerIconHolder)
 				triggerThumb.Image = imgAsset
 				triggerThumb.Visible = true
 				leftReserve = 26
 			elseif previewItem.Icon then
 				triggerThumb.Visible = false
-				clearTriggerIcon()
-				local iconCol, iconToken = resolveCustomColor(previewItem.IconColor or previewItem.Color)
-				Icons.Create(previewItem.Icon, {
-					Size = UDim2.fromOffset(15, 15),
-					Position = UDim2.fromScale(0.5, 0.5),
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Color = iconCol or iconToken or "Accent",
-					Parent = triggerIconHolder,
-				})
-				triggerIconHolder.Visible = true
+				renderIconInto(
+					triggerIconHolder,
+					previewItem.Icon,
+					previewItem.IconColor or previewItem.Color,
+					previewItem.OriginalIconColor,
+					15,
+					"Accent"
+				)
 				leftReserve = 22
 			else
 				triggerThumb.Visible = false
-				clearTriggerIcon()
+				clearIconHolder(triggerIconHolder)
 			end
 
 			local rightReserve = 20
+			local hasRightIcon = (previewItem.RightIcon ~= nil and previewItem.RightIcon ~= "")
 			if previewItem.Badge ~= nil and previewItem.Badge ~= "" then
 				local badgeStr = tostring(previewItem.Badge)
 				local badgeCol, badgeToken = resolveCustomColor(previewItem.BadgeColor)
@@ -830,22 +970,67 @@ function Dropdown.new(parent, opts, ctx)
 				applyColorOrToken(triggerBadge, "BackgroundColor3", badgeCol, badgeToken, "Accent")
 				applyColorOrToken(triggerBadgeStroke, "Color", badgeCol, badgeToken, "Accent")
 				applyColorOrToken(triggerBadgeText, "TextColor3", badgeCol, badgeToken, "Accent")
+				if hasRightIcon then
+					renderIconInto(
+						triggerBadgeIconHolder,
+						previewItem.RightIcon,
+						previewItem.RightIconColor or previewItem.BadgeColor,
+						previewItem.OriginalRightIconColor,
+						11,
+						badgeToken or "Accent"
+					)
+				else
+					clearIconHolder(triggerBadgeIconHolder)
+				end
 				triggerBadge.Visible = true
 				triggerRightText.Visible = false
-				local badgeW = math.clamp(#badgeStr * 6 + 18, 34, 72)
+				clearIconHolder(triggerRightIconHolder)
+				local badgeW = math.clamp(#badgeStr * 6 + (hasRightIcon and 32 or 18), 34, 96)
 				rightReserve = 24 + badgeW
 			elseif previewItem.RightText ~= nil and previewItem.RightText ~= "" then
 				local hintStr = tostring(previewItem.RightText)
-				local hintCol, hintToken = resolveCustomColor(previewItem.BadgeColor)
+				local hintCol, hintToken = resolveCustomColor(previewItem.RightTextColor or previewItem.BadgeColor)
 				triggerRightText.Text = hintStr
 				applyColorOrToken(triggerRightText, "TextColor3", hintCol, hintToken, "Muted")
 				triggerRightText.Visible = true
 				triggerBadge.Visible = false
-				local hintW = math.clamp(#hintStr * 6 + 6, 26, 68)
-				rightReserve = 24 + hintW
+				clearIconHolder(triggerBadgeIconHolder)
+				if hasRightIcon then
+					renderIconInto(
+						triggerRightIconHolder,
+						previewItem.RightIcon,
+						previewItem.RightIconColor or previewItem.RightTextColor or previewItem.BadgeColor,
+						previewItem.OriginalRightIconColor,
+						13,
+						hintToken or "Muted"
+					)
+					triggerRightText.Position = UDim2.new(1, -37, 0.5, 0)
+					local hintW = math.clamp(#hintStr * 6 + 24, 38, 92)
+					rightReserve = 24 + hintW
+				else
+					clearIconHolder(triggerRightIconHolder)
+					triggerRightText.Position = UDim2.new(1, -20, 0.5, 0)
+					local hintW = math.clamp(#hintStr * 6 + 6, 26, 68)
+					rightReserve = 24 + hintW
+				end
+			elseif hasRightIcon then
+				triggerBadge.Visible = false
+				clearIconHolder(triggerBadgeIconHolder)
+				triggerRightText.Visible = false
+				renderIconInto(
+					triggerRightIconHolder,
+					previewItem.RightIcon,
+					previewItem.RightIconColor or previewItem.Color,
+					previewItem.OriginalRightIconColor,
+					14,
+					"SubText"
+				)
+				rightReserve = 38
 			else
 				triggerBadge.Visible = false
+				clearIconHolder(triggerBadgeIconHolder)
 				triggerRightText.Visible = false
+				clearIconHolder(triggerRightIconHolder)
 			end
 
 			summaryLabel.Position = UDim2.fromOffset(leftReserve, 0)
@@ -866,9 +1051,11 @@ function Dropdown.new(parent, opts, ctx)
 		end
 
 		triggerThumb.Visible = false
-		clearTriggerIcon()
+		clearIconHolder(triggerIconHolder)
 		triggerBadge.Visible = false
+		clearIconHolder(triggerBadgeIconHolder)
 		triggerRightText.Visible = false
+		clearIconHolder(triggerRightIconHolder)
 		summaryLabel.Position = UDim2.fromOffset(0, 0)
 		summaryLabel.Size = UDim2.new(1, -20, 1, 0)
 
@@ -944,7 +1131,7 @@ function Dropdown.new(parent, opts, ctx)
 		end
 		entry.TitleLabel.TextTransparency = disabled and 0.48 or 0
 
-		if entry.IconInst and not item.IconColor then
+		if entry.IconInst and not item.IconColor and not item.OriginalIconColor and not entry.IconIsOriginal then
 			Icons.SetColor(entry.IconInst, active and "Accent" or "SubText")
 		end
 
@@ -1143,7 +1330,7 @@ function Dropdown.new(parent, opts, ctx)
 		for index, item in ipairs(items) do
 			local hasDesc = (item.Desc ~= nil and item.Desc ~= "")
 			local imgAsset = normalizeImageAsset(item.Image)
-			local hasAccessory = (item.Badge ~= nil and item.Badge ~= "") or (item.RightText ~= nil and item.RightText ~= "")
+			local hasRightIcon = (item.RightIcon ~= nil and item.RightIcon ~= "")
 			local btn = Create.New("TextButton", {
 				Name = "Opt_" .. index,
 				Size = UDim2.new(1, 0, 0, hasDesc and 44 or 28),
@@ -1164,8 +1351,17 @@ function Dropdown.new(parent, opts, ctx)
 			})
 
 			local leftReserve = imgAsset and 26 or (item.Icon and 22 or 0)
-			local rightReserve = hasAccessory and 82 or 20
+			local accWidth = 0
+			if item.Badge ~= nil and item.Badge ~= "" then
+				accWidth = math.clamp(#tostring(item.Badge) * 6 + (hasRightIcon and 32 or 18), 34, 100)
+			elseif item.RightText ~= nil and item.RightText ~= "" then
+				accWidth = math.clamp(#tostring(item.RightText) * 6 + (hasRightIcon and 24 or 8), 26, 96)
+			elseif hasRightIcon then
+				accWidth = 18
+			end
+			local rightReserve = accWidth > 0 and (24 + accWidth) or 20
 			local iconInst = nil
+			local iconIsOriginal = false
 			local thumbInst = nil
 
 			if imgAsset then
@@ -1187,16 +1383,25 @@ function Dropdown.new(parent, opts, ctx)
 				})
 			elseif item.Icon then
 				local iconCol, iconToken = resolveCustomColor(item.IconColor)
+				iconIsOriginal = (item.OriginalIconColor == true)
+					or Icons.IsOriginalColor(item.IconColor)
+					or (not iconCol and not iconToken and Icons.Resolve(item.Icon).Kind == "Asset")
 				iconInst = Icons.Create(item.Icon, {
 					Size = UDim2.fromOffset(15, 15),
 					Position = UDim2.new(0, 0, 0.5, 0),
 					AnchorPoint = Vector2.new(0, 0.5),
-					Color = iconCol or iconToken or "SubText",
+					OriginalColor = iconIsOriginal,
+					Color = (not iconIsOriginal) and (iconCol or iconToken or "SubText") or nil,
 					Transparency = item.Disabled and 0.45 or 0,
 					ZIndex = 114,
 					Parent = btn,
 				})
 			end
+
+			local rIconCol, rIconTok = resolveCustomColor(item.RightIconColor)
+			local rOrigIcon = (item.OriginalRightIconColor == true)
+				or Icons.IsOriginalColor(item.RightIconColor)
+				or (hasRightIcon and not rIconCol and not rIconTok and Icons.Resolve(item.RightIcon).Kind == "Asset")
 
 			if item.Badge ~= nil and item.Badge ~= "" then
 				local badgeCol, badgeToken = resolveCustomColor(item.BadgeColor)
@@ -1214,12 +1419,29 @@ function Dropdown.new(parent, opts, ctx)
 					ZIndex = 114,
 					Parent = btn,
 				})
+				Create.List(badgeFrame, {
+					Direction = Enum.FillDirection.Horizontal,
+					Gap = 4,
+					VAlign = Enum.VerticalAlignment.Center,
+				})
 				Create.Stroke(badgeFrame, {
 					Color = badgeCol,
 					Theme = (not badgeCol) and { Color = badgeToken or "Accent" } or nil,
 					Transparency = 0.55,
 					Thickness = 1,
 				})
+				if hasRightIcon then
+					Icons.Create(item.RightIcon, {
+						Name = "RightIcon",
+						Size = UDim2.fromOffset(11, 11),
+						OriginalColor = rOrigIcon,
+						Color = (not rOrigIcon) and (rIconCol or rIconTok or badgeCol or badgeToken or "Accent") or nil,
+						Transparency = item.Disabled and 0.45 or 0,
+						LayoutOrder = 1,
+						ZIndex = 115,
+						Parent = badgeFrame,
+					})
+				end
 				local badgeTxt = Create.Text({
 					Size = UDim2.fromOffset(0, 18),
 					AutomaticSize = Enum.AutomaticSize.X,
@@ -1228,6 +1450,7 @@ function Dropdown.new(parent, opts, ctx)
 					TextSize = 10,
 					Color = badgeToken or "Accent",
 					TextYAlignment = Enum.TextYAlignment.Center,
+					LayoutOrder = 2,
 					ZIndex = 115,
 					Parent = badgeFrame,
 				})
@@ -1236,12 +1459,12 @@ function Dropdown.new(parent, opts, ctx)
 					badgeTxt.TextColor3 = badgeCol
 				end
 			elseif item.RightText ~= nil and item.RightText ~= "" then
-				local hintCol, hintToken = resolveCustomColor(item.BadgeColor)
+				local hintCol, hintToken = resolveCustomColor(item.RightTextColor or item.BadgeColor)
 				local hintTxt = Create.Text({
 					Name = "RightText",
 					Size = UDim2.fromOffset(0, 16),
 					AutomaticSize = Enum.AutomaticSize.X,
-					Position = UDim2.new(1, -20, 0.5, 0),
+					Position = UDim2.new(1, hasRightIcon and -37 or -20, 0.5, 0),
 					AnchorPoint = Vector2.new(1, 0.5),
 					Text = tostring(item.RightText),
 					Font = "Medium",
@@ -1255,6 +1478,31 @@ function Dropdown.new(parent, opts, ctx)
 					Theme.Unbind(hintTxt, "TextColor3")
 					hintTxt.TextColor3 = hintCol
 				end
+				if hasRightIcon then
+					Icons.Create(item.RightIcon, {
+						Name = "RightIcon",
+						Size = UDim2.fromOffset(13, 13),
+						Position = UDim2.new(1, -20, 0.5, 0),
+						AnchorPoint = Vector2.new(1, 0.5),
+						OriginalColor = rOrigIcon,
+						Color = (not rOrigIcon) and (rIconCol or rIconTok or hintCol or hintToken or "Muted") or nil,
+						Transparency = item.Disabled and 0.45 or 0,
+						ZIndex = 114,
+						Parent = btn,
+					})
+				end
+			elseif hasRightIcon then
+				Icons.Create(item.RightIcon, {
+					Name = "RightIcon",
+					Size = UDim2.fromOffset(14, 14),
+					Position = UDim2.new(1, -20, 0.5, 0),
+					AnchorPoint = Vector2.new(1, 0.5),
+					OriginalColor = rOrigIcon,
+					Color = (not rOrigIcon) and (rIconCol or rIconTok or "SubText") or nil,
+					Transparency = item.Disabled and 0.45 or 0,
+					ZIndex = 114,
+					Parent = btn,
+				})
 			end
 
 			local titleLbl
@@ -1332,6 +1580,7 @@ function Dropdown.new(parent, opts, ctx)
 				DescLabel = descLbl,
 				CheckIcon = checkIcon,
 				IconInst = iconInst,
+				IconIsOriginal = iconIsOriginal,
 				ThumbInst = thumbInst,
 				Hovered = false,
 			}
@@ -1379,15 +1628,39 @@ function Dropdown.new(parent, opts, ctx)
 
 	-- Fallback screen positioning if ctx.OpenPopup is unavailable
 	local fallbackOutsideConn
+	local fallbackAnchorConns = {}
+	local function clearFallbackTrackers()
+		if fallbackOutsideConn then
+			fallbackOutsideConn:Disconnect()
+			fallbackOutsideConn = nil
+		end
+		for i = #fallbackAnchorConns, 1, -1 do
+			fallbackAnchorConns[i]:Disconnect()
+			fallbackAnchorConns[i] = nil
+		end
+	end
+
 	local function placePopupFallback()
 		local layer = ctx.PopupLayer or row.Frame:FindFirstAncestorOfClass("ScreenGui")
 		if not layer then
 			return
 		end
-		popup.Parent = layer
-		local viewSize = layer.AbsoluteSize
+		local scroller = trigger:FindFirstAncestorOfClass("ScrollingFrame")
 		local anchorPos = trigger.AbsolutePosition
 		local anchorSize = trigger.AbsoluteSize
+		if scroller then
+			local sPos = scroller.AbsolutePosition
+			local sSize = scroller.AbsoluteSize
+			if sSize.Y > 0 then
+				local centerY = anchorPos.Y + anchorSize.Y * 0.5
+				if centerY < sPos.Y - 4 or centerY > sPos.Y + sSize.Y + 4 then
+					self:Close()
+					return
+				end
+			end
+		end
+		popup.Parent = layer
+		local viewSize = layer.AbsoluteSize
 		local popSize = popup.Size
 		local px = Util.Clamp(anchorPos.X + anchorSize.X - popSize.X.Offset, 8, math.max(8, viewSize.X - popSize.X.Offset - 8))
 		local py = anchorPos.Y + anchorSize.Y + 6
@@ -1417,10 +1690,7 @@ function Dropdown.new(parent, opts, ctx)
 		if chevron then
 			Tween.Play(chevron, { Rotation = chevronBaseRot }, Tween.Fast)
 		end
-		if fallbackOutsideConn then
-			fallbackOutsideConn:Disconnect()
-			fallbackOutsideConn = nil
-		end
+		clearFallbackTrackers()
 		if mode == "Inline" then
 			cancelInlineTween()
 			local currentH = inlineClip.AbsoluteSize.Y
@@ -1497,6 +1767,28 @@ function Dropdown.new(parent, opts, ctx)
 			ctx.OpenPopup(popupId, popup, trigger, handleClosedState)
 		else
 			placePopupFallback()
+			if not isOpen then
+				return
+			end
+			clearFallbackTrackers()
+			table.insert(fallbackAnchorConns, trigger:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+				if isOpen then
+					placePopupFallback()
+				end
+			end))
+			table.insert(fallbackAnchorConns, trigger:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				if isOpen then
+					placePopupFallback()
+				end
+			end))
+			local scroller = trigger:FindFirstAncestorOfClass("ScrollingFrame")
+			if scroller then
+				table.insert(fallbackAnchorConns, scroller:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+					if isOpen then
+						placePopupFallback()
+					end
+				end))
+			end
 			fallbackOutsideConn = Services.UserInputService.InputBegan:Connect(function(input)
 				if input.KeyCode == Enum.KeyCode.Escape then
 					self:Close()
@@ -1636,7 +1928,7 @@ function Dropdown.new(parent, opts, ctx)
 
 	function self:SetValues(list)
 		local prev = getSelectedValues()
-		items = normalizeList(list)
+		items = normalizeList(list, autoRightIcon)
 		rebuildOptions()
 		if multi then
 			self:Set(prev, true)
@@ -1722,10 +2014,7 @@ function Dropdown.new(parent, opts, ctx)
 	self.Maid:Give(function()
 		self:Close()
 		cancelInlineTween()
-		if fallbackOutsideConn then
-			fallbackOutsideConn:Disconnect()
-			fallbackOutsideConn = nil
-		end
+		clearFallbackTrackers()
 		popup:Destroy()
 	end)
 

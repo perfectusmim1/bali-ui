@@ -35,6 +35,30 @@ local glyphs = {
 }
 local glyphRotation = { ["chevron-down"] = 90, ["chevron-up"] = -90 }
 
+local ALIASES = {
+	yen = "coins",
+	["japanese-yen"] = "coins",
+	currency = "coins",
+	gold = "coins",
+	coin = "coins",
+	money = "wallet",
+	cash = "wallet",
+	usd = "wallet",
+	gems = "gem",
+	diamond = "gem",
+	crystal = "sparkles",
+	world = "globe",
+	island = "map-pin",
+	teleport = "navigation",
+	travel = "navigation",
+	boss = "skull",
+	ticket = "tag",
+}
+
+function Icons.IsOriginalColor(colorSpec)
+	return colorSpec == "Original" or colorSpec == "None" or colorSpec == "Raw" or colorSpec == false
+end
+
 local function isLocalAsset(text)
 	return string.find(text, "^rbxasset://") ~= nil
 end
@@ -81,8 +105,9 @@ function Icons.Resolve(icon)
 		return { Kind = "Asset", Image = icon }
 	end
 	local key = string.lower(icon)
+	key = ALIASES[key] or key
 	if (key == "bali-logo" or key == "bali") and Assets.Available and Assets.Images.Logo then
-		return { Kind = "Asset", Image = Assets.Images.Logo }
+		return { Kind = "Asset", Image = Assets.Images.Logo, IsBrand = true }
 	end
 	local cell = Assets.Data.Icons[key]
 	if cell and Assets.Available and Assets.Images.Atlas then
@@ -102,7 +127,12 @@ function Icons.Resolve(icon)
 end
 
 function Icons.Exists(name)
-	return type(name) == "string" and Assets.Data.Icons[string.lower(name)] ~= nil
+	if type(name) ~= "string" then
+		return false
+	end
+	local key = string.lower(name)
+	key = ALIASES[key] or key
+	return Assets.Data.Icons[key] ~= nil
 end
 
 function Icons.List()
@@ -127,6 +157,9 @@ end
 function Icons.Create(icon, props)
 	props = props or {}
 	local iconKey = type(icon) == "string" and string.lower(icon) or nil
+	if iconKey then
+		iconKey = ALIASES[iconKey] or iconKey
+	end
 	local descriptor = Icons.Resolve(icon)
 	if not descriptor then
 		return nil
@@ -210,7 +243,13 @@ function Icons.Create(icon, props)
 		instance.Visible = props.Visible == true
 	end
 
-	local color = props.Color or "Text"
+	local useOriginal = (props.OriginalColor == true)
+		or Icons.IsOriginalColor(props.Color)
+		or (descriptor.Kind == "Asset" and not descriptor.IsBrand and props.Color == nil)
+	local color = useOriginal and Color3.new(1, 1, 1) or (props.Color or "Text")
+	if useOriginal then
+		instance:SetAttribute("_BaliOriginalColor", true)
+	end
 	if #barChildren > 0 then
 		for _, bar in ipairs(barChildren) do
 			if typeof(color) == "Color3" then
@@ -259,9 +298,17 @@ function Icons.Set(instance, icon)
 end
 
 -- Rebinds the colour of an icon to another theme key (or a Color3)
-function Icons.SetColor(instance, color, animate)
+function Icons.SetColor(instance, color, animate, forceOverride)
 	if not instance then
 		return
+	end
+	if Icons.IsOriginalColor(color) then
+		instance:SetAttribute("_BaliOriginalColor", true)
+		color = Color3.new(1, 1, 1)
+	elseif forceOverride then
+		instance:SetAttribute("_BaliOriginalColor", nil)
+	elseif instance:GetAttribute("_BaliOriginalColor") == true then
+		color = Color3.new(1, 1, 1)
 	end
 	if instance:IsA("Frame") then
 		for _, child in ipairs(instance:GetChildren()) do

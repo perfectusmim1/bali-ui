@@ -206,7 +206,12 @@ function Paragraph.new(parent, opts, ctx)
 	opts = Util.Options(opts, {}, "Title")
 	local element = Base.New("Paragraph", parent, opts, ctx)
 
-	local card = Base.Card(parent, { Padding = 0, ClipsDescendants = true })
+	local card = Base.Card(parent, {
+		Padding = 0,
+		ClipsDescendants = true,
+		Tint = opts.Tint,
+		CardColor = opts.CardColor,
+	})
 	local accentColor = opts.Color or "Accent"
 	local showBar = (opts.AccentBar ~= false)
 
@@ -288,8 +293,10 @@ function Paragraph.new(parent, opts, ctx)
 	})
 
 	local iconWidth = 0
+	local hasExplicitIconColor = (opts.OriginalIconColor == true) or (opts.IconColor ~= nil)
+	local initIconColor = (opts.OriginalIconColor == true or Icons.IsOriginalColor(opts.IconColor)) and "Original" or (opts.IconColor or accentColor)
 	if opts.Icon and opts.Icon ~= "" and opts.Icon ~= false then
-		iconBadge = Base.IconBadge(header, opts.Icon, accentColor)
+		iconBadge = Base.IconBadge(header, opts.Icon, initIconColor)
 		iconBadge.Frame.LayoutOrder = 1
 		iconWidth = 30
 	end
@@ -314,7 +321,7 @@ function Paragraph.new(parent, opts, ctx)
 				barGrad.Color = ColorSequence.new(activeTheme[accentColor] or activeTheme.Accent)
 			end
 		end
-		if iconBadge and colorSpec ~= nil then
+		if iconBadge and colorSpec ~= nil and not hasExplicitIconColor then
 			iconBadge:SetColor(accentColor)
 		end
 	end

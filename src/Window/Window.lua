@@ -135,7 +135,7 @@ function Window.new(screenGui, options)
 		Folder = nil,
 		AutoLoadConfig = false,
 		ConfirmClose = true,
-		DestroyOnClose = false,
+		DestroyOnClose = true,
 		OwnsScreenGui = false,
 		OnClose = nil,
 		OnDestroy = nil,
@@ -961,7 +961,7 @@ function Window.new(screenGui, options)
 		_toggleKey = Util.ResolveKey(options.ToggleKey) or Enum.KeyCode.RightShift,
 		_ownsScreenGui = options.OwnsScreenGui == true,
 		_confirmClose = options.ConfirmClose ~= false,
-		_destroyOnClose = options.DestroyOnClose == true,
+		_destroyOnClose = options.DestroyOnClose ~= false,
 		_onClose = options.OnClose,
 		_onDestroy = options.OnDestroy,
 		_brandTitleLabel = brandTitleLabel,
@@ -1234,34 +1234,37 @@ function Window.new(screenGui, options)
 	end))
 	maid:Give(closeBtn.Activated:Connect(function(input)
 		Transition.Ripple(closeBtn, input, "Error")
-		if self._destroyOnClose and not self._confirmClose then
-			self:Unload()
-			return
-		end
 		if not self._confirmClose then
-			self:SetVisible(false)
 			if type(self._onClose) == "function" then
 				Util.Spawn(self._onClose)
+			end
+			if self._destroyOnClose then
+				self:Unload()
+			else
+				self:SetVisible(false)
 			end
 			return
 		end
 		self:Dialog({
-			Title = "Unload " .. self.Title .. "?",
-			Content = "This will close the workspace interface and clean up active HUD overlays.",
+			Title = "Close " .. self.Title .. "?",
+			Content = "This will unload the interface and clean up active HUD overlays.",
 			Icon = "power",
 			Buttons = {
-				{ Title = "Cancel", Variant = "Default" },
+				{ Title = "Cancel", Variant = "Ghost" },
 				{
-					Title = "Hide Instead",
+					Title = "Minimize",
 					Variant = "Default",
 					Callback = function()
 						self:SetVisible(false)
 					end,
 				},
 				{
-					Title = "Unload",
+					Title = "Close UI",
 					Variant = "Danger",
 					Callback = function()
+						if type(self._onClose) == "function" then
+							Util.Spawn(self._onClose)
+						end
 						self:Unload()
 					end,
 				},
@@ -1352,12 +1355,44 @@ function Window:OpenPopup(id, frame, anchorGui, onClose)
 		end
 	end)
 
+	local anchorPosConn, anchorSizeConn, scrollConn
+	if anchorGui and typeof(anchorGui) == "Instance" and anchorGui:IsA("GuiObject") then
+		local scroll = anchorGui:FindFirstAncestorOfClass("ScrollingFrame")
+		local function handleAnchorMoved()
+			if not self._activePopup or self._activePopup.Frame ~= frame then
+				return
+			end
+			if not anchorGui.Parent or not anchorGui.Visible then
+				self:ClosePopup(id)
+				return
+			end
+			if scroll and scroll.AbsoluteSize.Y > 0 and anchorGui.AbsoluteSize.Y > 0 then
+				local cy = anchorGui.AbsolutePosition.Y + anchorGui.AbsoluteSize.Y * 0.5
+				local sTop = scroll.AbsolutePosition.Y
+				local sBottom = sTop + scroll.AbsoluteSize.Y
+				if cy < sTop or cy > sBottom then
+					self:ClosePopup(id)
+					return
+				end
+			end
+			self:_positionPopup(frame, anchorGui)
+		end
+		anchorPosConn = anchorGui:GetPropertyChangedSignal("AbsolutePosition"):Connect(handleAnchorMoved)
+		anchorSizeConn = anchorGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(handleAnchorMoved)
+		if scroll then
+			scrollConn = scroll:GetPropertyChangedSignal("CanvasPosition"):Connect(handleAnchorMoved)
+		end
+	end
+
 	self._activePopup = {
 		Id = id,
 		Frame = frame,
 		Anchor = anchorGui,
 		OnClose = onClose,
 		SizeConn = sizeConn,
+		AnchorPosConn = anchorPosConn,
+		AnchorSizeConn = anchorSizeConn,
+		ScrollConn = scrollConn,
 	}
 
 	task.defer(function()
@@ -1379,10 +1414,12 @@ function Window:ClosePopup(id)
 	end
 
 	self._activePopup = nil
-	if current.SizeConn then
-		pcall(function()
-			current.SizeConn:Disconnect()
-		end)
+	for _, connKey in ipairs({ "SizeConn", "AnchorPosConn", "AnchorSizeConn", "ScrollConn" }) do
+		if current[connKey] then
+			pcall(function()
+				current[connKey]:Disconnect()
+			end)
+		end
 	end
 
 	local popupBackdrop = self.PopupLayer:FindFirstChild("PopupBackdrop")
@@ -2060,6 +2097,10 @@ end
 
 function Window:Unload()
 	return self:Destroy(false)
+end
+
+function Window:Close()
+	return self:Unload()
 end
 
 function Window:Destroy(instant)

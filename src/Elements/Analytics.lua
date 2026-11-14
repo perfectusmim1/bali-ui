@@ -20,7 +20,12 @@ local Analytics = {}
 -- ─── Shared Helpers ──────────────────────────────────────────────────────────
 
 local function unwrapCard(cardParent, opts)
-	local cardObj = Base.Card(cardParent, opts)
+	local cardOpts = opts
+	if type(opts) == "table" and opts.Color ~= nil and opts.Tint == nil and opts.CardColor == nil then
+		cardOpts = table.clone(opts)
+		cardOpts._ColorIsAccentOnly = true
+	end
+	local cardObj = Base.Card(cardParent, cardOpts)
 	if typeof(cardObj) == "Instance" then
 		return cardObj, cardObj:FindFirstChildOfClass("UIStroke"), nil
 	end
@@ -1331,6 +1336,8 @@ function Table.new(parent, opts, ctx)
 		Columns = {},
 		Rows = {},
 		Selectable = false,
+		Checkboxes = nil,
+		ShowCheckboxes = nil,
 		MaxHeight = 240,
 		Searchable = false,
 		OnRowClick = nil,
@@ -1358,6 +1365,14 @@ function Table.new(parent, opts, ctx)
 	local searchable = opts.Searchable == true
 	local maxHeight = math.max(80, tonumber(opts.MaxHeight) or 240)
 	local actionDef = type(opts.Action) == "table" and opts.Action or nil
+	local showCheckboxes
+	if opts.Checkboxes ~= nil then
+		showCheckboxes = (opts.Checkboxes == true)
+	elseif opts.ShowCheckboxes ~= nil then
+		showCheckboxes = (opts.ShowCheckboxes == true)
+	else
+		showCheckboxes = selectable and (actionDef == nil)
+	end
 	local selectedSet = {} -- [rowTable] = true
 	local searchQuery = ""
 
@@ -1440,7 +1455,7 @@ function Table.new(parent, opts, ctx)
 	end
 
 	-- Exact shared column geometry calculator
-	local checkReserve = selectable and 28 or 0
+	local checkReserve = showCheckboxes and 28 or 0
 	local actionReserve = actionDef and 78 or 0
 	local colGap = 6
 
@@ -1649,7 +1664,7 @@ function Table.new(parent, opts, ctx)
 			})
 
 			local checkBox, checkStroke, checkIcon
-			if selectable then
+			if showCheckboxes then
 				checkBox = Create.New("Frame", {
 					Name = "Checkbox",
 					Size = UDim2.fromOffset(18, 18),
@@ -1772,10 +1787,36 @@ function Table.new(parent, opts, ctx)
 						Parent = cellFrame,
 					})
 					bindColorProp(cellLbl, "TextColor3", resolvedColor)
+					if Tooltip and Tooltip.Bind and cellText ~= "" then
+						pcall(Tooltip.Bind, cellFrame, function()
+							if cellLbl.TextFits == false or #cellText > 22 then
+								return cellText
+							end
+							return nil
+						end)
+					end
 				end
 			end
 
-			if actionDef then
+			local rowAction = type(row.Action) == "table" and row.Action or actionDef
+			if rowAction then
+				local actVariant = rowAction.Variant or "Default"
+				local actColorSpec = rowAction.Color
+				if not actColorSpec then
+					if actVariant == "Primary" then
+						actColorSpec = "Accent"
+					elseif actVariant == "Danger" or actVariant == "Error" then
+						actColorSpec = "Error"
+					elseif actVariant == "Success" then
+						actColorSpec = "Success"
+					elseif actVariant == "Warning" then
+						actColorSpec = "Warning"
+					end
+				end
+				local isPrimaryAct = (actVariant == "Primary")
+				local resolvedActColor = actColorSpec and resolveColorSpec(actColorSpec, "Accent") or "Accent"
+				local actDisabled = (rowAction.Disabled == true)
+
 				local actBtn = Create.New("TextButton", {
 					Name = "ActionBtn",
 					Size = UDim2.fromOffset(72, 24),
@@ -1783,16 +1824,27 @@ function Table.new(parent, opts, ctx)
 					AnchorPoint = Vector2.new(1, 0.5),
 					Text = "",
 					AutoButtonColor = false,
+					Active = not actDisabled,
 					BackgroundTransparency = 0,
 					Corner = 6,
 					Padding = { 0, 6, 0, 6 },
-					Theme = { BackgroundColor3 = "Field" },
 					Parent = rowBtn,
 				})
+				if isPrimaryAct then
+					bindColorProp(actBtn, "BackgroundColor3", resolvedActColor)
+				else
+					Theme.Bind(actBtn, { BackgroundColor3 = "Field" })
+				end
 				local actStroke = Create.Stroke(actBtn, {
 					Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
 				})
-				Transition.Hover(actBtn, actBtn, "Field", "FieldHover", actStroke)
+				if actColorSpec and not isPrimaryAct then
+					bindColorProp(actStroke, "Color", resolvedActColor)
+					actStroke.Transparency = 0.58
+				end
+				if not isPrimaryAct and not actDisabled then
+					Transition.Hover(actBtn, actBtn, "Field", "FieldHover", actStroke)
+				end
 				local actInner = Create.New("Frame", {
 					Size = UDim2.fromScale(1, 1),
 					BackgroundTransparency = 1,
@@ -1804,32 +1856,37 @@ function Table.new(parent, opts, ctx)
 					HAlign = Enum.HorizontalAlignment.Center,
 					VAlign = Enum.VerticalAlignment.Center,
 				})
-				if actionDef.Icon then
-					Icons.Create(actionDef.Icon, {
+				local contentColor = isPrimaryAct and "AccentText" or (actDisabled and "Muted" or resolvedActColor)
+				if rowAction.Icon then
+					Icons.Create(rowAction.Icon, {
 						Size = UDim2.fromOffset(13, 13),
-						Color = "Accent",
+						Color = contentColor,
 						LayoutOrder = 1,
 						Parent = actInner,
 					})
 				end
-				if actionDef.Title and actionDef.Title ~= "" then
-					Create.Text({
+				if rowAction.Title and rowAction.Title ~= "" then
+					local actLbl = Create.Text({
 						Size = UDim2.fromOffset(0, 24),
 						AutomaticSize = Enum.AutomaticSize.X,
-						Text = tostring(actionDef.Title),
+						Text = tostring(rowAction.Title),
 						TextSize = 11,
 						Font = "SemiBold",
 						TextXAlignment = Enum.TextXAlignment.Center,
 						TextTruncate = Enum.TextTruncate.AtEnd,
-						Color = "Accent",
 						LayoutOrder = 2,
 						Parent = actInner,
 					})
+					bindColorProp(actLbl, "TextColor3", contentColor)
 				end
 				actBtn.Activated:Connect(function()
-					Transition.Ripple(actBtn, nil, "Accent")
-					if actionDef.Callback then
-						Util.Spawn(actionDef.Callback, row, rowIdx)
+					if actDisabled then
+						return
+					end
+					Transition.Ripple(actBtn, nil, isPrimaryAct and "AccentText" or resolvedActColor)
+					local cb = rowAction.Callback or (actionDef and actionDef.Callback)
+					if cb then
+						Util.Spawn(cb, row, rowIdx)
 					end
 				end)
 			end
@@ -1875,6 +1932,20 @@ function Table.new(parent, opts, ctx)
 			searchQuery = Util.Trim(searchInput.Text)
 			applyFilter()
 		end)
+	end
+
+	function self:SetCheckboxes(enabled)
+		showCheckboxes = (enabled == true)
+		if showCheckboxes then
+			selectable = true
+		end
+		checkReserve = showCheckboxes and 28 or 0
+		headerColsWrap.Size = UDim2.new(1, -(checkReserve + actionReserve), 1, 0)
+		headerColsWrap.Position = UDim2.fromOffset(checkReserve, 0)
+		if not showCheckboxes then
+			table.clear(selectedSet)
+		end
+		rebuildRows()
 	end
 
 	function self:SetRows(newRows)

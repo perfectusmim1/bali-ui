@@ -26,8 +26,8 @@ Theme.BuiltInFonts = {
 }
 Theme.Fonts = table.clone(Theme.BuiltInFonts)
 Theme.OnDeviceFonts = true
-Theme.FontOrder = { "Builder", "Gotham", "Montserrat", "Ubuntu", "Nunito" }
-Theme.FontFamily = "Builder"
+Theme.FontOrder = { "Montserrat", "Gotham", "Builder", "Ubuntu", "Nunito" }
+Theme.FontFamily = "Montserrat"
 
 -- Base (dark) palette every preset inherits from
 local Base = {
@@ -226,14 +226,22 @@ function Theme.SyncOnDeviceFonts()
 	end
 end
 
+local READABLE_WEIGHTS = {
+	Regular = Enum.FontWeight.Medium,
+	Medium = Enum.FontWeight.Medium,
+	SemiBold = Enum.FontWeight.SemiBold,
+	Bold = Enum.FontWeight.Bold,
+}
+
 function Theme.Font(weight)
 	local family = Theme.GetFontAsset(Theme.FontFamily)
-	local enumWeight = Enum.FontWeight[weight or "Regular"] or Enum.FontWeight.Regular
+	local wKey = weight or "Regular"
+	local enumWeight = READABLE_WEIGHTS[wKey] or Enum.FontWeight[wKey] or Enum.FontWeight.Medium
 	local ok, f = pcall(Font.new, family, enumWeight, Enum.FontStyle.Normal)
 	if ok and f then
 		return f
 	end
-	local fbFamily = Theme.BuiltInFonts[Theme.FontFamily] or Theme.BuiltInFonts.Gotham
+	local fbFamily = Theme.BuiltInFonts[Theme.FontFamily] or Theme.BuiltInFonts.Montserrat or Theme.BuiltInFonts.Gotham
 	local okFb, fFb = pcall(Font.new, fbFamily, enumWeight, Enum.FontStyle.Normal)
 	if okFb and fFb then
 		return fFb

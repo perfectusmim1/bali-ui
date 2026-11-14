@@ -9,6 +9,7 @@ local Theme = require("Core/Theme")
 local Create = require("Core/Create")
 local Icons = require("Core/Icons")
 local Transition = require("Core/Transition")
+local Tooltip = require("Systems/Tooltip")
 local Base = require("Elements/Base")
 
 local Segmented = {}
@@ -25,6 +26,7 @@ local function normalizeItems(values)
 			table.insert(items, {
 				Title = title,
 				Icon = raw.Icon,
+				Tooltip = raw.Tooltip,
 				Value = val,
 			})
 		else
@@ -32,6 +34,7 @@ local function normalizeItems(values)
 			table.insert(items, {
 				Title = str,
 				Icon = nil,
+				Tooltip = nil,
 				Value = raw,
 			})
 		end
@@ -353,6 +356,38 @@ function Segmented.new(parent, opts, ctx)
 			local sizeLimit = Instance.new("UISizeConstraint")
 			sizeLimit.MaxSize = Vector2.new(9999, 28)
 			sizeLimit.Parent = lbl
+
+			local function syncSegFit()
+				local bw = btn.AbsoluteSize.X
+				local iconSpace = iconObj and 19 or 0
+				if bw > 0 then
+					local availW = math.max(14, bw - 12 - iconSpace)
+					sizeLimit.MaxSize = Vector2.new(availW, 28)
+					local needSmall = (n >= 4) or (#lbl.Text >= 9 and availW < (#lbl.Text * 6.8))
+					lbl.TextSize = needSmall and 11 or 12
+				else
+					sizeLimit.MaxSize = Vector2.new(9999, 28)
+					lbl.TextSize = (n >= 4 and #lbl.Text >= 8) and 11 or 12
+				end
+			end
+			syncSegFit()
+			btn:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncSegFit)
+
+			if Tooltip and Tooltip.Bind then
+				pcall(Tooltip.Bind, btn, function()
+					if item.Tooltip and item.Tooltip ~= "" then
+						return item.Tooltip
+					end
+					local bw = btn.AbsoluteSize.X
+					local iconSpace = iconObj and 19 or 0
+					local availW = bw > 0 and (bw - 12 - iconSpace) or 9999
+					local estW = #lbl.Text * (lbl.TextSize * 0.56)
+					if lbl.TextFits == false or (bw > 0 and estW > availW) then
+						return item.Title
+					end
+					return nil
+				end)
+			end
 
 			btn.MouseEnter:Connect(function()
 				if element.Disabled or element.Locked or activeIndex == i or Util.IsTouchDevice() then

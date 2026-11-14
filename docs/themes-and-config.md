@@ -23,7 +23,7 @@ Seven curated palettes ship out of the box (`Graphite` is default):
 ```lua
 Bali:SetTheme("Ocean", true) -- second arg animates property transitions
 Bali:SetAccent(Color3.fromRGB(59, 130, 246), true)
-Bali:SetFont("Builder") -- "Builder" | "Gotham" | "Montserrat" | "Ubuntu" | "Nunito"
+Bali:SetFont("Montserrat") -- "Montserrat" (Default) | "Gotham" | "Builder" | "Ubuntu" | "Nunito"
 ```
 
 ### Registering Custom Themes (`AddTheme`)

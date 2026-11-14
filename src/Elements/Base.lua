@@ -22,6 +22,14 @@ local function bindColor(instance, prop, colorKey, fallback)
 	if typeof(key) == "Color3" then
 		Theme.Unbind(instance, prop)
 		instance[prop] = key
+	elseif type(key) == "string" and string.sub(key, 1, 1) == "#" then
+		local ok, col = pcall(Color3.fromHex, key)
+		if ok and typeof(col) == "Color3" then
+			Theme.Unbind(instance, prop)
+			instance[prop] = col
+			return
+		end
+		Theme.Bind(instance, { [prop] = fallback or "Accent" })
 	else
 		Theme.Bind(instance, { [prop] = key })
 	end
@@ -31,8 +39,81 @@ local function resolveColor(colorKey, fallback)
 	local key = colorKey or fallback or "Accent"
 	if typeof(key) == "Color3" then
 		return key
+	elseif type(key) == "string" and string.sub(key, 1, 1) == "#" then
+		local ok, col = pcall(Color3.fromHex, key)
+		if ok and typeof(col) == "Color3" then
+			return col
+		end
 	end
 	return Theme.Resolve(key) or Theme.Current.Accent
+end
+
+local function resolveTintColor(t, colorSpec)
+	if typeof(colorSpec) == "Color3" then
+		return colorSpec
+	elseif type(colorSpec) == "string" then
+		if string.sub(colorSpec, 1, 1) == "#" then
+			local ok, c = pcall(Color3.fromHex, colorSpec)
+			if ok and typeof(c) == "Color3" then
+				return c
+			end
+		end
+		if t and t[colorSpec] ~= nil and typeof(t[colorSpec]) == "Color3" then
+			return t[colorSpec]
+		end
+	end
+	return nil
+end
+
+function Base.ResolveTintColor(themeTable, colorSpec)
+	return resolveTintColor(themeTable or Theme.Current, colorSpec)
+end
+
+function Base.ApplyTint(frame, stroke, colorSpec, kind, surfaceKey, transKey)
+	if not frame then
+		return
+	end
+	local baseKey = surfaceKey or frame:GetAttribute("_BaliSurfaceKey") or (kind == "Card" and "Card" or "Tile")
+	local baseTransKey = transKey or (kind == "Card" and "CardTransparency" or "TileTransparency")
+	if colorSpec == nil or colorSpec == false or Icons.IsOriginalColor(colorSpec) then
+		Theme.Bind(frame, {
+			BackgroundColor3 = baseKey,
+			BackgroundTransparency = baseTransKey,
+		})
+		if stroke then
+			Theme.Bind(stroke, {
+				Color = "Stroke",
+				Transparency = function(t)
+					return math.max((t.StrokeTransparency or 0.89) - 0.02, 0)
+				end,
+			})
+		end
+		return
+	end
+
+	local tintAlpha = kind == "Card" and 0.14 or 0.16
+	Theme.Bind(frame, {
+		BackgroundColor3 = function(t)
+			local base = t[baseKey] or t.Tile
+			local target = resolveTintColor(t, colorSpec)
+			if target and typeof(base) == "Color3" then
+				return Util.LerpColor(base, target, tintAlpha)
+			end
+			return base
+		end,
+		BackgroundTransparency = baseTransKey,
+	})
+	if stroke then
+		Theme.Bind(stroke, {
+			Color = function(t)
+				local target = resolveTintColor(t, colorSpec)
+				return target and Util.LerpColor(t.Stroke, target, 0.48) or t.Stroke
+			end,
+			Transparency = function(t)
+				return math.max((t.StrokeTransparency or 0.89) - 0.08, 0.42)
+			end,
+		})
+	end
 end
 
 local function bindTooltipOnce(frame, tooltipOpt, maid)
@@ -214,27 +295,30 @@ end
 
 function Base.IconBadge(parent, icon, colorKey)
 	colorKey = colorKey or "Accent"
+	local isOrig = Icons.IsOriginalColor(colorKey)
+	local wellKey = isOrig and "Elevated" or colorKey
+	local strokeKey = isOrig and "Stroke" or colorKey
 
 	local frame = Create.New("Frame", {
 		Name = "IconBadge",
 		Size = UDim2.fromOffset(30, 30),
-		BackgroundTransparency = 0.84,
+		BackgroundTransparency = isOrig and 0.45 or 0.84,
 		Corner = 8,
 		Parent = parent,
 	})
-	bindColor(frame, "BackgroundColor3", colorKey, "Accent")
+	bindColor(frame, "BackgroundColor3", wellKey, "Accent")
 
 	local stroke = Create.Stroke(frame, {
-		Transparency = 0.74,
+		Transparency = isOrig and 0.78 or 0.74,
 		Thickness = 1,
 	})
-	bindColor(stroke, "Color", colorKey, "Accent")
+	bindColor(stroke, "Color", strokeKey, "Accent")
 
 	local iconObj = Icons.Create(icon or "sparkles", {
 		Size = UDim2.fromOffset(16, 16),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Color = colorKey,
+		Color = isOrig and "Original" or colorKey,
 		Parent = frame,
 	})
 
@@ -252,10 +336,13 @@ function Base.IconBadge(parent, icon, colorKey)
 
 	function badge:SetColor(newColorKey)
 		newColorKey = newColorKey or "Accent"
-		bindColor(frame, "BackgroundColor3", newColorKey, "Accent")
-		bindColor(stroke, "Color", newColorKey, "Accent")
+		local nextOrig = Icons.IsOriginalColor(newColorKey)
+		frame.BackgroundTransparency = nextOrig and 0.45 or 0.84
+		stroke.Transparency = nextOrig and 0.78 or 0.74
+		bindColor(frame, "BackgroundColor3", nextOrig and "Elevated" or newColorKey, "Accent")
+		bindColor(stroke, "Color", nextOrig and "Stroke" or newColorKey, "Accent")
 		if iconObj then
-			Icons.SetColor(iconObj, newColorKey)
+			Icons.SetColor(iconObj, nextOrig and "Original" or newColorKey, false, true)
 		end
 	end
 
@@ -288,6 +375,10 @@ function Base.Card(parent, options)
 	end
 
 	local stroke = Create.GlassStroke(frame, options.StrokeStrength or 0.02)
+	local cardTintSpec = options.Tint or options.CardColor or (not options._ColorIsAccentOnly and options.Color or nil)
+	if cardTintSpec ~= nil then
+		Base.ApplyTint(frame, stroke, cardTintSpec, "Row", surfaceKey, transKey)
+	end
 
 	if options.Padding ~= nil then
 		Create.Padding(frame, options.Padding)
@@ -354,6 +445,10 @@ function Base.Card(parent, options)
 		Base.FlashFrame(frame, stroke, surfaceKey)
 	end
 
+	function card:SetColor(newColor)
+		Base.ApplyTint(frame, stroke, newColor, "Row", surfaceKey, transKey)
+	end
+
 	uiByFrame[frame] = card
 	return card
 end
@@ -383,6 +478,10 @@ function Base.Row(parent, options, rightWidth)
 	constraint.Parent = frame
 
 	local stroke = Create.GlassStroke(frame, options.StrokeStrength or 0.02)
+	local rowTintSpec = options.Tint or options.CardColor or (not options._ColorIsAccentOnly and options.Color or nil)
+	if rowTintSpec ~= nil then
+		Base.ApplyTint(frame, stroke, rowTintSpec, "Row", surfaceKey, transKey)
+	end
 
 	local body = Create.New("Frame", {
 		Name = "Body",
@@ -421,16 +520,22 @@ function Base.Row(parent, options, rightWidth)
 	local iconBadge = nil
 	local iconWidth = 0
 	if options.Icon and options.Icon ~= "" and options.Icon ~= false then
+		local desc = Icons.Resolve(options.Icon)
+		local isOrigIcon = (options.OriginalIconColor == true)
+			or Icons.IsOriginalColor(options.IconColor)
+			or (desc and desc.Kind == "Asset" and not desc.IsBrand and options.IconColor == nil and rowTintSpec == nil)
+		local defaultIconColor = (options.IconBadge == false) and "SubText" or "Accent"
+		local resolvedIconColor = isOrigIcon and "Original" or (options.IconColor or rowTintSpec or defaultIconColor)
 		if options.IconBadge == false then
 			iconObj = Icons.Create(options.Icon, {
 				Size = UDim2.fromOffset(18, 18),
-				Color = options.IconColor or "SubText",
+				Color = resolvedIconColor,
 				LayoutOrder = 1,
 				Parent = left,
 			})
 			iconWidth = 18
 		else
-			iconBadge = Base.IconBadge(left, options.Icon, options.IconColor or "Accent")
+			iconBadge = Base.IconBadge(left, options.Icon, resolvedIconColor)
 			iconBadge.Frame.LayoutOrder = 1
 			iconObj = iconBadge.Icon
 			iconWidth = 30
@@ -628,6 +733,23 @@ function Base.Row(parent, options, rightWidth)
 		Base.FlashFrame(frame, stroke, surfaceKey)
 	end
 
+	function row:SetColor(newColor)
+		Base.ApplyTint(frame, stroke, newColor, "Row", surfaceKey, transKey)
+		if iconBadge and options.IconColor == nil and options.OriginalIconColor ~= true then
+			iconBadge:SetColor(newColor or "Accent")
+		elseif iconObj and options.IconColor == nil and options.OriginalIconColor ~= true then
+			Icons.SetColor(iconObj, newColor or ((options.IconBadge == false) and "SubText" or "Accent"), false, true)
+		end
+	end
+
+	function row:SetIconColor(newColor)
+		if iconBadge then
+			iconBadge:SetColor(newColor or "Accent")
+		elseif iconObj then
+			Icons.SetColor(iconObj, newColor or ((options.IconBadge == false) and "SubText" or "Accent"), false, true)
+		end
+	end
+
 	uiByFrame[frame] = row
 	return row
 end
@@ -778,6 +900,26 @@ function Base.New(typeName, parent, options, ctx)
 			ui:Flash()
 		elseif self.Frame then
 			Base.FlashFrame(self.Frame)
+		end
+	end
+
+	function element:SetColor(colorSpec)
+		local ui = getUI()
+		if ui and type(ui.SetColor) == "function" then
+			ui:SetColor(colorSpec)
+		elseif self.Frame then
+			Base.ApplyTint(self.Frame, ui and ui.Stroke or self.Frame:FindFirstChildOfClass("UIStroke"), colorSpec, "Row")
+		end
+	end
+
+	function element:SetIconColor(colorSpec)
+		local ui = getUI()
+		if ui and type(ui.SetIconColor) == "function" then
+			ui:SetIconColor(colorSpec)
+		elseif ui and ui.IconBadge then
+			ui.IconBadge:SetColor(colorSpec)
+		elseif ui and ui.IconObj then
+			Icons.SetColor(ui.IconObj, colorSpec, false, true)
 		end
 	end
 
