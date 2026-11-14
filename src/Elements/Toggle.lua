@@ -45,7 +45,11 @@ function Toggle.new(parent, opts, ctx)
 	local track = Create.New("Frame", {
 		Name = "Track",
 		Size = UDim2.fromOffset(42, 22),
-		Theme = { BackgroundColor3 = "ToggleOff" },
+		Theme = {
+			BackgroundColor3 = function(t)
+				return state and t.Accent or t.ToggleOff
+			end,
+		},
 		Corner = UDim.new(1, 0),
 		LayoutOrder = 2,
 		Parent = row.Right,
@@ -62,21 +66,6 @@ function Toggle.new(parent, opts, ctx)
 		},
 		Thickness = 1,
 	})
-
-	local accentFill = Create.New("Frame", {
-		Name = "AccentFill",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BackgroundTransparency = state and 0 or 1,
-		Corner = UDim.new(1, 0),
-		ZIndex = 2,
-		Parent = track,
-	})
-
-	local fillGrad = Instance.new("UIGradient")
-	fillGrad.Color = Theme.AccentSequence()
-	fillGrad.Rotation = 15
-	fillGrad.Parent = accentFill
 
 	local knob = Create.New("Frame", {
 		Name = "Knob",
@@ -97,7 +86,7 @@ function Toggle.new(parent, opts, ctx)
 
 	local function applyVisual(animate)
 		local targetPos = UDim2.new(0, state and 22 or 2, 0.5, 0)
-		local targetAlpha = state and 0 or 1
+		local targetTrackBg = state and Theme.Current.Accent or Theme.Current.ToggleOff
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
 		local targetStrokeTrans = state and 0.45 or Theme.Current.StrokeTransparency
 
@@ -109,14 +98,14 @@ function Toggle.new(parent, opts, ctx)
 					Tween.Spring(knob, { Size = UDim2.fromOffset(18, 18) }, 0.13)
 				end
 			end)
-			Tween.Play(accentFill, { BackgroundTransparency = targetAlpha }, Tween.Fast, Enum.EasingStyle.Quad)
+			Tween.Play(track, { BackgroundColor3 = targetTrackBg }, Tween.Fast, Enum.EasingStyle.Quad)
 			Tween.Play(trackStroke, {
 				Color = targetStrokeColor,
 				Transparency = targetStrokeTrans,
 			}, Tween.Fast, Enum.EasingStyle.Quad)
 		else
 			knob.Position = targetPos
-			accentFill.BackgroundTransparency = targetAlpha
+			track.BackgroundColor3 = targetTrackBg
 			trackStroke.Color = targetStrokeColor
 			trackStroke.Transparency = targetStrokeTrans
 		end
@@ -126,7 +115,6 @@ function Toggle.new(parent, opts, ctx)
 		if element._destroyed then
 			return
 		end
-		fillGrad.Color = Theme.AccentSequence(t)
 		applyVisual(false)
 	end))
 
@@ -368,7 +356,11 @@ function Checkbox.new(parent, opts, ctx)
 		Size = UDim2.fromOffset(20, 20),
 		Position = UDim2.fromScale(1, 0.5),
 		AnchorPoint = Vector2.new(1, 0.5),
-		Theme = { BackgroundColor3 = "Field" },
+		Theme = {
+			BackgroundColor3 = function(t)
+				return state and t.Accent or t.Field
+			end,
+		},
 		Corner = 6,
 		Parent = row.Right,
 	})
@@ -379,26 +371,11 @@ function Checkbox.new(parent, opts, ctx)
 				return state and t.Accent or t.Stroke
 			end,
 			Transparency = function(t)
-				return state and 0.25 or t.StrokeTransparency
+				return state and 0.15 or t.StrokeTransparency
 			end,
 		},
 		Thickness = 1,
 	})
-
-	local accentFill = Create.New("Frame", {
-		Name = "AccentFill",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BackgroundTransparency = state and 0 or 1,
-		Corner = 6,
-		ZIndex = 2,
-		Parent = box,
-	})
-
-	local fillGrad = Instance.new("UIGradient")
-	fillGrad.Color = Theme.AccentSequence()
-	fillGrad.Rotation = 35
-	fillGrad.Parent = accentFill
 
 	local checkIcon = Icons.Create("check", {
 		Size = UDim2.fromOffset(13, 13),
@@ -412,14 +389,15 @@ function Checkbox.new(parent, opts, ctx)
 
 	local function applyVisual(animate)
 		local targetAlpha = state and 0 or 1
+		local targetBg = state and Theme.Current.Accent or Theme.Current.Field
 		local targetSize = state and UDim2.fromOffset(13, 13) or UDim2.fromOffset(6, 6)
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
-		local targetStrokeTrans = state and 0.25 or Theme.Current.StrokeTransparency
+		local targetStrokeTrans = state and 0.15 or Theme.Current.StrokeTransparency
 		local iconTarget = checkIcon and Icons.TransparencyTarget(checkIcon) or nil
 		local iconTransProp = iconTarget and Icons.TransparencyProperty(iconTarget) or "ImageTransparency"
 
 		if animate then
-			Tween.Play(accentFill, { BackgroundTransparency = targetAlpha }, Tween.Fast, Enum.EasingStyle.Quad)
+			Tween.Play(box, { BackgroundColor3 = targetBg }, Tween.Fast, Enum.EasingStyle.Quad)
 			if checkIcon and iconTarget then
 				if iconTarget == checkIcon then
 					Tween.Play(checkIcon, { [iconTransProp] = targetAlpha, Size = targetSize }, Tween.Fast, Enum.EasingStyle.Exponential)
@@ -433,9 +411,9 @@ function Checkbox.new(parent, opts, ctx)
 				Transparency = targetStrokeTrans,
 			}, Tween.Fast, Enum.EasingStyle.Quad)
 		else
-			accentFill.BackgroundTransparency = targetAlpha
-			if checkIcon then
-				checkIcon[iconTransProp] = targetAlpha
+			box.BackgroundColor3 = targetBg
+			if checkIcon and iconTarget then
+				iconTarget[iconTransProp] = targetAlpha
 				checkIcon.Size = targetSize
 			end
 			boxStroke.Color = targetStrokeColor
@@ -443,11 +421,10 @@ function Checkbox.new(parent, opts, ctx)
 		end
 	end
 
-	element.Maid:Give(Theme.Changed:Connect(function(t)
+	element.Maid:Give(Theme.Changed:Connect(function()
 		if element._destroyed then
 			return
 		end
-		fillGrad.Color = Theme.AccentSequence(t)
 		applyVisual(false)
 	end))
 

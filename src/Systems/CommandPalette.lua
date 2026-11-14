@@ -615,11 +615,21 @@ local function ensureBuilt()
 		ZIndex = 305,
 	})
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Parent = modal,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 14,
+		ZIndex = 305,
+	})
+
 	local glowId = Assets.Get("Glow")
 	if glowId then
 		Create.New("ImageLabel", {
 			Name = "Glow",
-			Parent = modal,
+			Parent = bgClip,
 			Size = UDim2.fromScale(0.75, 0.7),
 			Position = UDim2.fromScale(-0.18, -0.25),
 			Image = glowId,
@@ -638,8 +648,9 @@ local function ensureBuilt()
 	if noiseId then
 		Create.New("ImageLabel", {
 			Name = "Noise",
-			Parent = modal,
+			Parent = bgClip,
 			Size = UDim2.fromScale(1, 1),
+			Corner = 14,
 			Image = noiseId,
 			ScaleType = Enum.ScaleType.Tile,
 			TileSize = UDim2.fromOffset(128, 128),

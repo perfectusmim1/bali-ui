@@ -267,7 +267,17 @@ function Window.new(screenGui, options)
 	})
 	Create.GlassStroke(main, 0.04)
 
-	-- Ambient obsidian glass radial blooms & grain
+	-- Ambient obsidian glass radial blooms & grain (clipped cleanly to rounded corners)
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 14,
+		ZIndex = 1,
+		Parent = main,
+	})
+
 	local glowTopLeft, glowBottomRight, noiseLayer = nil, nil, nil
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
@@ -282,7 +292,7 @@ function Window.new(screenGui, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = main,
+			Parent = bgClip,
 		})
 		glowBottomRight = Create.New("ImageLabel", {
 			Name = "GlowBottomRight",
@@ -296,7 +306,7 @@ function Window.new(screenGui, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = main,
+			Parent = bgClip,
 		})
 	end
 
@@ -309,9 +319,10 @@ function Window.new(screenGui, options)
 			TileSize = UDim2.fromOffset(128, 128),
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
+			Corner = 14,
 			Theme = { ImageTransparency = "NoiseTransparency" },
 			ZIndex = 1,
-			Parent = main,
+			Parent = bgClip,
 		})
 	end
 
@@ -320,13 +331,21 @@ function Window.new(screenGui, options)
 	local isCollapsed = options.SidebarCollapsed == true or (isMobile and options.SidebarCollapsed ~= false) or (initW < 580 and options.SidebarCollapsed ~= false)
 	local startSidebarW = isCollapsed and SIDEBAR_COLLAPSED or expandedWidth
 
-	local sidebar = Create.New("Frame", {
-		Name = "Sidebar",
+	local sidebarBg = Create.New("Frame", {
+		Name = "SidebarBg",
 		Size = UDim2.new(0, startSidebarW, 1, 0),
 		Theme = {
 			BackgroundColor3 = "Sidebar",
 			BackgroundTransparency = "SidebarTransparency",
 		},
+		ZIndex = 2,
+		Parent = bgClip,
+	})
+
+	local sidebar = Create.New("Frame", {
+		Name = "Sidebar",
+		Size = UDim2.new(0, startSidebarW, 1, 0),
+		BackgroundTransparency = 1,
 		ClipsDescendants = true,
 		ZIndex = 3,
 		Parent = main,
@@ -373,23 +392,41 @@ function Window.new(screenGui, options)
 		AutoButtonColor = false,
 		Corner = 8,
 		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.88,
 		Parent = brandRow,
 	})
-	local brandGrad = Instance.new("UIGradient")
-	brandGrad.Color = Theme.AccentSequence()
-	brandGrad.Rotation = 35
-	brandGrad.Parent = brandBadge
-	maid:Give(Theme.Changed:Connect(function(theme)
-		brandGrad.Color = Theme.AccentSequence(theme)
-	end))
+	local brandStroke = Create.Stroke(brandBadge, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.68,
+		Thickness = 1,
+	})
 
-	Icons.Create(options.Icon or "bali-logo", {
+	local brandLogoIcon = Icons.Create(options.Icon or "bali-logo", {
+		Name = "BrandLogoIcon",
 		Size = UDim2.fromOffset(18, 18),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "AccentText",
+		Color = "Accent",
+		Visible = not isCollapsed,
 		Parent = brandBadge,
 	})
+	local brandExpandIcon = Icons.Create("panel-left", {
+		Name = "BrandExpandIcon",
+		Size = UDim2.fromOffset(16, 16),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Color = "Text",
+		Visible = isCollapsed,
+		Parent = brandBadge,
+	})
+	maid:Give(brandBadge.MouseEnter:Connect(function()
+		Tween.Play(brandBadge, { BackgroundTransparency = 0.78 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		Tween.Play(brandStroke, { Transparency = 0.38 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	end))
+	maid:Give(brandBadge.MouseLeave:Connect(function()
+		Tween.Play(brandBadge, { BackgroundTransparency = 0.88 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		Tween.Play(brandStroke, { Transparency = 0.68 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	end))
 
 	local brandText = Create.New("Frame", {
 		Name = "BrandText",
@@ -664,7 +701,7 @@ function Window.new(screenGui, options)
 	local function syncTabScrollBounds()
 		local topH = sidebarTop.AbsoluteSize.Y
 		tabScroll.Position = UDim2.fromOffset(0, topH)
-		tabScroll.Size = UDim2.new(1, 0, 1, -topH)
+		tabScroll.Size = UDim2.new(1, -2, 1, -(topH + 10))
 	end
 	maid:Give(sidebarTop:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncTabScrollBounds))
 	task.defer(syncTabScrollBounds)
@@ -764,7 +801,7 @@ function Window.new(screenGui, options)
 			BackgroundColor3 = "Tile",
 			BackgroundTransparency = "TileTransparency",
 		},
-		Visible = isCollapsed,
+		Visible = false,
 		LayoutOrder = 1,
 		Parent = breadcrumbWrap,
 	})
@@ -794,7 +831,7 @@ function Window.new(screenGui, options)
 		Font = "Medium",
 		TextSize = 12,
 		Color = "SubText",
-		Size = UDim2.new(1, isCollapsed and -60 or -26, 0, 20),
+		Size = UDim2.new(1, -26, 0, 20),
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		RichText = true,
 		LayoutOrder = 3,
@@ -803,26 +840,26 @@ function Window.new(screenGui, options)
 
 	local pageContainer = Create.New("Frame", {
 		Name = "PageContainer",
-		Position = UDim2.fromOffset(0, TOPBAR_HEIGHT),
-		Size = UDim2.new(1, 0, 1, -TOPBAR_HEIGHT),
+		Position = UDim2.fromOffset(0, TOPBAR_HEIGHT + 2),
+		Size = UDim2.new(1, -3, 1, -(TOPBAR_HEIGHT + 12)),
 		BackgroundTransparency = 1,
 		ClipsDescendants = true,
 		ZIndex = 2,
 		Parent = bodyArea,
 	})
 
-	-- Bottom-Right Resize Grip
+	-- Bottom-Right Resize Grip (inset safely inside 14px rounded corner)
 	local resizeGrip = Create.New("Frame", {
 		Name = "ResizeGrip",
 		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -4, 1, -4),
-		Size = UDim2.fromOffset(18, 18),
+		Position = UDim2.new(1, -6, 1, -6),
+		Size = UDim2.fromOffset(16, 16),
 		BackgroundTransparency = 1,
 		ZIndex = 15,
 		Parent = main,
 	})
 	Icons.Create("grip", {
-		Size = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(10, 10),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = "Muted",
@@ -861,12 +898,14 @@ function Window.new(screenGui, options)
 		_tabScroll = tabScroll,
 		_sidebarExpandedWidth = expandedWidth,
 		_sidebarCollapsed = isCollapsed,
+		_sidebarBg = sidebarBg,
 		_mobileMode = isMobile,
 		_desktopPreferredSize = desiredSize,
 		_effectiveMin = effectiveMin,
 		_glowTopLeft = glowTopLeft,
 		_glowBottomRight = glowBottomRight,
 		_noiseLayer = noiseLayer,
+		_bgClipCorner = bgClip:FindFirstChildOfClass("UICorner"),
 		_resizeGrip = resizeGrip,
 		_visible = true,
 		_visSeq = 0,
@@ -889,6 +928,8 @@ function Window.new(screenGui, options)
 		_brandTitleLabel = brandTitleLabel,
 		_brandSubLabel = brandSubLabel,
 		_brandText = brandText,
+		_brandLogoIcon = brandLogoIcon,
+		_brandExpandIcon = brandExpandIcon,
 		_collapseBtn = collapseBtn,
 		_expandBtn = expandBtn,
 		_welcomeCard = welcomeCard,
@@ -1095,8 +1136,9 @@ function Window.new(screenGui, options)
 	maid:Give(expandBtn.Activated:Connect(function()
 		self:ToggleSidebar(false)
 	end))
-	maid:Give(brandBadge.Activated:Connect(function()
+	maid:Give(brandBadge.Activated:Connect(function(input)
 		if self._sidebarCollapsed then
+			Transition.Ripple(brandBadge, input, "Accent")
 			self:ToggleSidebar(false)
 		end
 	end))
@@ -1656,7 +1698,15 @@ function Window:ToggleSidebar(collapsed)
 
 	self._brandText.Visible = not collapsed
 	self._collapseBtn.Visible = not collapsed
-	self._expandBtn.Visible = collapsed
+	if self._brandLogoIcon then
+		self._brandLogoIcon.Visible = not collapsed
+	end
+	if self._brandExpandIcon then
+		self._brandExpandIcon.Visible = collapsed
+	end
+	if self._expandBtn then
+		self._expandBtn.Visible = false
+	end
 	if self._searchPill then
 		self._searchPill.Visible = not collapsed
 	end
@@ -1665,7 +1715,7 @@ function Window:ToggleSidebar(collapsed)
 	if self._welcomeCard then
 		self._welcomeCard.Visible = not collapsed
 	end
-	self._breadcrumbLabel.Size = UDim2.new(1, collapsed and -60 or -26, 0, 20)
+	self._breadcrumbLabel.Size = UDim2.new(1, -26, 0, 20)
 
 	for _, cat in pairs(self._categories) do
 		if cat.Header then
@@ -1677,6 +1727,9 @@ function Window:ToggleSidebar(collapsed)
 	end
 
 	Tween.Play(self.Sidebar, { Size = UDim2.new(0, targetW, 1, 0) }, Tween.Normal)
+	if self._sidebarBg then
+		Tween.Play(self._sidebarBg, { Size = UDim2.new(0, targetW, 1, 0) }, Tween.Normal)
+	end
 	Tween.Play(self.BodyArea, {
 		Position = UDim2.new(0, targetW, 0, 0),
 		Size = UDim2.new(1, -targetW, 1, 0),
@@ -1773,6 +1826,7 @@ function Window:SetVisible(visible)
 
 		if not Tween.Reduced then
 			self._morphing = true
+			local morphDur = 0.30
 			local restorePos = self._restorePos or wrapper.Position
 			local restoreSize = self._restoreSize or wrapper.Size
 			local targetPos, targetScale = computeMorphOrigin(restorePos, restoreSize)
@@ -1782,14 +1836,14 @@ function Window:SetVisible(visible)
 			Tween.Play(
 				minScale,
 				{ Scale = targetScale },
-				Tween.Fast,
+				morphDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
 			Tween.Play(
 				wrapper,
 				{ Position = targetPos },
-				Tween.Fast,
+				morphDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
@@ -1806,7 +1860,7 @@ function Window:SetVisible(visible)
 				self.BodyArea.Visible = true
 				self:_setAmbientChromeVisible(true)
 				self._morphing = false
-			end, { NoPositionTween = true })
+			end, { NoPositionTween = true, Duration = morphDur })
 			return
 		end
 
@@ -1818,6 +1872,7 @@ function Window:SetVisible(visible)
 	else
 		if not Tween.Reduced then
 			self._morphing = true
+			local morphDur = 0.30
 			local restorePos = self._restorePos or wrapper.Position
 			local restoreSize = self._restoreSize or wrapper.Size
 			local startPos, startScale = computeMorphOrigin(restorePos, restoreSize)
@@ -1836,18 +1891,18 @@ function Window:SetVisible(visible)
 			Tween.Play(
 				minScale,
 				{ Scale = 1 },
-				Tween.Normal,
+				morphDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
 			local restoreTw = Tween.Play(
 				wrapper,
 				{ Position = restorePos },
-				Tween.Normal,
+				morphDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
-			Transition.Mount(wrapper, 1, { NoPositionTween = true })
+			Transition.Mount(wrapper, 1, { NoPositionTween = true, Duration = morphDur })
 
 			Tween.Then(restoreTw, function()
 				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then

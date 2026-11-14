@@ -104,24 +104,23 @@ function MobileButton.new(parentLayer, window, options)
 
 	local badge = Create.New("Frame", {
 		Size = UDim2.fromOffset(24, 24),
-		Corner = 999,
+		Corner = 7,
 		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.88,
 		LayoutOrder = 1,
 		Parent = content,
 	})
-	local badgeGrad = Instance.new("UIGradient")
-	badgeGrad.Color = Theme.AccentSequence()
-	badgeGrad.Rotation = 35
-	badgeGrad.Parent = badge
-	maid:Give(Theme.Changed:Connect(function(theme)
-		badgeGrad.Color = Theme.AccentSequence(theme)
-	end))
+	Create.Stroke(badge, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.68,
+		Thickness = 1,
+	})
 
 	Icons.Create(options.Icon or "bali-logo", {
-		Size = UDim2.fromOffset(14, 14),
+		Size = UDim2.fromOffset(15, 15),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "AccentText",
+		Color = "Accent",
 		Parent = badge,
 	})
 

@@ -214,7 +214,7 @@ function Dropdown.new(parent, opts, ctx)
 		Parent = popup,
 	})
 
-	local glassClip = Create.New("Frame", {
+	local glassClip = Create.New("CanvasGroup", {
 		Name = "GlassClip",
 		Size = UDim2.fromScale(1, 1),
 		Corner = 10,
@@ -269,6 +269,7 @@ function Dropdown.new(parent, opts, ctx)
 			Image = glassAsset,
 			ScaleType = Enum.ScaleType.Stretch,
 			ImageTransparency = 0.80,
+			Corner = 10,
 			Theme = { ImageColor3 = "Text" },
 			ZIndex = 110,
 			Parent = glassClip,
@@ -283,6 +284,7 @@ function Dropdown.new(parent, opts, ctx)
 			Image = noiseAsset,
 			ScaleType = Enum.ScaleType.Tile,
 			TileSize = UDim2.fromOffset(128, 128),
+			Corner = 10,
 			ZIndex = 110,
 			Theme = {
 				ImageColor3 = "Stroke",
@@ -528,7 +530,7 @@ function Dropdown.new(parent, opts, ctx)
 			end
 		end
 
-		local padV = 6
+		local padV = 8
 		local contentH = scrollLayout.AbsoluteContentSize.Y
 		local estPerRow = hasDesc and 44 or 28
 		local maxListH = maxVisible * estPerRow + math.max(0, maxVisible - 1) * 3 + padV
@@ -552,6 +554,9 @@ function Dropdown.new(parent, opts, ctx)
 		local anchorTop = trigger.AbsolutePosition.Y
 		local wasFlipped = preserveFlip == true and isOpen and popup.Parent ~= nil and prevBottom <= anchorTop + 4
 
+		local needsScroll = (visibleCount > maxVisible) or (contentH > 0 and contentH + padV > listH)
+		scroll.ScrollingEnabled = needsScroll
+		scroll.ScrollBarThickness = needsScroll and 3 or 0
 		scroll.Size = UDim2.new(1, 0, 0, listH)
 		popup.Size = UDim2.fromOffset(width, totalH)
 

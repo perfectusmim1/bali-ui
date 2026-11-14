@@ -85,7 +85,10 @@ local function collectFadeEntries(root)
 		return {}
 	end
 
-	local refresh = not root:GetAttribute("_BaliUnmounted") and not root:GetAttribute("_BaliFadingIn")
+	local isFading = root:GetAttribute("_BaliFading") == true
+		or root:GetAttribute("_BaliUnmounted") == true
+		or root:GetAttribute("_BaliFadingIn") == true
+	local refresh = not isFading
 	local entries = {}
 
 	local function isForegroundContent(inst, prop)
@@ -112,15 +115,16 @@ local function collectFadeEntries(root)
 	end
 
 	local function record(inst, prop, attrName)
-		local val = inst:GetAttribute(attrName)
-		if refresh or val == nil then
-			local cur = inst[prop]
-			if cur >= 0.995 and val ~= nil and not refresh then
-				-- Keep earlier resting transparency if already fading out
-				cur = val
-			end
-			val = cur
+		local val
+		if refresh then
+			val = inst[prop]
 			inst:SetAttribute(attrName, val)
+		else
+			val = inst:GetAttribute(attrName)
+			if val == nil then
+				val = inst[prop]
+				inst:SetAttribute(attrName, val)
+			end
 		end
 		if val < 0.995 then
 			table.insert(entries, {
@@ -148,12 +152,20 @@ local function collectFadeEntries(root)
 		end
 	end
 
-	scan(root)
-	for _, desc in ipairs(root:GetDescendants()) do
-		if desc.Name ~= "_BaliRippleWash" then
-			scan(desc)
+	local function walkVisibleDescendants(parentNode)
+		for _, child in ipairs(parentNode:GetChildren()) do
+			if child.Name ~= "_BaliRippleWash" then
+				if child:IsA("GuiObject") and not child.Visible then
+					continue
+				end
+				scan(child)
+				walkVisibleDescendants(child)
+			end
 		end
 	end
+
+	scan(root)
+	walkVisibleDescendants(root)
 
 	return entries
 end
@@ -208,6 +220,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 	end
 
 	local noPos = type(opts) == "table" and opts.NoPositionTween == true
+	local dur = (type(opts) == "table" and tonumber(opts.Duration)) or 0.28
 	local animId = bumpAnimId(frame)
 	invalidateCascadeTree(frame)
 	local entries = collectFadeEntries(frame)
@@ -221,6 +234,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 		end
 	end
 
+	frame:SetAttribute("_BaliFading", true)
 	frame:SetAttribute("_BaliUnmounted", false)
 	frame:SetAttribute("_BaliFadingIn", true)
 	frame.Visible = true
@@ -234,6 +248,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 				entry.Inst[entry.Prop] = entry.Target
 			end
 		end
+		frame:SetAttribute("_BaliFading", nil)
 		frame:SetAttribute("_BaliFadingIn", false)
 		frame:SetAttribute("_BaliMountTargetPos", nil)
 		return nil
@@ -247,9 +262,10 @@ function Transition.Mount(frame, _scaleFrom, opts)
 			targetPos.Y.Scale,
 			targetPos.Y.Offset + 8
 		)
-		mainTween = Tween.Play(frame, { Position = targetPos }, Tween.Normal, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		mainTween = Tween.Play(frame, { Position = targetPos }, dur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 
+	local bgDur = math.max(dur * 0.85, 0.16)
 	for _, entry in ipairs(entries) do
 		local inst = entry.Inst
 		if inst and inst.Parent then
@@ -257,7 +273,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 			local t = Tween.Play(
 				inst,
 				{ [entry.Prop] = entry.Target },
-				entry.IsContent and Tween.Normal or Tween.Fast,
+				entry.IsContent and dur or bgDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
@@ -270,11 +286,13 @@ function Transition.Mount(frame, _scaleFrom, opts)
 	if mainTween then
 		Tween.Then(mainTween, function()
 			if frame.Parent and frame:GetAttribute("_BaliAnimId") == animId then
+				frame:SetAttribute("_BaliFading", nil)
 				frame:SetAttribute("_BaliFadingIn", false)
 				frame:SetAttribute("_BaliMountTargetPos", nil)
 			end
 		end)
 	else
+		frame:SetAttribute("_BaliFading", nil)
 		frame:SetAttribute("_BaliFadingIn", false)
 		frame:SetAttribute("_BaliMountTargetPos", nil)
 	end
@@ -291,6 +309,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 	end
 
 	local noPos = type(opts) == "table" and opts.NoPositionTween == true
+	local dur = (type(opts) == "table" and tonumber(opts.Duration)) or 0.28
 	local animId = bumpAnimId(frame)
 	invalidateCascadeTree(frame)
 	local entries = collectFadeEntries(frame)
@@ -304,6 +323,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 		end
 	end
 
+	frame:SetAttribute("_BaliFading", true)
 	frame:SetAttribute("_BaliFadingIn", false)
 	frame:SetAttribute("_BaliUnmounted", true)
 
@@ -322,6 +342,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 			Util.SafeCall(onDone)
 		end
 		if frame.Parent then
+			frame:SetAttribute("_BaliFading", nil)
 			frame:SetAttribute("_BaliUnmounted", false)
 			-- Restore resting transparencies only after hiding/onDone so text never flashes back
 			if not frame.Visible then
@@ -348,17 +369,15 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 				targetPos.Y.Scale,
 				targetPos.Y.Offset + 6
 			),
-		}, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+		}, dur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 
-	local contentDur = math.max(Tween.Fast * 0.58, 0.06)
+	local contentDur = math.max(dur * 0.82, 0.14)
 	for _, entry in ipairs(entries) do
 		local inst = entry.Inst
 		if inst and inst.Parent then
-			local dur = entry.IsContent and contentDur or Tween.Fast
-			local style = Enum.EasingStyle.Quint
-			local dir = Enum.EasingDirection.Out
-			local t = Tween.Play(inst, { [entry.Prop] = 1 }, dur, style, dir)
+			local entryDur = entry.IsContent and contentDur or dur
+			local t = Tween.Play(inst, { [entry.Prop] = 1 }, entryDur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 			if not entry.IsContent then
 				mainTween = t
 			elseif not mainTween then
@@ -743,34 +762,51 @@ local function collectCascadeTargets(container, out, limit)
 end
 
 local function snapshotVisualProps(root)
-	local refresh = not root:GetAttribute("_BaliCascading")
+	local isFading = root:GetAttribute("_BaliCascading") == true or root:GetAttribute("_BaliFading") == true
+	local refresh = not isFading
 	local entries = {}
 	local function addInst(inst)
 		if inst:IsA("GuiObject") then
 			if refresh or inst:GetAttribute("_BaliCascadeBg") == nil then
-				local rest = inst:GetAttribute("_BaliRestBg")
-				inst:SetAttribute("_BaliCascadeBg", rest ~= nil and rest or inst.BackgroundTransparency)
+				local val = isFading and inst:GetAttribute("_BaliRestBg") or inst.BackgroundTransparency
+				if val == nil then
+					val = inst.BackgroundTransparency
+				end
+				inst:SetAttribute("_BaliRestBg", val)
+				inst:SetAttribute("_BaliCascadeBg", val)
 			end
 			table.insert(entries, { Inst = inst, Prop = "BackgroundTransparency", Target = inst:GetAttribute("_BaliCascadeBg"), IsContent = false })
 		end
 		if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
 			if refresh or inst:GetAttribute("_BaliCascadeTxt") == nil then
-				local rest = inst:GetAttribute("_BaliRestTxt")
-				inst:SetAttribute("_BaliCascadeTxt", rest ~= nil and rest or inst.TextTransparency)
+				local val = isFading and inst:GetAttribute("_BaliRestTxt") or inst.TextTransparency
+				if val == nil then
+					val = inst.TextTransparency
+				end
+				inst:SetAttribute("_BaliRestTxt", val)
+				inst:SetAttribute("_BaliCascadeTxt", val)
 			end
 			table.insert(entries, { Inst = inst, Prop = "TextTransparency", Target = inst:GetAttribute("_BaliCascadeTxt"), IsContent = true })
 		elseif inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
 			if refresh or inst:GetAttribute("_BaliCascadeImg") == nil then
-				local rest = inst:GetAttribute("_BaliRestImg")
-				inst:SetAttribute("_BaliCascadeImg", rest ~= nil and rest or inst.ImageTransparency)
+				local val = isFading and inst:GetAttribute("_BaliRestImg") or inst.ImageTransparency
+				if val == nil then
+					val = inst.ImageTransparency
+				end
+				inst:SetAttribute("_BaliRestImg", val)
+				inst:SetAttribute("_BaliCascadeImg", val)
 			end
 			local n = inst.Name
 			local isForeground = (n ~= "Shadow" and n ~= "WindowShadow" and n ~= "Glow" and n ~= "GlowTop" and n ~= "GlowBottom" and n ~= "GlowLeft" and n ~= "GlowRight" and n ~= "GlowTopLeft" and n ~= "GlowBottomRight" and n ~= "Noise" and n ~= "GlassSheen" and n ~= "Picture")
 			table.insert(entries, { Inst = inst, Prop = "ImageTransparency", Target = inst:GetAttribute("_BaliCascadeImg"), IsContent = isForeground })
 		elseif inst:IsA("UIStroke") then
 			if refresh or inst:GetAttribute("_BaliCascadeStroke") == nil then
-				local rest = inst:GetAttribute("_BaliRestStr")
-				inst:SetAttribute("_BaliCascadeStroke", rest ~= nil and rest or inst.Transparency)
+				local val = isFading and inst:GetAttribute("_BaliRestStr") or inst.Transparency
+				if val == nil then
+					val = inst.Transparency
+				end
+				inst:SetAttribute("_BaliRestStr", val)
+				inst:SetAttribute("_BaliCascadeStroke", val)
 			end
 			table.insert(entries, { Inst = inst, Prop = "Transparency", Target = inst:GetAttribute("_BaliCascadeStroke"), IsContent = false })
 		end

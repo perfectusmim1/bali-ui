@@ -1307,7 +1307,16 @@ function ProfileCard.new(parent, opts, ctx)
 	card.Frame.ClipsDescendants = true
 
 	if Assets.Get("Glow") then
-		local glow = Create.New("ImageLabel", {
+		local glowClip = Create.New("CanvasGroup", {
+			Name = "GlowClip",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			ClipsDescendants = true,
+			Corner = 10,
+			ZIndex = 1,
+			Parent = card.Frame,
+		})
+		Create.New("ImageLabel", {
 			Name = "Glow",
 			Size = UDim2.fromOffset(180, 120),
 			Position = UDim2.fromOffset(-36, -36),
@@ -1318,7 +1327,7 @@ function ProfileCard.new(parent, opts, ctx)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = card.Frame,
+			Parent = glowClip,
 		})
 	end
 

@@ -130,6 +130,16 @@ function Dialog.Show(dialogLayer, options)
 	})
 	Create.GlassStroke(modal, 0.05)
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 14,
+		ZIndex = 1,
+		Parent = modal,
+	})
+
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
 		Create.New("ImageLabel", {
@@ -143,7 +153,7 @@ function Dialog.Show(dialogLayer, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = modal,
+			Parent = bgClip,
 		})
 	end
 
@@ -156,9 +166,10 @@ function Dialog.Show(dialogLayer, options)
 			TileSize = UDim2.fromOffset(128, 128),
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
+			Corner = 14,
 			Theme = { ImageTransparency = "NoiseTransparency" },
 			ZIndex = 1,
-			Parent = modal,
+			Parent = bgClip,
 		})
 	end
 

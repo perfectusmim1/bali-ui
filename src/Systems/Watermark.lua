@@ -189,11 +189,21 @@ local function ensureBuilt()
 	})
 	Create.GlassStroke(pill, 0.06)
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Parent = pill,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = UDim.new(1, 0),
+		ZIndex = 350,
+	})
+
 	local glowId = Assets.Get("Glow")
 	if glowId then
 		Create.New("ImageLabel", {
 			Name = "Glow",
-			Parent = pill,
+			Parent = bgClip,
 			Size = UDim2.fromScale(0.6, 2),
 			Position = UDim2.fromScale(-0.12, -0.5),
 			Image = glowId,
@@ -204,7 +214,7 @@ local function ensureBuilt()
 					return math.min(t.GlowTransparency + 0.06, 0.94)
 				end,
 			},
-			ZIndex = 349,
+			ZIndex = 350,
 		})
 	end
 
@@ -212,8 +222,9 @@ local function ensureBuilt()
 	if noiseId then
 		Create.New("ImageLabel", {
 			Name = "Noise",
-			Parent = pill,
+			Parent = bgClip,
 			Size = UDim2.fromScale(1, 1),
+			Corner = UDim.new(1, 0),
 			Image = noiseId,
 			ScaleType = Enum.ScaleType.Tile,
 			TileSize = UDim2.fromOffset(128, 128),
@@ -221,7 +232,7 @@ local function ensureBuilt()
 				ImageColor3 = "Stroke",
 				ImageTransparency = "NoiseTransparency",
 			},
-			ZIndex = 349,
+			ZIndex = 350,
 		})
 	end
 

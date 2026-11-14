@@ -708,16 +708,16 @@ function Icons.Create(icon, props)
 
 	local size = props.Size or UDim2.fromOffset(16, 16)
 	local instance
-	local barChild = nil
-	if iconKey == "minus" then
-		-- Crisp 2px vector bar avoids blurry/faint 1px atlas scaling on compact action buttons
+	local barChildren = {}
+	if iconKey == "minus" or iconKey == "plus" then
+		-- Crisp 2px vector bars avoid blurry/faint 1px atlas scaling on compact action buttons
 		instance = Create.New("Frame", {
 			Name = props.Name or "Icon",
 			Size = size,
 			BackgroundTransparency = 1,
 		})
-		local barW = math.max(9, math.floor((size.X.Offset or 14) * 0.72))
-		barChild = Create.New("Frame", {
+		local barW = math.max(10, math.floor((size.X.Offset or 14) * 0.76 + 0.5))
+		local hBar = Create.New("Frame", {
 			Name = "MinusBar",
 			Size = UDim2.fromOffset(barW, 2),
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -726,6 +726,19 @@ function Icons.Create(icon, props)
 			Corner = 99,
 			Parent = instance,
 		})
+		table.insert(barChildren, hBar)
+		if iconKey == "plus" then
+			local vBar = Create.New("Frame", {
+				Name = "PlusVBar",
+				Size = UDim2.fromOffset(2, barW),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				BackgroundTransparency = props.Transparency or 0,
+				Corner = 99,
+				Parent = instance,
+			})
+			table.insert(barChildren, vBar)
+		end
 	elseif descriptor.Kind == "Glyph" then
 		instance = Create.New("TextLabel", {
 			Name = props.Name or "Icon",
@@ -760,17 +773,29 @@ function Icons.Create(icon, props)
 	end
 	if props.ZIndex then
 		instance.ZIndex = props.ZIndex
+		for _, bar in ipairs(barChildren) do
+			bar.ZIndex = props.ZIndex
+		end
 	end
 	if props.LayoutOrder then
 		instance.LayoutOrder = props.LayoutOrder
 	end
 
 	local color = props.Color or "Text"
-	local colorTarget = barChild or instance
-	if typeof(color) == "Color3" then
-		colorTarget[colorProperty(colorTarget)] = color
+	if #barChildren > 0 then
+		for _, bar in ipairs(barChildren) do
+			if typeof(color) == "Color3" then
+				bar.BackgroundColor3 = color
+			else
+				Theme.Bind(bar, { BackgroundColor3 = color })
+			end
+		end
 	else
-		Theme.Bind(colorTarget, { [colorProperty(colorTarget)] = color })
+		if typeof(color) == "Color3" then
+			instance[colorProperty(instance)] = color
+		else
+			Theme.Bind(instance, { [colorProperty(instance)] = color })
+		end
 	end
 
 	if props.Parent then
@@ -809,14 +834,26 @@ function Icons.SetColor(instance, color, animate)
 	if not instance then
 		return
 	end
-	local target = instance:FindFirstChild("MinusBar") or instance
-	local property = colorProperty(target)
-	if typeof(color) == "Color3" then
-		Theme.Unbind(target, property)
-		target[property] = color
+	if instance:IsA("Frame") then
+		for _, child in ipairs(instance:GetChildren()) do
+			if child:IsA("Frame") then
+				if typeof(color) == "Color3" then
+					Theme.Unbind(child, "BackgroundColor3")
+					child.BackgroundColor3 = color
+				else
+					Theme.Bind(child, { BackgroundColor3 = color })
+				end
+			end
+		end
 		return
 	end
-	Theme.Bind(target, { [property] = color })
+	local property = colorProperty(instance)
+	if typeof(color) == "Color3" then
+		Theme.Unbind(instance, property)
+		instance[property] = color
+		return
+	end
+	Theme.Bind(instance, { [property] = color })
 end
 
 function Icons.ColorProperty(instance)
@@ -841,6 +878,17 @@ function Icons.TransparencyProperty(instance)
 end
 
 function Icons.SetTransparency(instance, alpha)
+	if not instance then
+		return
+	end
+	if instance:IsA("Frame") then
+		for _, child in ipairs(instance:GetChildren()) do
+			if child:IsA("Frame") then
+				child.BackgroundTransparency = alpha
+			end
+		end
+		return
+	end
 	local target = Icons.TransparencyTarget(instance)
 	if not target then
 		return
@@ -1464,7 +1512,10 @@ local function collectFadeEntries(root)
 		return {}
 	end
 
-	local refresh = not root:GetAttribute("_BaliUnmounted") and not root:GetAttribute("_BaliFadingIn")
+	local isFading = root:GetAttribute("_BaliFading") == true
+		or root:GetAttribute("_BaliUnmounted") == true
+		or root:GetAttribute("_BaliFadingIn") == true
+	local refresh = not isFading
 	local entries = {}
 
 	local function isForegroundContent(inst, prop)
@@ -1491,15 +1542,16 @@ local function collectFadeEntries(root)
 	end
 
 	local function record(inst, prop, attrName)
-		local val = inst:GetAttribute(attrName)
-		if refresh or val == nil then
-			local cur = inst[prop]
-			if cur >= 0.995 and val ~= nil and not refresh then
-				-- Keep earlier resting transparency if already fading out
-				cur = val
-			end
-			val = cur
+		local val
+		if refresh then
+			val = inst[prop]
 			inst:SetAttribute(attrName, val)
+		else
+			val = inst:GetAttribute(attrName)
+			if val == nil then
+				val = inst[prop]
+				inst:SetAttribute(attrName, val)
+			end
 		end
 		if val < 0.995 then
 			table.insert(entries, {
@@ -1527,12 +1579,20 @@ local function collectFadeEntries(root)
 		end
 	end
 
-	scan(root)
-	for _, desc in ipairs(root:GetDescendants()) do
-		if desc.Name ~= "_BaliRippleWash" then
-			scan(desc)
+	local function walkVisibleDescendants(parentNode)
+		for _, child in ipairs(parentNode:GetChildren()) do
+			if child.Name ~= "_BaliRippleWash" then
+				if child:IsA("GuiObject") and not child.Visible then
+					continue
+				end
+				scan(child)
+				walkVisibleDescendants(child)
+			end
 		end
 	end
+
+	scan(root)
+	walkVisibleDescendants(root)
 
 	return entries
 end
@@ -1587,6 +1647,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 	end
 
 	local noPos = type(opts) == "table" and opts.NoPositionTween == true
+	local dur = (type(opts) == "table" and tonumber(opts.Duration)) or 0.28
 	local animId = bumpAnimId(frame)
 	invalidateCascadeTree(frame)
 	local entries = collectFadeEntries(frame)
@@ -1600,6 +1661,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 		end
 	end
 
+	frame:SetAttribute("_BaliFading", true)
 	frame:SetAttribute("_BaliUnmounted", false)
 	frame:SetAttribute("_BaliFadingIn", true)
 	frame.Visible = true
@@ -1613,6 +1675,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 				entry.Inst[entry.Prop] = entry.Target
 			end
 		end
+		frame:SetAttribute("_BaliFading", nil)
 		frame:SetAttribute("_BaliFadingIn", false)
 		frame:SetAttribute("_BaliMountTargetPos", nil)
 		return nil
@@ -1626,9 +1689,10 @@ function Transition.Mount(frame, _scaleFrom, opts)
 			targetPos.Y.Scale,
 			targetPos.Y.Offset + 8
 		)
-		mainTween = Tween.Play(frame, { Position = targetPos }, Tween.Normal, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		mainTween = Tween.Play(frame, { Position = targetPos }, dur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 
+	local bgDur = math.max(dur * 0.85, 0.16)
 	for _, entry in ipairs(entries) do
 		local inst = entry.Inst
 		if inst and inst.Parent then
@@ -1636,7 +1700,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 			local t = Tween.Play(
 				inst,
 				{ [entry.Prop] = entry.Target },
-				entry.IsContent and Tween.Normal or Tween.Fast,
+				entry.IsContent and dur or bgDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
@@ -1649,11 +1713,13 @@ function Transition.Mount(frame, _scaleFrom, opts)
 	if mainTween then
 		Tween.Then(mainTween, function()
 			if frame.Parent and frame:GetAttribute("_BaliAnimId") == animId then
+				frame:SetAttribute("_BaliFading", nil)
 				frame:SetAttribute("_BaliFadingIn", false)
 				frame:SetAttribute("_BaliMountTargetPos", nil)
 			end
 		end)
 	else
+		frame:SetAttribute("_BaliFading", nil)
 		frame:SetAttribute("_BaliFadingIn", false)
 		frame:SetAttribute("_BaliMountTargetPos", nil)
 	end
@@ -1670,6 +1736,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 	end
 
 	local noPos = type(opts) == "table" and opts.NoPositionTween == true
+	local dur = (type(opts) == "table" and tonumber(opts.Duration)) or 0.28
 	local animId = bumpAnimId(frame)
 	invalidateCascadeTree(frame)
 	local entries = collectFadeEntries(frame)
@@ -1683,6 +1750,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 		end
 	end
 
+	frame:SetAttribute("_BaliFading", true)
 	frame:SetAttribute("_BaliFadingIn", false)
 	frame:SetAttribute("_BaliUnmounted", true)
 
@@ -1701,6 +1769,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 			Util.SafeCall(onDone)
 		end
 		if frame.Parent then
+			frame:SetAttribute("_BaliFading", nil)
 			frame:SetAttribute("_BaliUnmounted", false)
 			-- Restore resting transparencies only after hiding/onDone so text never flashes back
 			if not frame.Visible then
@@ -1727,17 +1796,15 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 				targetPos.Y.Scale,
 				targetPos.Y.Offset + 6
 			),
-		}, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+		}, dur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 
-	local contentDur = math.max(Tween.Fast * 0.58, 0.06)
+	local contentDur = math.max(dur * 0.82, 0.14)
 	for _, entry in ipairs(entries) do
 		local inst = entry.Inst
 		if inst and inst.Parent then
-			local dur = entry.IsContent and contentDur or Tween.Fast
-			local style = Enum.EasingStyle.Quint
-			local dir = Enum.EasingDirection.Out
-			local t = Tween.Play(inst, { [entry.Prop] = 1 }, dur, style, dir)
+			local entryDur = entry.IsContent and contentDur or dur
+			local t = Tween.Play(inst, { [entry.Prop] = 1 }, entryDur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 			if not entry.IsContent then
 				mainTween = t
 			elseif not mainTween then
@@ -2122,34 +2189,51 @@ local function collectCascadeTargets(container, out, limit)
 end
 
 local function snapshotVisualProps(root)
-	local refresh = not root:GetAttribute("_BaliCascading")
+	local isFading = root:GetAttribute("_BaliCascading") == true or root:GetAttribute("_BaliFading") == true
+	local refresh = not isFading
 	local entries = {}
 	local function addInst(inst)
 		if inst:IsA("GuiObject") then
 			if refresh or inst:GetAttribute("_BaliCascadeBg") == nil then
-				local rest = inst:GetAttribute("_BaliRestBg")
-				inst:SetAttribute("_BaliCascadeBg", rest ~= nil and rest or inst.BackgroundTransparency)
+				local val = isFading and inst:GetAttribute("_BaliRestBg") or inst.BackgroundTransparency
+				if val == nil then
+					val = inst.BackgroundTransparency
+				end
+				inst:SetAttribute("_BaliRestBg", val)
+				inst:SetAttribute("_BaliCascadeBg", val)
 			end
 			table.insert(entries, { Inst = inst, Prop = "BackgroundTransparency", Target = inst:GetAttribute("_BaliCascadeBg"), IsContent = false })
 		end
 		if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
 			if refresh or inst:GetAttribute("_BaliCascadeTxt") == nil then
-				local rest = inst:GetAttribute("_BaliRestTxt")
-				inst:SetAttribute("_BaliCascadeTxt", rest ~= nil and rest or inst.TextTransparency)
+				local val = isFading and inst:GetAttribute("_BaliRestTxt") or inst.TextTransparency
+				if val == nil then
+					val = inst.TextTransparency
+				end
+				inst:SetAttribute("_BaliRestTxt", val)
+				inst:SetAttribute("_BaliCascadeTxt", val)
 			end
 			table.insert(entries, { Inst = inst, Prop = "TextTransparency", Target = inst:GetAttribute("_BaliCascadeTxt"), IsContent = true })
 		elseif inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
 			if refresh or inst:GetAttribute("_BaliCascadeImg") == nil then
-				local rest = inst:GetAttribute("_BaliRestImg")
-				inst:SetAttribute("_BaliCascadeImg", rest ~= nil and rest or inst.ImageTransparency)
+				local val = isFading and inst:GetAttribute("_BaliRestImg") or inst.ImageTransparency
+				if val == nil then
+					val = inst.ImageTransparency
+				end
+				inst:SetAttribute("_BaliRestImg", val)
+				inst:SetAttribute("_BaliCascadeImg", val)
 			end
 			local n = inst.Name
 			local isForeground = (n ~= "Shadow" and n ~= "WindowShadow" and n ~= "Glow" and n ~= "GlowTop" and n ~= "GlowBottom" and n ~= "GlowLeft" and n ~= "GlowRight" and n ~= "GlowTopLeft" and n ~= "GlowBottomRight" and n ~= "Noise" and n ~= "GlassSheen" and n ~= "Picture")
 			table.insert(entries, { Inst = inst, Prop = "ImageTransparency", Target = inst:GetAttribute("_BaliCascadeImg"), IsContent = isForeground })
 		elseif inst:IsA("UIStroke") then
 			if refresh or inst:GetAttribute("_BaliCascadeStroke") == nil then
-				local rest = inst:GetAttribute("_BaliRestStr")
-				inst:SetAttribute("_BaliCascadeStroke", rest ~= nil and rest or inst.Transparency)
+				local val = isFading and inst:GetAttribute("_BaliRestStr") or inst.Transparency
+				if val == nil then
+					val = inst.Transparency
+				end
+				inst:SetAttribute("_BaliRestStr", val)
+				inst:SetAttribute("_BaliCascadeStroke", val)
 			end
 			table.insert(entries, { Inst = inst, Prop = "Transparency", Target = inst:GetAttribute("_BaliCascadeStroke"), IsContent = false })
 		end
@@ -3613,11 +3697,21 @@ local function ensureBuilt()
 		ZIndex = 305,
 	})
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Parent = modal,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 14,
+		ZIndex = 305,
+	})
+
 	local glowId = Assets.Get("Glow")
 	if glowId then
 		Create.New("ImageLabel", {
 			Name = "Glow",
-			Parent = modal,
+			Parent = bgClip,
 			Size = UDim2.fromScale(0.75, 0.7),
 			Position = UDim2.fromScale(-0.18, -0.25),
 			Image = glowId,
@@ -3636,8 +3730,9 @@ local function ensureBuilt()
 	if noiseId then
 		Create.New("ImageLabel", {
 			Name = "Noise",
-			Parent = modal,
+			Parent = bgClip,
 			Size = UDim2.fromScale(1, 1),
+			Corner = 14,
 			Image = noiseId,
 			ScaleType = Enum.ScaleType.Tile,
 			TileSize = UDim2.fromOffset(128, 128),
@@ -5695,11 +5790,21 @@ local function ensureBuilt()
 	})
 	Create.GlassStroke(panel, 0.06)
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Parent = panel,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 12,
+		ZIndex = 340,
+	})
+
 	local glowId = Assets.Get("Glow")
 	if glowId then
 		Create.New("ImageLabel", {
 			Name = "Glow",
-			Parent = panel,
+			Parent = bgClip,
 			Size = UDim2.fromScale(0.85, 0.9),
 			Position = UDim2.fromScale(-0.2, -0.35),
 			Image = glowId,
@@ -5710,7 +5815,7 @@ local function ensureBuilt()
 					return math.min(t.GlowTransparency + 0.05, 0.94)
 				end,
 			},
-			ZIndex = 339,
+			ZIndex = 340,
 		})
 	end
 
@@ -5718,8 +5823,9 @@ local function ensureBuilt()
 	if noiseId then
 		Create.New("ImageLabel", {
 			Name = "Noise",
-			Parent = panel,
+			Parent = bgClip,
 			Size = UDim2.fromScale(1, 1),
+			Corner = 12,
 			Image = noiseId,
 			ScaleType = Enum.ScaleType.Tile,
 			TileSize = UDim2.fromOffset(128, 128),
@@ -5727,7 +5833,7 @@ local function ensureBuilt()
 				ImageColor3 = "Stroke",
 				ImageTransparency = "NoiseTransparency",
 			},
-			ZIndex = 339,
+			ZIndex = 340,
 		})
 	end
 
@@ -6250,12 +6356,22 @@ function Notification.Notify(opts)
 	})
 	Create.GlassStroke(card, 0.06)
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Parent = card,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 12,
+		ZIndex = 402,
+	})
+
 	local glowId = Assets.Get("Glow")
 	local glowImg = nil
 	if glowId then
 		glowImg = Create.New("ImageLabel", {
 			Name = "Glow",
-			Parent = card,
+			Parent = bgClip,
 			Size = UDim2.fromScale(0.75, 1.5),
 			Position = UDim2.fromScale(-0.22, -0.32),
 			Image = glowId,
@@ -6274,8 +6390,9 @@ function Notification.Notify(opts)
 	if noiseId then
 		Create.New("ImageLabel", {
 			Name = "Noise",
-			Parent = card,
+			Parent = bgClip,
 			Size = UDim2.fromScale(1, 1),
+			Corner = 12,
 			Image = noiseId,
 			ScaleType = Enum.ScaleType.Tile,
 			TileSize = UDim2.fromOffset(128, 128),
@@ -7356,11 +7473,21 @@ local function ensureBuilt()
 	})
 	Create.GlassStroke(pill, 0.06)
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Parent = pill,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = UDim.new(1, 0),
+		ZIndex = 350,
+	})
+
 	local glowId = Assets.Get("Glow")
 	if glowId then
 		Create.New("ImageLabel", {
 			Name = "Glow",
-			Parent = pill,
+			Parent = bgClip,
 			Size = UDim2.fromScale(0.6, 2),
 			Position = UDim2.fromScale(-0.12, -0.5),
 			Image = glowId,
@@ -7371,7 +7498,7 @@ local function ensureBuilt()
 					return math.min(t.GlowTransparency + 0.06, 0.94)
 				end,
 			},
-			ZIndex = 349,
+			ZIndex = 350,
 		})
 	end
 
@@ -7379,8 +7506,9 @@ local function ensureBuilt()
 	if noiseId then
 		Create.New("ImageLabel", {
 			Name = "Noise",
-			Parent = pill,
+			Parent = bgClip,
 			Size = UDim2.fromScale(1, 1),
+			Corner = UDim.new(1, 0),
 			Image = noiseId,
 			ScaleType = Enum.ScaleType.Tile,
 			TileSize = UDim2.fromOffset(128, 128),
@@ -7388,7 +7516,7 @@ local function ensureBuilt()
 				ImageColor3 = "Stroke",
 				ImageTransparency = "NoiseTransparency",
 			},
-			ZIndex = 349,
+			ZIndex = 350,
 		})
 	end
 
@@ -8101,9 +8229,18 @@ function StatCard.new(parent, opts, ctx)
 	self.Value = currentRaw
 	self.Stroke = cardStroke
 
-	-- Subtle top-left radial Glow tint
+	-- Subtle top-left radial Glow tint (clipped cleanly to card corner)
 	local glowImg = Assets.Get("Glow")
 	if opts.Glow ~= false and glowImg then
+		local glowClip = Create.New("CanvasGroup", {
+			Name = "GlowClip",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			ClipsDescendants = true,
+			Corner = opts.Corner or 10,
+			ZIndex = 1,
+			Parent = cardFrame,
+		})
 		local glow = Create.New("ImageLabel", {
 			Name = "Glow",
 			Size = UDim2.fromOffset(180, 120),
@@ -8112,7 +8249,7 @@ function StatCard.new(parent, opts, ctx)
 			ScaleType = Enum.ScaleType.Stretch,
 			ZIndex = 1,
 			Theme = { ImageTransparency = "GlowTransparency" },
-			Parent = cardFrame,
+			Parent = glowClip,
 		})
 		bindColorProp(glow, "ImageColor3", colorSpec)
 	end
@@ -9923,12 +10060,16 @@ function CardGrid.new(parent, opts, ctx)
 			Theme.Unbind(entry.Button, "BackgroundColor3")
 			Theme.Unbind(entry.Button, "BackgroundTransparency")
 			entry.Button.BackgroundTransparency = 0.04
+			entry.Button:SetAttribute("_BaliRestBg", 0.04)
+			entry.Button:SetAttribute("_BaliCascadeBg", 0.04)
 			entry.Gradient.Enabled = true
 			entry.Gradient.Color = Theme.AccentSequence()
 			Theme.Bind(entry.Stroke, {
 				Color = "Accent",
 				Transparency = function() return 0.25 end,
 			})
+			entry.Stroke:SetAttribute("_BaliRestStr", 0.25)
+			entry.Stroke:SetAttribute("_BaliCascadeStroke", 0.25)
 			Theme.Bind(entry.TitleLabel, { TextColor3 = "AccentText" })
 			if entry.IconObj then
 				Icons.SetColor(entry.IconObj, "AccentText")
@@ -9944,10 +10085,14 @@ function CardGrid.new(parent, opts, ctx)
 				BackgroundColor3 = entry.Hovered and "TileHover" or "Tile",
 				BackgroundTransparency = "TileTransparency",
 			})
+			entry.Button:SetAttribute("_BaliRestBg", Theme.Current.TileTransparency)
+			entry.Button:SetAttribute("_BaliCascadeBg", Theme.Current.TileTransparency)
 			Theme.Bind(entry.Stroke, {
 				Color = "Stroke",
 				Transparency = "StrokeTransparency",
 			})
+			entry.Stroke:SetAttribute("_BaliRestStr", Theme.Current.StrokeTransparency)
+			entry.Stroke:SetAttribute("_BaliCascadeStroke", Theme.Current.StrokeTransparency)
 			Theme.Bind(entry.TitleLabel, { TextColor3 = "Text" })
 			if entry.IconObj then
 				Icons.SetColor(entry.IconObj, "Accent")
@@ -12828,7 +12973,7 @@ function Dropdown.new(parent, opts, ctx)
 		Parent = popup,
 	})
 
-	local glassClip = Create.New("Frame", {
+	local glassClip = Create.New("CanvasGroup", {
 		Name = "GlassClip",
 		Size = UDim2.fromScale(1, 1),
 		Corner = 10,
@@ -12883,6 +13028,7 @@ function Dropdown.new(parent, opts, ctx)
 			Image = glassAsset,
 			ScaleType = Enum.ScaleType.Stretch,
 			ImageTransparency = 0.80,
+			Corner = 10,
 			Theme = { ImageColor3 = "Text" },
 			ZIndex = 110,
 			Parent = glassClip,
@@ -12897,6 +13043,7 @@ function Dropdown.new(parent, opts, ctx)
 			Image = noiseAsset,
 			ScaleType = Enum.ScaleType.Tile,
 			TileSize = UDim2.fromOffset(128, 128),
+			Corner = 10,
 			ZIndex = 110,
 			Theme = {
 				ImageColor3 = "Stroke",
@@ -13142,7 +13289,7 @@ function Dropdown.new(parent, opts, ctx)
 			end
 		end
 
-		local padV = 6
+		local padV = 8
 		local contentH = scrollLayout.AbsoluteContentSize.Y
 		local estPerRow = hasDesc and 44 or 28
 		local maxListH = maxVisible * estPerRow + math.max(0, maxVisible - 1) * 3 + padV
@@ -13166,6 +13313,9 @@ function Dropdown.new(parent, opts, ctx)
 		local anchorTop = trigger.AbsolutePosition.Y
 		local wasFlipped = preserveFlip == true and isOpen and popup.Parent ~= nil and prevBottom <= anchorTop + 4
 
+		local needsScroll = (visibleCount > maxVisible) or (contentH > 0 and contentH + padV > listH)
+		scroll.ScrollingEnabled = needsScroll
+		scroll.ScrollBarThickness = needsScroll and 3 or 0
 		scroll.Size = UDim2.new(1, 0, 0, listH)
 		popup.Size = UDim2.fromOffset(width, totalH)
 
@@ -17733,7 +17883,16 @@ function ProfileCard.new(parent, opts, ctx)
 	card.Frame.ClipsDescendants = true
 
 	if Assets.Get("Glow") then
-		local glow = Create.New("ImageLabel", {
+		local glowClip = Create.New("CanvasGroup", {
+			Name = "GlowClip",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			ClipsDescendants = true,
+			Corner = 10,
+			ZIndex = 1,
+			Parent = card.Frame,
+		})
+		Create.New("ImageLabel", {
 			Name = "Glow",
 			Size = UDim2.fromOffset(180, 120),
 			Position = UDim2.fromOffset(-36, -36),
@@ -17744,7 +17903,7 @@ function ProfileCard.new(parent, opts, ctx)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = card.Frame,
+			Parent = glowClip,
 		})
 	end
 
@@ -18046,7 +18205,11 @@ function Toggle.new(parent, opts, ctx)
 	local track = Create.New("Frame", {
 		Name = "Track",
 		Size = UDim2.fromOffset(42, 22),
-		Theme = { BackgroundColor3 = "ToggleOff" },
+		Theme = {
+			BackgroundColor3 = function(t)
+				return state and t.Accent or t.ToggleOff
+			end,
+		},
 		Corner = UDim.new(1, 0),
 		LayoutOrder = 2,
 		Parent = row.Right,
@@ -18063,21 +18226,6 @@ function Toggle.new(parent, opts, ctx)
 		},
 		Thickness = 1,
 	})
-
-	local accentFill = Create.New("Frame", {
-		Name = "AccentFill",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BackgroundTransparency = state and 0 or 1,
-		Corner = UDim.new(1, 0),
-		ZIndex = 2,
-		Parent = track,
-	})
-
-	local fillGrad = Instance.new("UIGradient")
-	fillGrad.Color = Theme.AccentSequence()
-	fillGrad.Rotation = 15
-	fillGrad.Parent = accentFill
 
 	local knob = Create.New("Frame", {
 		Name = "Knob",
@@ -18098,7 +18246,7 @@ function Toggle.new(parent, opts, ctx)
 
 	local function applyVisual(animate)
 		local targetPos = UDim2.new(0, state and 22 or 2, 0.5, 0)
-		local targetAlpha = state and 0 or 1
+		local targetTrackBg = state and Theme.Current.Accent or Theme.Current.ToggleOff
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
 		local targetStrokeTrans = state and 0.45 or Theme.Current.StrokeTransparency
 
@@ -18110,14 +18258,14 @@ function Toggle.new(parent, opts, ctx)
 					Tween.Spring(knob, { Size = UDim2.fromOffset(18, 18) }, 0.13)
 				end
 			end)
-			Tween.Play(accentFill, { BackgroundTransparency = targetAlpha }, Tween.Fast, Enum.EasingStyle.Quad)
+			Tween.Play(track, { BackgroundColor3 = targetTrackBg }, Tween.Fast, Enum.EasingStyle.Quad)
 			Tween.Play(trackStroke, {
 				Color = targetStrokeColor,
 				Transparency = targetStrokeTrans,
 			}, Tween.Fast, Enum.EasingStyle.Quad)
 		else
 			knob.Position = targetPos
-			accentFill.BackgroundTransparency = targetAlpha
+			track.BackgroundColor3 = targetTrackBg
 			trackStroke.Color = targetStrokeColor
 			trackStroke.Transparency = targetStrokeTrans
 		end
@@ -18127,7 +18275,6 @@ function Toggle.new(parent, opts, ctx)
 		if element._destroyed then
 			return
 		end
-		fillGrad.Color = Theme.AccentSequence(t)
 		applyVisual(false)
 	end))
 
@@ -18369,7 +18516,11 @@ function Checkbox.new(parent, opts, ctx)
 		Size = UDim2.fromOffset(20, 20),
 		Position = UDim2.fromScale(1, 0.5),
 		AnchorPoint = Vector2.new(1, 0.5),
-		Theme = { BackgroundColor3 = "Field" },
+		Theme = {
+			BackgroundColor3 = function(t)
+				return state and t.Accent or t.Field
+			end,
+		},
 		Corner = 6,
 		Parent = row.Right,
 	})
@@ -18380,26 +18531,11 @@ function Checkbox.new(parent, opts, ctx)
 				return state and t.Accent or t.Stroke
 			end,
 			Transparency = function(t)
-				return state and 0.25 or t.StrokeTransparency
+				return state and 0.15 or t.StrokeTransparency
 			end,
 		},
 		Thickness = 1,
 	})
-
-	local accentFill = Create.New("Frame", {
-		Name = "AccentFill",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BackgroundTransparency = state and 0 or 1,
-		Corner = 6,
-		ZIndex = 2,
-		Parent = box,
-	})
-
-	local fillGrad = Instance.new("UIGradient")
-	fillGrad.Color = Theme.AccentSequence()
-	fillGrad.Rotation = 35
-	fillGrad.Parent = accentFill
 
 	local checkIcon = Icons.Create("check", {
 		Size = UDim2.fromOffset(13, 13),
@@ -18413,14 +18549,15 @@ function Checkbox.new(parent, opts, ctx)
 
 	local function applyVisual(animate)
 		local targetAlpha = state and 0 or 1
+		local targetBg = state and Theme.Current.Accent or Theme.Current.Field
 		local targetSize = state and UDim2.fromOffset(13, 13) or UDim2.fromOffset(6, 6)
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
-		local targetStrokeTrans = state and 0.25 or Theme.Current.StrokeTransparency
+		local targetStrokeTrans = state and 0.15 or Theme.Current.StrokeTransparency
 		local iconTarget = checkIcon and Icons.TransparencyTarget(checkIcon) or nil
 		local iconTransProp = iconTarget and Icons.TransparencyProperty(iconTarget) or "ImageTransparency"
 
 		if animate then
-			Tween.Play(accentFill, { BackgroundTransparency = targetAlpha }, Tween.Fast, Enum.EasingStyle.Quad)
+			Tween.Play(box, { BackgroundColor3 = targetBg }, Tween.Fast, Enum.EasingStyle.Quad)
 			if checkIcon and iconTarget then
 				if iconTarget == checkIcon then
 					Tween.Play(checkIcon, { [iconTransProp] = targetAlpha, Size = targetSize }, Tween.Fast, Enum.EasingStyle.Exponential)
@@ -18434,9 +18571,9 @@ function Checkbox.new(parent, opts, ctx)
 				Transparency = targetStrokeTrans,
 			}, Tween.Fast, Enum.EasingStyle.Quad)
 		else
-			accentFill.BackgroundTransparency = targetAlpha
-			if checkIcon then
-				checkIcon[iconTransProp] = targetAlpha
+			box.BackgroundColor3 = targetBg
+			if checkIcon and iconTarget then
+				iconTarget[iconTransProp] = targetAlpha
 				checkIcon.Size = targetSize
 			end
 			boxStroke.Color = targetStrokeColor
@@ -18444,11 +18581,10 @@ function Checkbox.new(parent, opts, ctx)
 		end
 	end
 
-	element.Maid:Give(Theme.Changed:Connect(function(t)
+	element.Maid:Give(Theme.Changed:Connect(function()
 		if element._destroyed then
 			return
 		end
-		fillGrad.Color = Theme.AccentSequence(t)
 		applyVisual(false)
 	end))
 
@@ -18962,6 +19098,16 @@ function Dialog.Show(dialogLayer, options)
 	})
 	Create.GlassStroke(modal, 0.05)
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 14,
+		ZIndex = 1,
+		Parent = modal,
+	})
+
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
 		Create.New("ImageLabel", {
@@ -18975,7 +19121,7 @@ function Dialog.Show(dialogLayer, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = modal,
+			Parent = bgClip,
 		})
 	end
 
@@ -18988,9 +19134,10 @@ function Dialog.Show(dialogLayer, options)
 			TileSize = UDim2.fromOffset(128, 128),
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
+			Corner = 14,
 			Theme = { ImageTransparency = "NoiseTransparency" },
 			ZIndex = 1,
-			Parent = modal,
+			Parent = bgClip,
 		})
 	end
 
@@ -19484,6 +19631,16 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 	})
 	Create.GlassStroke(card, 0.05)
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 14,
+		ZIndex = 1,
+		Parent = card,
+	})
+
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
 		Create.New("ImageLabel", {
@@ -19497,7 +19654,7 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = card,
+			Parent = bgClip,
 		})
 		Create.New("ImageLabel", {
 			Name = "GlowBottom",
@@ -19511,7 +19668,7 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = card,
+			Parent = bgClip,
 		})
 	end
 
@@ -19524,9 +19681,10 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 			TileSize = UDim2.fromOffset(128, 128),
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
+			Corner = 14,
 			Theme = { ImageTransparency = "NoiseTransparency" },
 			ZIndex = 1,
-			Parent = card,
+			Parent = bgClip,
 		})
 	end
 
@@ -19587,22 +19745,21 @@ function Loader.LoadingScreen(parentGui, options)
 		Size = UDim2.fromOffset(40, 40),
 		Corner = 11,
 		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.88,
 		LayoutOrder = 1,
 		Parent = header,
 	})
-	local badgeGrad = Instance.new("UIGradient")
-	badgeGrad.Color = Theme.AccentSequence()
-	badgeGrad.Rotation = 35
-	badgeGrad.Parent = badge
-	maid:Give(Theme.Changed:Connect(function(theme)
-		badgeGrad.Color = Theme.AccentSequence(theme)
-	end))
+	Create.Stroke(badge, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.65,
+		Thickness = 1,
+	})
 
 	local badgeIcon = Icons.Create(options.Icon or "bali-logo", {
-		Size = UDim2.fromOffset(20, 20),
+		Size = UDim2.fromOffset(22, 22),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "AccentText",
+		Color = "Accent",
 		Parent = badge,
 	})
 	local stopPulse = nil
@@ -20079,6 +20236,16 @@ function Loader.KeySystem(parentGui, options)
 	})
 	Create.GlassStroke(mainCard, 0.05)
 
+	local keyBgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 16,
+		ZIndex = 1,
+		Parent = mainCard,
+	})
+
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
 		Create.New("ImageLabel", {
@@ -20092,7 +20259,7 @@ function Loader.KeySystem(parentGui, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = mainCard,
+			Parent = keyBgClip,
 		})
 		Create.New("ImageLabel", {
 			Name = "GlowBottom",
@@ -20106,7 +20273,7 @@ function Loader.KeySystem(parentGui, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = mainCard,
+			Parent = keyBgClip,
 		})
 	end
 
@@ -20271,21 +20438,20 @@ function Loader.KeySystem(parentGui, options)
 		Size = UDim2.fromOffset(40, 40),
 		Corner = 11,
 		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.88,
 		LayoutOrder = 1,
 		Parent = header,
 	})
-	local badgeGrad = Instance.new("UIGradient")
-	badgeGrad.Color = Theme.AccentSequence()
-	badgeGrad.Rotation = 35
-	badgeGrad.Parent = iconBadge
-	maid:Give(Theme.Changed:Connect(function(theme)
-		badgeGrad.Color = Theme.AccentSequence(theme)
-	end))
+	Create.Stroke(iconBadge, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.65,
+		Thickness = 1,
+	})
 	Icons.Create(options.Icon or "key", {
-		Size = UDim2.fromOffset(18, 18),
+		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "AccentText",
+		Color = "Accent",
 		Parent = iconBadge,
 	})
 
@@ -21602,24 +21768,23 @@ function MobileButton.new(parentLayer, window, options)
 
 	local badge = Create.New("Frame", {
 		Size = UDim2.fromOffset(24, 24),
-		Corner = 999,
+		Corner = 7,
 		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.88,
 		LayoutOrder = 1,
 		Parent = content,
 	})
-	local badgeGrad = Instance.new("UIGradient")
-	badgeGrad.Color = Theme.AccentSequence()
-	badgeGrad.Rotation = 35
-	badgeGrad.Parent = badge
-	maid:Give(Theme.Changed:Connect(function(theme)
-		badgeGrad.Color = Theme.AccentSequence(theme)
-	end))
+	Create.Stroke(badge, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.68,
+		Thickness = 1,
+	})
 
 	Icons.Create(options.Icon or "bali-logo", {
-		Size = UDim2.fromOffset(14, 14),
+		Size = UDim2.fromOffset(15, 15),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "AccentText",
+		Color = "Accent",
 		Parent = badge,
 	})
 
@@ -23292,7 +23457,17 @@ function Window.new(screenGui, options)
 	})
 	Create.GlassStroke(main, 0.04)
 
-	-- Ambient obsidian glass radial blooms & grain
+	-- Ambient obsidian glass radial blooms & grain (clipped cleanly to rounded corners)
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 14,
+		ZIndex = 1,
+		Parent = main,
+	})
+
 	local glowTopLeft, glowBottomRight, noiseLayer = nil, nil, nil
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
@@ -23307,7 +23482,7 @@ function Window.new(screenGui, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = main,
+			Parent = bgClip,
 		})
 		glowBottomRight = Create.New("ImageLabel", {
 			Name = "GlowBottomRight",
@@ -23321,7 +23496,7 @@ function Window.new(screenGui, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = main,
+			Parent = bgClip,
 		})
 	end
 
@@ -23334,9 +23509,10 @@ function Window.new(screenGui, options)
 			TileSize = UDim2.fromOffset(128, 128),
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
+			Corner = 14,
 			Theme = { ImageTransparency = "NoiseTransparency" },
 			ZIndex = 1,
-			Parent = main,
+			Parent = bgClip,
 		})
 	end
 
@@ -23345,13 +23521,21 @@ function Window.new(screenGui, options)
 	local isCollapsed = options.SidebarCollapsed == true or (isMobile and options.SidebarCollapsed ~= false) or (initW < 580 and options.SidebarCollapsed ~= false)
 	local startSidebarW = isCollapsed and SIDEBAR_COLLAPSED or expandedWidth
 
-	local sidebar = Create.New("Frame", {
-		Name = "Sidebar",
+	local sidebarBg = Create.New("Frame", {
+		Name = "SidebarBg",
 		Size = UDim2.new(0, startSidebarW, 1, 0),
 		Theme = {
 			BackgroundColor3 = "Sidebar",
 			BackgroundTransparency = "SidebarTransparency",
 		},
+		ZIndex = 2,
+		Parent = bgClip,
+	})
+
+	local sidebar = Create.New("Frame", {
+		Name = "Sidebar",
+		Size = UDim2.new(0, startSidebarW, 1, 0),
+		BackgroundTransparency = 1,
 		ClipsDescendants = true,
 		ZIndex = 3,
 		Parent = main,
@@ -23398,23 +23582,41 @@ function Window.new(screenGui, options)
 		AutoButtonColor = false,
 		Corner = 8,
 		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.88,
 		Parent = brandRow,
 	})
-	local brandGrad = Instance.new("UIGradient")
-	brandGrad.Color = Theme.AccentSequence()
-	brandGrad.Rotation = 35
-	brandGrad.Parent = brandBadge
-	maid:Give(Theme.Changed:Connect(function(theme)
-		brandGrad.Color = Theme.AccentSequence(theme)
-	end))
+	local brandStroke = Create.Stroke(brandBadge, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.68,
+		Thickness = 1,
+	})
 
-	Icons.Create(options.Icon or "bali-logo", {
+	local brandLogoIcon = Icons.Create(options.Icon or "bali-logo", {
+		Name = "BrandLogoIcon",
 		Size = UDim2.fromOffset(18, 18),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "AccentText",
+		Color = "Accent",
+		Visible = not isCollapsed,
 		Parent = brandBadge,
 	})
+	local brandExpandIcon = Icons.Create("panel-left", {
+		Name = "BrandExpandIcon",
+		Size = UDim2.fromOffset(16, 16),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Color = "Text",
+		Visible = isCollapsed,
+		Parent = brandBadge,
+	})
+	maid:Give(brandBadge.MouseEnter:Connect(function()
+		Tween.Play(brandBadge, { BackgroundTransparency = 0.78 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		Tween.Play(brandStroke, { Transparency = 0.38 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	end))
+	maid:Give(brandBadge.MouseLeave:Connect(function()
+		Tween.Play(brandBadge, { BackgroundTransparency = 0.88 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		Tween.Play(brandStroke, { Transparency = 0.68 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	end))
 
 	local brandText = Create.New("Frame", {
 		Name = "BrandText",
@@ -23689,7 +23891,7 @@ function Window.new(screenGui, options)
 	local function syncTabScrollBounds()
 		local topH = sidebarTop.AbsoluteSize.Y
 		tabScroll.Position = UDim2.fromOffset(0, topH)
-		tabScroll.Size = UDim2.new(1, 0, 1, -topH)
+		tabScroll.Size = UDim2.new(1, -2, 1, -(topH + 10))
 	end
 	maid:Give(sidebarTop:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncTabScrollBounds))
 	task.defer(syncTabScrollBounds)
@@ -23789,7 +23991,7 @@ function Window.new(screenGui, options)
 			BackgroundColor3 = "Tile",
 			BackgroundTransparency = "TileTransparency",
 		},
-		Visible = isCollapsed,
+		Visible = false,
 		LayoutOrder = 1,
 		Parent = breadcrumbWrap,
 	})
@@ -23819,7 +24021,7 @@ function Window.new(screenGui, options)
 		Font = "Medium",
 		TextSize = 12,
 		Color = "SubText",
-		Size = UDim2.new(1, isCollapsed and -60 or -26, 0, 20),
+		Size = UDim2.new(1, -26, 0, 20),
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		RichText = true,
 		LayoutOrder = 3,
@@ -23828,26 +24030,26 @@ function Window.new(screenGui, options)
 
 	local pageContainer = Create.New("Frame", {
 		Name = "PageContainer",
-		Position = UDim2.fromOffset(0, TOPBAR_HEIGHT),
-		Size = UDim2.new(1, 0, 1, -TOPBAR_HEIGHT),
+		Position = UDim2.fromOffset(0, TOPBAR_HEIGHT + 2),
+		Size = UDim2.new(1, -3, 1, -(TOPBAR_HEIGHT + 12)),
 		BackgroundTransparency = 1,
 		ClipsDescendants = true,
 		ZIndex = 2,
 		Parent = bodyArea,
 	})
 
-	-- Bottom-Right Resize Grip
+	-- Bottom-Right Resize Grip (inset safely inside 14px rounded corner)
 	local resizeGrip = Create.New("Frame", {
 		Name = "ResizeGrip",
 		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -4, 1, -4),
-		Size = UDim2.fromOffset(18, 18),
+		Position = UDim2.new(1, -6, 1, -6),
+		Size = UDim2.fromOffset(16, 16),
 		BackgroundTransparency = 1,
 		ZIndex = 15,
 		Parent = main,
 	})
 	Icons.Create("grip", {
-		Size = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(10, 10),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = "Muted",
@@ -23886,12 +24088,14 @@ function Window.new(screenGui, options)
 		_tabScroll = tabScroll,
 		_sidebarExpandedWidth = expandedWidth,
 		_sidebarCollapsed = isCollapsed,
+		_sidebarBg = sidebarBg,
 		_mobileMode = isMobile,
 		_desktopPreferredSize = desiredSize,
 		_effectiveMin = effectiveMin,
 		_glowTopLeft = glowTopLeft,
 		_glowBottomRight = glowBottomRight,
 		_noiseLayer = noiseLayer,
+		_bgClipCorner = bgClip:FindFirstChildOfClass("UICorner"),
 		_resizeGrip = resizeGrip,
 		_visible = true,
 		_visSeq = 0,
@@ -23914,6 +24118,8 @@ function Window.new(screenGui, options)
 		_brandTitleLabel = brandTitleLabel,
 		_brandSubLabel = brandSubLabel,
 		_brandText = brandText,
+		_brandLogoIcon = brandLogoIcon,
+		_brandExpandIcon = brandExpandIcon,
 		_collapseBtn = collapseBtn,
 		_expandBtn = expandBtn,
 		_welcomeCard = welcomeCard,
@@ -24120,8 +24326,9 @@ function Window.new(screenGui, options)
 	maid:Give(expandBtn.Activated:Connect(function()
 		self:ToggleSidebar(false)
 	end))
-	maid:Give(brandBadge.Activated:Connect(function()
+	maid:Give(brandBadge.Activated:Connect(function(input)
 		if self._sidebarCollapsed then
+			Transition.Ripple(brandBadge, input, "Accent")
 			self:ToggleSidebar(false)
 		end
 	end))
@@ -24681,7 +24888,15 @@ function Window:ToggleSidebar(collapsed)
 
 	self._brandText.Visible = not collapsed
 	self._collapseBtn.Visible = not collapsed
-	self._expandBtn.Visible = collapsed
+	if self._brandLogoIcon then
+		self._brandLogoIcon.Visible = not collapsed
+	end
+	if self._brandExpandIcon then
+		self._brandExpandIcon.Visible = collapsed
+	end
+	if self._expandBtn then
+		self._expandBtn.Visible = false
+	end
 	if self._searchPill then
 		self._searchPill.Visible = not collapsed
 	end
@@ -24690,7 +24905,7 @@ function Window:ToggleSidebar(collapsed)
 	if self._welcomeCard then
 		self._welcomeCard.Visible = not collapsed
 	end
-	self._breadcrumbLabel.Size = UDim2.new(1, collapsed and -60 or -26, 0, 20)
+	self._breadcrumbLabel.Size = UDim2.new(1, -26, 0, 20)
 
 	for _, cat in pairs(self._categories) do
 		if cat.Header then
@@ -24702,6 +24917,9 @@ function Window:ToggleSidebar(collapsed)
 	end
 
 	Tween.Play(self.Sidebar, { Size = UDim2.new(0, targetW, 1, 0) }, Tween.Normal)
+	if self._sidebarBg then
+		Tween.Play(self._sidebarBg, { Size = UDim2.new(0, targetW, 1, 0) }, Tween.Normal)
+	end
 	Tween.Play(self.BodyArea, {
 		Position = UDim2.new(0, targetW, 0, 0),
 		Size = UDim2.new(1, -targetW, 1, 0),
@@ -24798,6 +25016,7 @@ function Window:SetVisible(visible)
 
 		if not Tween.Reduced then
 			self._morphing = true
+			local morphDur = 0.30
 			local restorePos = self._restorePos or wrapper.Position
 			local restoreSize = self._restoreSize or wrapper.Size
 			local targetPos, targetScale = computeMorphOrigin(restorePos, restoreSize)
@@ -24807,14 +25026,14 @@ function Window:SetVisible(visible)
 			Tween.Play(
 				minScale,
 				{ Scale = targetScale },
-				Tween.Fast,
+				morphDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
 			Tween.Play(
 				wrapper,
 				{ Position = targetPos },
-				Tween.Fast,
+				morphDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
@@ -24831,7 +25050,7 @@ function Window:SetVisible(visible)
 				self.BodyArea.Visible = true
 				self:_setAmbientChromeVisible(true)
 				self._morphing = false
-			end, { NoPositionTween = true })
+			end, { NoPositionTween = true, Duration = morphDur })
 			return
 		end
 
@@ -24843,6 +25062,7 @@ function Window:SetVisible(visible)
 	else
 		if not Tween.Reduced then
 			self._morphing = true
+			local morphDur = 0.30
 			local restorePos = self._restorePos or wrapper.Position
 			local restoreSize = self._restoreSize or wrapper.Size
 			local startPos, startScale = computeMorphOrigin(restorePos, restoreSize)
@@ -24861,18 +25081,18 @@ function Window:SetVisible(visible)
 			Tween.Play(
 				minScale,
 				{ Scale = 1 },
-				Tween.Normal,
+				morphDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
 			local restoreTw = Tween.Play(
 				wrapper,
 				{ Position = restorePos },
-				Tween.Normal,
+				morphDur,
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
-			Transition.Mount(wrapper, 1, { NoPositionTween = true })
+			Transition.Mount(wrapper, 1, { NoPositionTween = true, Duration = morphDur })
 
 			Tween.Then(restoreTw, function()
 				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then

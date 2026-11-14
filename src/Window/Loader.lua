@@ -90,6 +90,16 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 	})
 	Create.GlassStroke(card, 0.05)
 
+	local bgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 14,
+		ZIndex = 1,
+		Parent = card,
+	})
+
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
 		Create.New("ImageLabel", {
@@ -103,7 +113,7 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = card,
+			Parent = bgClip,
 		})
 		Create.New("ImageLabel", {
 			Name = "GlowBottom",
@@ -117,7 +127,7 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = card,
+			Parent = bgClip,
 		})
 	end
 
@@ -130,9 +140,10 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 			TileSize = UDim2.fromOffset(128, 128),
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
+			Corner = 14,
 			Theme = { ImageTransparency = "NoiseTransparency" },
 			ZIndex = 1,
-			Parent = card,
+			Parent = bgClip,
 		})
 	end
 
@@ -193,22 +204,21 @@ function Loader.LoadingScreen(parentGui, options)
 		Size = UDim2.fromOffset(40, 40),
 		Corner = 11,
 		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.88,
 		LayoutOrder = 1,
 		Parent = header,
 	})
-	local badgeGrad = Instance.new("UIGradient")
-	badgeGrad.Color = Theme.AccentSequence()
-	badgeGrad.Rotation = 35
-	badgeGrad.Parent = badge
-	maid:Give(Theme.Changed:Connect(function(theme)
-		badgeGrad.Color = Theme.AccentSequence(theme)
-	end))
+	Create.Stroke(badge, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.65,
+		Thickness = 1,
+	})
 
 	local badgeIcon = Icons.Create(options.Icon or "bali-logo", {
-		Size = UDim2.fromOffset(20, 20),
+		Size = UDim2.fromOffset(22, 22),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "AccentText",
+		Color = "Accent",
 		Parent = badge,
 	})
 	local stopPulse = nil
@@ -685,6 +695,16 @@ function Loader.KeySystem(parentGui, options)
 	})
 	Create.GlassStroke(mainCard, 0.05)
 
+	local keyBgClip = Create.New("CanvasGroup", {
+		Name = "BackgroundClip",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Corner = 16,
+		ZIndex = 1,
+		Parent = mainCard,
+	})
+
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
 		Create.New("ImageLabel", {
@@ -698,7 +718,7 @@ function Loader.KeySystem(parentGui, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = mainCard,
+			Parent = keyBgClip,
 		})
 		Create.New("ImageLabel", {
 			Name = "GlowBottom",
@@ -712,7 +732,7 @@ function Loader.KeySystem(parentGui, options)
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = mainCard,
+			Parent = keyBgClip,
 		})
 	end
 
@@ -877,21 +897,20 @@ function Loader.KeySystem(parentGui, options)
 		Size = UDim2.fromOffset(40, 40),
 		Corner = 11,
 		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.88,
 		LayoutOrder = 1,
 		Parent = header,
 	})
-	local badgeGrad = Instance.new("UIGradient")
-	badgeGrad.Color = Theme.AccentSequence()
-	badgeGrad.Rotation = 35
-	badgeGrad.Parent = iconBadge
-	maid:Give(Theme.Changed:Connect(function(theme)
-		badgeGrad.Color = Theme.AccentSequence(theme)
-	end))
+	Create.Stroke(iconBadge, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.65,
+		Thickness = 1,
+	})
 	Icons.Create(options.Icon or "key", {
-		Size = UDim2.fromOffset(18, 18),
+		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "AccentText",
+		Color = "Accent",
 		Parent = iconBadge,
 	})
 

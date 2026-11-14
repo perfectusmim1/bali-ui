@@ -184,9 +184,18 @@ function StatCard.new(parent, opts, ctx)
 	self.Value = currentRaw
 	self.Stroke = cardStroke
 
-	-- Subtle top-left radial Glow tint
+	-- Subtle top-left radial Glow tint (clipped cleanly to card corner)
 	local glowImg = Assets.Get("Glow")
 	if opts.Glow ~= false and glowImg then
+		local glowClip = Create.New("CanvasGroup", {
+			Name = "GlowClip",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			ClipsDescendants = true,
+			Corner = opts.Corner or 10,
+			ZIndex = 1,
+			Parent = cardFrame,
+		})
 		local glow = Create.New("ImageLabel", {
 			Name = "Glow",
 			Size = UDim2.fromOffset(180, 120),
@@ -195,7 +204,7 @@ function StatCard.new(parent, opts, ctx)
 			ScaleType = Enum.ScaleType.Stretch,
 			ZIndex = 1,
 			Theme = { ImageTransparency = "GlowTransparency" },
-			Parent = cardFrame,
+			Parent = glowClip,
 		})
 		bindColorProp(glow, "ImageColor3", colorSpec)
 	end
@@ -2006,12 +2015,16 @@ function CardGrid.new(parent, opts, ctx)
 			Theme.Unbind(entry.Button, "BackgroundColor3")
 			Theme.Unbind(entry.Button, "BackgroundTransparency")
 			entry.Button.BackgroundTransparency = 0.04
+			entry.Button:SetAttribute("_BaliRestBg", 0.04)
+			entry.Button:SetAttribute("_BaliCascadeBg", 0.04)
 			entry.Gradient.Enabled = true
 			entry.Gradient.Color = Theme.AccentSequence()
 			Theme.Bind(entry.Stroke, {
 				Color = "Accent",
 				Transparency = function() return 0.25 end,
 			})
+			entry.Stroke:SetAttribute("_BaliRestStr", 0.25)
+			entry.Stroke:SetAttribute("_BaliCascadeStroke", 0.25)
 			Theme.Bind(entry.TitleLabel, { TextColor3 = "AccentText" })
 			if entry.IconObj then
 				Icons.SetColor(entry.IconObj, "AccentText")
@@ -2027,10 +2040,14 @@ function CardGrid.new(parent, opts, ctx)
 				BackgroundColor3 = entry.Hovered and "TileHover" or "Tile",
 				BackgroundTransparency = "TileTransparency",
 			})
+			entry.Button:SetAttribute("_BaliRestBg", Theme.Current.TileTransparency)
+			entry.Button:SetAttribute("_BaliCascadeBg", Theme.Current.TileTransparency)
 			Theme.Bind(entry.Stroke, {
 				Color = "Stroke",
 				Transparency = "StrokeTransparency",
 			})
+			entry.Stroke:SetAttribute("_BaliRestStr", Theme.Current.StrokeTransparency)
+			entry.Stroke:SetAttribute("_BaliCascadeStroke", Theme.Current.StrokeTransparency)
 			Theme.Bind(entry.TitleLabel, { TextColor3 = "Text" })
 			if entry.IconObj then
 				Icons.SetColor(entry.IconObj, "Accent")
