@@ -345,7 +345,7 @@ function Notification.Notify(opts)
 	})
 
 	local iconObj = Icons.Create(opts.Icon or typeMeta.Icon, {
-		Size = UDim2.fromOffset(13, 13),
+		Size = UDim2.fromOffset(15, 15),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = typeMeta.ColorKey,
@@ -380,7 +380,7 @@ function Notification.Notify(opts)
 		ZIndex = 406,
 	})
 	local closeIcon = Icons.Create("x", {
-		Size = UDim2.fromOffset(13, 13),
+		Size = UDim2.fromOffset(14, 14),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = "Muted",

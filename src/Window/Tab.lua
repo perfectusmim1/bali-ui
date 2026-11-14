@@ -734,7 +734,7 @@ function Tab:AddSubTab(options)
 	})
 
 	local subIcon = Icons.Create(options.Icon, {
-		Size = UDim2.fromOffset(13, 13),
+		Size = UDim2.fromOffset(14, 14),
 		Color = "SubText",
 		LayoutOrder = 1,
 		Parent = subBtn,

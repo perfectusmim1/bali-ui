@@ -61,10 +61,10 @@ function Toggle.new(parent, opts, ctx)
 				return state and t.Accent or t.Stroke
 			end,
 			Transparency = function(t)
-				return state and 0.45 or t.StrokeTransparency
+				return state and 1 or math.min(0.42, t.StrokeTransparency)
 			end,
 		},
-		Thickness = 1,
+		Thickness = 1.2,
 	})
 
 	local knob = Create.New("Frame", {
@@ -88,7 +88,7 @@ function Toggle.new(parent, opts, ctx)
 		local targetPos = UDim2.new(0, state and 22 or 2, 0.5, 0)
 		local targetTrackBg = state and Theme.Current.Accent or Theme.Current.ToggleOff
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
-		local targetStrokeTrans = state and 0.45 or Theme.Current.StrokeTransparency
+		local targetStrokeTrans = state and 1 or math.min(0.42, Theme.Current.StrokeTransparency)
 
 		if animate then
 			Tween.Spring(knob, { Position = targetPos }, Tween.Fast + 0.08)
@@ -371,14 +371,14 @@ function Checkbox.new(parent, opts, ctx)
 				return state and t.Accent or t.Stroke
 			end,
 			Transparency = function(t)
-				return state and 0.15 or t.StrokeTransparency
+				return state and 1 or 0.38
 			end,
 		},
-		Thickness = 1,
+		Thickness = 1.25,
 	})
 
 	local checkIcon = Icons.Create("check", {
-		Size = UDim2.fromOffset(13, 13),
+		Size = UDim2.fromOffset(14, 14),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Color = "AccentText",
@@ -390,9 +390,9 @@ function Checkbox.new(parent, opts, ctx)
 	local function applyVisual(animate)
 		local targetAlpha = state and 0 or 1
 		local targetBg = state and Theme.Current.Accent or Theme.Current.Field
-		local targetSize = state and UDim2.fromOffset(13, 13) or UDim2.fromOffset(6, 6)
+		local targetSize = state and UDim2.fromOffset(14, 14) or UDim2.fromOffset(6, 6)
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
-		local targetStrokeTrans = state and 0.15 or Theme.Current.StrokeTransparency
+		local targetStrokeTrans = state and 1 or 0.38
 		local iconTarget = checkIcon and Icons.TransparencyTarget(checkIcon) or nil
 		local iconTransProp = iconTarget and Icons.TransparencyProperty(iconTarget) or "ImageTransparency"
 

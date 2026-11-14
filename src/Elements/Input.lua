@@ -321,7 +321,7 @@ function Input.new(parent, opts, ctx)
 			Parent = trailingWrap,
 		})
 		Icons.Create("x", {
-			Size = UDim2.fromOffset(13, 13),
+			Size = UDim2.fromOffset(14, 14),
 			Position = UDim2.fromScale(0.5, 0.5),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Color = "SubText",

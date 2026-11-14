@@ -88,7 +88,7 @@ function Label.new(parent, opts, ctx)
 			Parent = row.Right,
 		})
 		copyIcon = Icons.Create("copy", {
-			Size = UDim2.fromOffset(13, 13),
+			Size = UDim2.fromOffset(14, 14),
 			Position = UDim2.fromScale(0.5, 0.5),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Color = "SubText",
@@ -808,7 +808,7 @@ function CodeBlock.new(parent, opts, ctx)
 	})
 
 	local copyIcon = Icons.Create("copy", {
-		Size = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(14, 14),
 		Color = "SubText",
 		LayoutOrder = 1,
 		Parent = copyBtn,
@@ -1500,7 +1500,7 @@ function ProfileCard.new(parent, opts, ctx)
 
 		if btnOpts.Icon then
 			Icons.Create(btnOpts.Icon, {
-				Size = UDim2.fromOffset(13, 13),
+				Size = UDim2.fromOffset(14, 14),
 				Color = "Text",
 				LayoutOrder = 1,
 				Parent = pillBtn,

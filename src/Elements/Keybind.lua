@@ -378,7 +378,7 @@ function Keybind.new(parent, opts, ctx)
 			Parent = btn,
 		})
 		local chk = Icons.Create("check", {
-			Size = UDim2.fromOffset(12, 12),
+			Size = UDim2.fromOffset(14, 14),
 			Position = UDim2.new(1, 0, 0.5, 0),
 			AnchorPoint = Vector2.new(1, 0.5),
 			Color = "Accent",

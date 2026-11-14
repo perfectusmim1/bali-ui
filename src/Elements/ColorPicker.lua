@@ -286,7 +286,7 @@ function ColorPicker.new(parent, opts, ctx)
 		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
 	})
 	local rainbowIcon = Icons.Create("sparkles", {
-		Size = UDim2.fromOffset(11, 11),
+		Size = UDim2.fromOffset(13, 13),
 		Position = UDim2.new(0, 0, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		Color = "SubText",

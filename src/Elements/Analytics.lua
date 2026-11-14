@@ -263,7 +263,7 @@ function StatCard.new(parent, opts, ctx)
 		Theme = { Color = "Success", Transparency = function() return 0.65 end },
 	})
 	local deltaIcon = Icons.Create("trending-up", {
-		Size = UDim2.fromOffset(11, 11),
+		Size = UDim2.fromOffset(13, 13),
 		Color = "Success",
 		LayoutOrder = 1,
 		ZIndex = 4,
@@ -1417,7 +1417,7 @@ function Table.new(parent, opts, ctx)
 				Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
 			})
 			Icons.Create("search", {
-				Size = UDim2.fromOffset(12, 12),
+				Size = UDim2.fromOffset(14, 14),
 				Position = UDim2.new(0, 0, 0.5, 0),
 				AnchorPoint = Vector2.new(0, 0.5),
 				Color = "Muted",
@@ -1624,7 +1624,7 @@ function Table.new(parent, opts, ctx)
 			})
 			Theme.Bind(obj.CheckStroke, {
 				Color = active and "Accent" or "Stroke",
-				Transparency = active and function() return 0.2 end or "StrokeTransparency",
+				Transparency = active and function() return 1 end or function() return 0.38 end,
 			})
 			if obj.CheckIcon then
 				obj.CheckIcon.Visible = active
@@ -1667,9 +1667,10 @@ function Table.new(parent, opts, ctx)
 				})
 				checkStroke = Create.Stroke(checkBox, {
 					Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+					Thickness = 1.25,
 				})
 				checkIcon = Icons.Create("check", {
-					Size = UDim2.fromOffset(11, 11),
+					Size = UDim2.fromOffset(13, 13),
 					Position = UDim2.fromScale(0.5, 0.5),
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					Color = "AccentText",
@@ -1811,7 +1812,7 @@ function Table.new(parent, opts, ctx)
 				})
 				if actionDef.Icon then
 					Icons.Create(actionDef.Icon, {
-						Size = UDim2.fromOffset(11, 11),
+						Size = UDim2.fromOffset(13, 13),
 						Color = "Accent",
 						LayoutOrder = 1,
 						Parent = actInner,

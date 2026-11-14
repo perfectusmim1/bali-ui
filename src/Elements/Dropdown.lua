@@ -324,7 +324,7 @@ function Dropdown.new(parent, opts, ctx)
 		})
 
 		Icons.Create("search", {
-			Size = UDim2.fromOffset(13, 13),
+			Size = UDim2.fromOffset(14, 14),
 			Position = UDim2.new(0, 0, 0.5, 0),
 			AnchorPoint = Vector2.new(0, 0.5),
 			Color = "Muted",
@@ -359,7 +359,7 @@ function Dropdown.new(parent, opts, ctx)
 			Parent = searchWrap,
 		})
 		Icons.Create("x", {
-			Size = UDim2.fromOffset(12, 12),
+			Size = UDim2.fromOffset(13, 13),
 			Position = UDim2.fromScale(0.5, 0.5),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Color = "Muted",
@@ -671,7 +671,7 @@ function Dropdown.new(parent, opts, ctx)
 
 			if item.Icon then
 				Icons.Create(item.Icon, {
-					Size = UDim2.fromOffset(14, 14),
+					Size = UDim2.fromOffset(15, 15),
 					Position = UDim2.new(0, 0, 0.5, 0),
 					AnchorPoint = Vector2.new(0, 0.5),
 					Color = "SubText",
@@ -735,7 +735,7 @@ function Dropdown.new(parent, opts, ctx)
 			end
 
 			local checkIcon = Icons.Create("check", {
-				Size = UDim2.fromOffset(13, 13),
+				Size = UDim2.fromOffset(14, 14),
 				Position = UDim2.new(1, 0, 0.5, 0),
 				AnchorPoint = Vector2.new(1, 0.5),
 				Color = "Accent",

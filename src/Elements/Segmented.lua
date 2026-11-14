@@ -299,7 +299,7 @@ function Segmented.new(parent, opts, ctx)
 			local iconObj = nil
 			if item.Icon and item.Icon ~= "" and item.Icon ~= false then
 				iconObj = Icons.Create(item.Icon, {
-					Size = UDim2.fromOffset(13, 13),
+					Size = UDim2.fromOffset(14, 14),
 					Color = "SubText",
 					LayoutOrder = 1,
 					ZIndex = 5,

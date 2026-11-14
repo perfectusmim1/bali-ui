@@ -136,7 +136,7 @@ local function createLockOverlay(frame, cornerRadius)
 	})
 
 	Icons.Create("lock", {
-		Size = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(13, 13),
 		Color = "SubText",
 		LayoutOrder = 1,
 		ZIndex = 32,
