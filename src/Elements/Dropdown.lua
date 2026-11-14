@@ -298,14 +298,12 @@ function Dropdown.new(parent, opts, ctx)
 		Visible = false,
 		ZIndex = 110,
 		Corner = 10,
+		BackgroundTransparency = 0,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = function(t)
-				return math.min(t.CardTransparency or 0.12, 0.04)
-			end,
 		},
 	})
-	Create.GlassStroke(popup, 0.06)
+	Create.GlassStroke(popup, 0.12)
 
 	Create.New("TextButton", {
 		Name = "InputSink",
@@ -733,7 +731,7 @@ function Dropdown.new(parent, opts, ctx)
 
 		local layerH = (ctx.PopupLayer and ctx.PopupLayer.AbsoluteSize.Y > 0) and ctx.PopupLayer.AbsoluteSize.Y or 680
 		local anchorW = (trigger.AbsoluteSize.X > 0) and trigger.AbsoluteSize.X or 168
-		local width = Util.Clamp(math.max(anchorW + 76, 248), 248, 320)
+		local width = (anchorW >= 180) and anchorW or Util.Clamp(math.max(anchorW + 40, 200), 200, 252)
 		local totalH = math.min(16 + searchH + listH, math.max(120, layerH - 16))
 		listH = math.max(36, totalH - 16 - searchH)
 

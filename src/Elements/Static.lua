@@ -25,9 +25,7 @@ function Label.new(parent, opts, ctx)
 	if rowOpts.IconBadge == nil then
 		rowOpts.IconBadge = false
 	end
-	if rowOpts.StackRight == nil then
-		rowOpts.StackRight = false
-	end
+	rowOpts._compactStack = true
 
 	local row = Base.Row(parent, rowOpts, 0)
 	element:BindUI(row)
@@ -38,6 +36,17 @@ function Label.new(parent, opts, ctx)
 		HAlign = Enum.HorizontalAlignment.Right,
 		Gap = 6,
 	})
+
+	local statusDot = Create.New("Frame", {
+		Name = "StatusDot",
+		Size = UDim2.fromOffset(8, 8),
+		Corner = UDim.new(1, 0),
+		Theme = { BackgroundColor3 = opts.DotColor or opts.BadgeColor or "Success" },
+		Visible = (opts.StatusDot == true or opts.DotColor ~= nil),
+		LayoutOrder = 0,
+		Parent = row.Right,
+	})
+	element.Maid:Give(Transition.Pulse(statusDot, "BackgroundTransparency", 0, 0.35, 1.8))
 
 	local valueText = opts.Value ~= nil and tostring(opts.Value) or (opts.Text ~= nil and tostring(opts.Text) or "")
 	element.Value = valueText
@@ -163,6 +172,30 @@ function Label.new(parent, opts, ctx)
 		end
 	end
 
+	function element:SetDot(colorKey, visible)
+		if visible == false then
+			statusDot.Visible = false
+			return
+		end
+		statusDot.Visible = true
+		if typeof(colorKey) == "Color3" then
+			Theme.Unbind(statusDot, "BackgroundColor3")
+			statusDot.BackgroundColor3 = colorKey
+		elseif type(colorKey) == "string" and colorKey ~= "" then
+			Theme.Bind(statusDot, { BackgroundColor3 = colorKey })
+		end
+	end
+
+	function element:SetStatus(valueTextArg, badgeText, colorKey)
+		if valueTextArg ~= nil then
+			self:SetValue(valueTextArg)
+		end
+		if badgeText ~= nil then
+			self:SetBadge(badgeText, colorKey)
+		end
+		self:SetDot(colorKey or opts.DotColor or opts.BadgeColor or "Success", true)
+	end
+
 	return element
 end
 
@@ -173,33 +206,51 @@ function Paragraph.new(parent, opts, ctx)
 	opts = Util.Options(opts, {}, "Title")
 	local element = Base.New("Paragraph", parent, opts, ctx)
 
-	local card = Base.Card(parent, { Padding = 0 })
+	local card = Base.Card(parent, { Padding = 0, ClipsDescendants = true })
 	local accentColor = opts.Color or "Accent"
 	local showBar = (opts.AccentBar ~= false)
 
+	local glow = nil
+	local bar = nil
+	local barGrad = nil
+	local iconBadge = nil
+
 	if showBar then
-		local bar = Create.New("Frame", {
+		local glowAsset = Assets and Assets.Get and Assets.Get("Glow")
+		if glowAsset and Assets.Available then
+			glow = Create.New("ImageLabel", {
+				Name = "Glow",
+				Image = glowAsset,
+				Size = UDim2.fromOffset(170, 72),
+				Position = UDim2.fromOffset(8, 2),
+				BackgroundTransparency = 1,
+				ImageTransparency = 0.88,
+				ZIndex = 0,
+				Parent = card.Frame,
+			})
+		end
+
+		bar = Create.New("Frame", {
 			Name = "AccentBar",
-			Size = UDim2.new(0, 3, 1, -18),
-			Position = UDim2.fromOffset(10, 9),
+			Size = UDim2.new(1, -20, 0, 2),
+			Position = UDim2.new(0, 10, 0, 0),
 			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.12,
 			Corner = UDim.new(1, 0),
 			ZIndex = 3,
 			Parent = card.Frame,
 		})
-		if typeof(accentColor) == "Color3" then
-			bar.BackgroundColor3 = accentColor
-		elseif accentColor ~= "Accent" then
-			Theme.Bind(bar, { BackgroundColor3 = accentColor })
-		else
-			local grad = Instance.new("UIGradient")
-			grad.Rotation = 90
-			grad.Color = Theme.AccentSequence()
-			grad.Parent = bar
-			element.Maid:Give(Theme.Changed:Connect(function(t)
-				grad.Color = Theme.AccentSequence(t)
-			end))
-		end
+		barGrad = Instance.new("UIGradient")
+		barGrad.Rotation = 0
+		barGrad.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.08, 0.35),
+			NumberSequenceKeypoint.new(0.22, 0),
+			NumberSequenceKeypoint.new(0.52, 0.25),
+			NumberSequenceKeypoint.new(0.85, 0.82),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		barGrad.Parent = bar
 	end
 
 	local body = Create.New("Frame", {
@@ -207,7 +258,7 @@ function Paragraph.new(parent, opts, ctx)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		Padding = { 12, 12, 12, showBar and 22 or 12 },
+		Padding = { 13, 14, 12, 14 },
 		ZIndex = 2,
 		Parent = card.Frame,
 	})
@@ -238,10 +289,40 @@ function Paragraph.new(parent, opts, ctx)
 
 	local iconWidth = 0
 	if opts.Icon and opts.Icon ~= "" and opts.Icon ~= false then
-		local badge = Base.IconBadge(header, opts.Icon, accentColor)
-		badge.Frame.LayoutOrder = 1
+		iconBadge = Base.IconBadge(header, opts.Icon, accentColor)
+		iconBadge.Frame.LayoutOrder = 1
 		iconWidth = 30
 	end
+
+	local function applyAccentColor(colorSpec, themeTable)
+		accentColor = colorSpec or "Accent"
+		local activeTheme = themeTable or Theme.Current
+		if glow then
+			if typeof(accentColor) == "Color3" then
+				Theme.Unbind(glow, "ImageColor3")
+				glow.ImageColor3 = accentColor
+			else
+				Theme.Bind(glow, { ImageColor3 = accentColor })
+			end
+		end
+		if barGrad then
+			if typeof(accentColor) == "Color3" then
+				barGrad.Color = ColorSequence.new(accentColor)
+			elseif accentColor == "Accent" then
+				barGrad.Color = Theme.AccentSequence(activeTheme)
+			else
+				barGrad.Color = ColorSequence.new(activeTheme[accentColor] or activeTheme.Accent)
+			end
+		end
+		if iconBadge and colorSpec ~= nil then
+			iconBadge:SetColor(accentColor)
+		end
+	end
+
+	applyAccentColor(accentColor)
+	element.Maid:Give(Theme.Changed:Connect(function(t)
+		applyAccentColor(accentColor, t)
+	end))
 
 	local titleLabel = Create.Text({
 		Name = "Title",
@@ -399,6 +480,16 @@ function Paragraph.new(parent, opts, ctx)
 		buildTags(tags)
 	end
 
+	function element:SetColor(newColor)
+		applyAccentColor(newColor)
+	end
+
+	function element:SetIcon(newIcon)
+		if iconBadge then
+			iconBadge:SetIcon(newIcon)
+		end
+	end
+
 	return element
 end
 
@@ -428,6 +519,7 @@ function Divider.new(parent, opts, ctx)
 	local leftLine = Create.New("Frame", {
 		Name = "LeftLine",
 		Size = labelText ~= "" and UDim2.new(0, 14, 0, 1) or UDim2.new(1, 0, 0, 1),
+		Corner = UDim.new(1, 0),
 		Theme = {
 			BackgroundColor3 = "Divider",
 			BackgroundTransparency = "DividerTransparency",
@@ -452,6 +544,7 @@ function Divider.new(parent, opts, ctx)
 	local rightLine = Create.New("Frame", {
 		Name = "RightLine",
 		Size = UDim2.new(1, -30, 0, 1),
+		Corner = UDim.new(1, 0),
 		Theme = {
 			BackgroundColor3 = "Divider",
 			BackgroundTransparency = "DividerTransparency",
@@ -901,7 +994,7 @@ function CodeBlock.new(parent, opts, ctx)
 		Parent = body,
 	})
 
-	local wrap = (opts.Wrap ~= false)
+	local wrap = (opts.Wrap == true)
 	local scroll = Create.New("ScrollingFrame", {
 		Name = "CodeScroll",
 		Size = UDim2.new(1, 0, 0, 0),
@@ -921,7 +1014,7 @@ function CodeBlock.new(parent, opts, ctx)
 	})
 
 	local padTop = 8
-	local padBottom = wrap and 10 or 14
+	local padBottom = wrap and 14 or 18
 	local padLeft = 10
 	local padRight = 14
 
@@ -969,11 +1062,13 @@ function CodeBlock.new(parent, opts, ctx)
 			if nl then
 				local seg = string.sub(src, startIdx, nl - 1)
 				seg = string.gsub(seg, "\r$", "")
+				seg = string.gsub(seg, "\t", "    ")
 				table.insert(out, seg)
 				startIdx = nl + 1
 			else
 				local seg = string.sub(src, startIdx)
 				seg = string.gsub(seg, "\r$", "")
+				seg = string.gsub(seg, "\t", "    ")
 				table.insert(out, seg)
 				break
 			end

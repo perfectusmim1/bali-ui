@@ -123,8 +123,11 @@ function main() {
 		throw new Error(`No .lua files found inside ${SRC_DIR}`);
 	}
 
-	const libraryModules = allFiles.filter((filePath) => toModuleName(filePath) !== "Example");
-	const exampleModules = allFiles;
+	const libraryModules = allFiles.filter((filePath) => {
+		const mod = toModuleName(filePath);
+		return mod !== "Example" && mod.toLowerCase() !== "key";
+	});
+	const exampleModules = allFiles.filter((filePath) => toModuleName(filePath).toLowerCase() !== "key");
 
 	fs.mkdirSync(DIST_DIR, { recursive: true });
 

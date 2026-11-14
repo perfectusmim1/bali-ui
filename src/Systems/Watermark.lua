@@ -61,11 +61,11 @@ local function readPlayerCount()
 end
 
 local function formatStats()
-	if customText ~= nil then
-		return tostring(customText)
+	local parts = {}
+	if customText ~= nil and customText ~= "" then
+		table.insert(parts, tostring(customText))
 	end
 
-	local parts = {}
 	local cfg = statsConfig
 
 	if cfg.FPS == true then

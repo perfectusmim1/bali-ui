@@ -133,11 +133,17 @@ function Keybind.new(parent, opts, ctx)
 		Text = "",
 		Corner = 7,
 		Padding = { 0, 8, 0, 8 },
+		BackgroundTransparency = 0.45,
 		Theme = { BackgroundColor3 = "Field" },
 		Parent = controls,
 	})
 	local modeStroke = Create.Stroke(modePill, {
-		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+		Theme = {
+			Color = "Stroke",
+			Transparency = function(t)
+				return math.min((t.StrokeTransparency or 0.85) + 0.08, 0.94)
+			end,
+		},
 	})
 	local modeLabel = Create.Text({
 		Name = "ModeText",

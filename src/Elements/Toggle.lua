@@ -10,6 +10,7 @@ local Create = require("Core/Create")
 local Icons = require("Core/Icons")
 local Transition = require("Core/Transition")
 local Input = require("Systems/Input")
+local KeybindList = require("Systems/KeybindList")
 local Base = require("Elements/Base")
 
 local ToggleModule = {}
@@ -47,7 +48,7 @@ function Toggle.new(parent, opts, ctx)
 		Size = UDim2.fromOffset(42, 22),
 		Theme = {
 			BackgroundColor3 = function(t)
-				return state and t.Accent or t.ToggleOff
+				return state and t.Accent or t.Field
 			end,
 		},
 		Corner = UDim.new(1, 0),
@@ -61,7 +62,7 @@ function Toggle.new(parent, opts, ctx)
 				return state and t.Accent or t.Stroke
 			end,
 			Transparency = function(t)
-				return state and 1 or math.min(0.42, t.StrokeTransparency)
+				return state and 1 or math.min(0.48, t.StrokeTransparency)
 			end,
 		},
 		Thickness = 1.2,
@@ -69,10 +70,10 @@ function Toggle.new(parent, opts, ctx)
 
 	local knob = Create.New("Frame", {
 		Name = "Knob",
-		Size = UDim2.fromOffset(18, 18),
+		Size = state and UDim2.fromOffset(18, 18) or UDim2.fromOffset(16, 16),
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, state and 22 or 2, 0.5, 0),
-		Theme = { BackgroundColor3 = "Knob" },
+		Position = UDim2.new(0, state and 22 or 3, 0.5, 0),
+		BackgroundColor3 = state and Theme.Current.Knob or (Theme.Current.Dark and Color3.fromRGB(186, 192, 206) or Theme.Current.Knob),
 		Corner = UDim.new(1, 0),
 		ZIndex = 3,
 		Parent = track,
@@ -82,20 +83,26 @@ function Toggle.new(parent, opts, ctx)
 	local currentKey = nil
 	local listening = false
 	local stopPulse = nil
+	local syncKeybindList = nil
 	local keyChip, keyStroke, keyLabel
 
 	local function applyVisual(animate)
-		local targetPos = UDim2.new(0, state and 22 or 2, 0.5, 0)
-		local targetTrackBg = state and Theme.Current.Accent or Theme.Current.ToggleOff
+		local targetPos = UDim2.new(0, state and 22 or 3, 0.5, 0)
+		local targetSize = state and UDim2.fromOffset(18, 18) or UDim2.fromOffset(16, 16)
+		local targetKnobColor = state and Theme.Current.Knob or (Theme.Current.Dark and Color3.fromRGB(186, 192, 206) or Theme.Current.Knob)
+		local targetTrackBg = state and Theme.Current.Accent or Theme.Current.Field
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
-		local targetStrokeTrans = state and 1 or math.min(0.42, Theme.Current.StrokeTransparency)
+		local targetStrokeTrans = state and 1 or math.min(0.48, Theme.Current.StrokeTransparency)
 
 		if animate then
 			Tween.Spring(knob, { Position = targetPos }, Tween.Fast + 0.08)
-			Tween.Play(knob, { Size = UDim2.fromOffset(22, 18) }, 0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			Tween.Play(knob, {
+				Size = UDim2.fromOffset(22, state and 18 or 16),
+				BackgroundColor3 = targetKnobColor,
+			}, 0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			task.delay(0.07, function()
 				if knob.Parent and not element._destroyed then
-					Tween.Spring(knob, { Size = UDim2.fromOffset(18, 18) }, 0.13)
+					Tween.Spring(knob, { Size = state and UDim2.fromOffset(18, 18) or UDim2.fromOffset(16, 16) }, 0.13)
 				end
 			end)
 			Tween.Play(track, { BackgroundColor3 = targetTrackBg }, Tween.Fast, Enum.EasingStyle.Quad)
@@ -105,6 +112,8 @@ function Toggle.new(parent, opts, ctx)
 			}, Tween.Fast, Enum.EasingStyle.Quad)
 		else
 			knob.Position = targetPos
+			knob.Size = targetSize
+			knob.BackgroundColor3 = targetKnobColor
 			track.BackgroundColor3 = targetTrackBg
 			trackStroke.Color = targetStrokeColor
 			trackStroke.Transparency = targetStrokeTrans
@@ -128,7 +137,8 @@ function Toggle.new(parent, opts, ctx)
 			Name = "KeyChip",
 			Size = UDim2.fromOffset(0, 22),
 			AutomaticSize = Enum.AutomaticSize.X,
-			Theme = { BackgroundColor3 = "Field" },
+			BackgroundTransparency = 0.12,
+			Theme = { BackgroundColor3 = "TileHover" },
 			Corner = 6,
 			Padding = { 0, 7, 0, 7 },
 			Text = "",
@@ -139,7 +149,8 @@ function Toggle.new(parent, opts, ctx)
 		})
 
 		keyStroke = Create.Stroke(keyChip, {
-			Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+			Theme = { Color = "Stroke" },
+			Transparency = 0.48,
 			Thickness = 1,
 		})
 
@@ -156,13 +167,14 @@ function Toggle.new(parent, opts, ctx)
 			Parent = keyChip,
 		})
 
-		element.Maid:Give(Transition.Hover(keyChip, keyChip, "Field", "FieldHover", keyStroke))
+		element.Maid:Give(Transition.Hover(keyChip, keyChip, "TileHover", "FieldHover", keyStroke))
 
 		local function syncChip()
 			if not listening then
 				keyLabel.Text = Util.KeyName(currentKey)
 				Theme.Bind(keyLabel, { TextColor3 = currentKey and "Text" or "Muted" })
-				Theme.Bind(keyStroke, { Color = "Stroke", Transparency = "StrokeTransparency" })
+				Theme.Bind(keyStroke, { Color = "Stroke" })
+				keyStroke.Transparency = 0.48
 			end
 			local chipW = math.max(28, math.ceil(keyChip.AbsoluteSize.X))
 			row:SetRightWidth(42 + 6 + chipW)
@@ -183,6 +195,19 @@ function Toggle.new(parent, opts, ctx)
 			syncChip()
 		end
 
+		local syncList = opts.SyncList ~= false
+		syncKeybindList = function()
+			if not syncList or not KeybindList or not KeybindList.Update then
+				return
+			end
+			KeybindList.Update(bindId, {
+				Title = tostring(element.Title or opts.Title or "Toggle"),
+				KeyName = Util.KeyName(currentKey),
+				Mode = "Toggle",
+				Active = state,
+			})
+		end
+
 		inputHandle = Input.RegisterKeybind(bindId, currentKey, function(active)
 			if element._destroyed or element.Disabled or element.Locked then
 				if inputHandle then
@@ -194,6 +219,15 @@ function Toggle.new(parent, opts, ctx)
 		end, "Toggle")
 		inputHandle.SetActive(state, true)
 
+		if syncList and KeybindList and KeybindList.Register then
+			KeybindList.Register(bindId, {
+				Title = tostring(opts.Title or "Toggle"),
+				KeyName = Util.KeyName(currentKey),
+				Mode = "Toggle",
+				Active = state,
+			})
+		end
+
 		element.Maid:Give(function()
 			if listening then
 				Input.CancelCapture()
@@ -202,6 +236,9 @@ function Toggle.new(parent, opts, ctx)
 			if inputHandle then
 				inputHandle.Destroy()
 				inputHandle = nil
+			end
+			if syncList and KeybindList and KeybindList.Unregister then
+				KeybindList.Unregister(bindId)
 			end
 		end)
 
@@ -237,6 +274,7 @@ function Toggle.new(parent, opts, ctx)
 				if inputHandle then
 					inputHandle.SetKey(currentKey)
 				end
+				syncKeybindList()
 				syncChip()
 				element.Changed:Fire(state, currentKey)
 			end)
@@ -283,6 +321,9 @@ function Toggle.new(parent, opts, ctx)
 		if inputHandle then
 			inputHandle.SetActive(state, true)
 		end
+		if syncKeybindList then
+			syncKeybindList()
+		end
 		if changed and not silent then
 			self.Changed:Fire(state)
 			if type(opts.Callback) == "function" then
@@ -310,6 +351,9 @@ function Toggle.new(parent, opts, ctx)
 		currentKey = Util.ResolveKey(key)
 		if inputHandle then
 			inputHandle.SetKey(currentKey)
+		end
+		if syncKeybindList then
+			syncKeybindList()
 		end
 		if keyLabel then
 			keyLabel.Text = Util.KeyName(currentKey)

@@ -275,10 +275,17 @@ local function collectMatches(query)
 
 				if best then
 					local elemType = tostring(entry.Type or "Control")
-					local badge = elemType
-					if elemType == "Button" then
-						badge = "Run"
-					elseif (elemType == "Toggle" or elemType == "Checkbox") and entry.Element and type(entry.Element.Get) == "function" then
+					local badgeMap = {
+						Button = "Run",
+						ColorPicker = "Color Picker",
+						RangeSlider = "Range Slider",
+						ProgressBar = "Progress",
+						ButtonRow = "Buttons",
+						CardGrid = "Cards",
+						StatCard = "Stat",
+					}
+					local badge = badgeMap[elemType] or elemType
+					if (elemType == "Toggle" or elemType == "Checkbox") and entry.Element and type(entry.Element.Get) == "function" then
 						local ok, val = pcall(entry.Element.Get, entry.Element)
 						if ok then
 							badge = val and "ON" or "OFF"
@@ -410,9 +417,9 @@ local function rebuildResults(query)
 			Parent = row,
 			Visible = false,
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.fromScale(0, 0.5),
-			Size = UDim2.fromOffset(3, 22),
-			Corner = 2,
+			Position = UDim2.new(0, 4, 0.5, 0),
+			Size = UDim2.fromOffset(2, 18),
+			Corner = UDim.new(1, 0),
 			Theme = { BackgroundColor3 = "Accent" },
 			ZIndex = 314,
 		})
@@ -594,15 +601,13 @@ local function ensureBuilt()
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Corner = 14,
 		ClipsDescendants = true,
+		BackgroundTransparency = 0,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = function(t)
-				return math.min(t.CardTransparency, 0.04)
-			end,
 		},
 		ZIndex = 305,
 	})
-	Create.GlassStroke(modal, 0.06)
+	Create.GlassStroke(modal, 0.12)
 
 	local inputSink = Create.New("TextButton", {
 		Name = "InputSink",
@@ -695,7 +700,7 @@ local function ensureBuilt()
 		Corner = 6,
 		BackgroundTransparency = 0.2,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Text = "ESC",
+		Text = "Esc",
 		Font = "SemiBold",
 		TextSize = 10,
 		Color = "SubText",
@@ -731,7 +736,9 @@ local function ensureBuilt()
 		Parent = listWrap,
 		Size = UDim2.new(1, 0, 0, 220),
 		BackgroundTransparency = 1,
-		ScrollBarThickness = 3,
+		ScrollBarThickness = 2,
+		ScrollBarImageTransparency = 0.45,
+		ClipsDescendants = true,
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		Padding = { 6, 8, 6, 8 },
@@ -756,22 +763,30 @@ local function ensureBuilt()
 	local footer = Create.New("Frame", {
 		Name = "Footer",
 		Parent = body,
-		Size = UDim2.new(1, 0, 0, 28),
-		BackgroundTransparency = 0.35,
-		Padding = { 0, 14, 0, 14 },
+		Size = UDim2.new(1, 0, 0, 30),
+		BackgroundTransparency = 0.18,
 		Theme = { BackgroundColor3 = "Field" },
 		LayoutOrder = 4,
 		ZIndex = 309,
+	})
+	Create.New("Frame", {
+		Name = "Divider",
+		Parent = footer,
+		Size = UDim2.new(1, 0, 0, 1),
+		BackgroundTransparency = 0.86,
+		Theme = { BackgroundColor3 = "Stroke" },
+		ZIndex = 310,
 	})
 
 	footerHint = Create.Text({
 		Name = "Hint",
 		Parent = footer,
 		Size = UDim2.fromScale(1, 1),
+		Padding = { 0, 16, 0, 16 },
 		Text = Util.IsTouchDevice() and "Tap any result to jump or execute" or "Up / Down to navigate   •   Enter to execute   •   Esc to close",
 		Font = "Regular",
 		TextSize = 11,
-		Color = "Muted",
+		Color = "SubText",
 		ZIndex = 310,
 	})
 
@@ -842,7 +857,7 @@ function CommandPalette.Open()
 	backdrop:SetAttribute("_BaliClosing", nil)
 	backdrop.Visible = true
 	backdrop.BackgroundTransparency = 1
-	Tween.Play(backdrop, { BackgroundTransparency = Theme.Current.OverlayTransparency }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	Tween.Play(backdrop, { BackgroundTransparency = 0.22 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 	searchBox.Text = ""
 	rebuildResults("")

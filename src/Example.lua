@@ -155,6 +155,7 @@ local barChart
 local allocBar
 local utilBar
 local telemetryTable
+local liveHealthLabel
 
 local function makeBaseRows()
 	return {
@@ -221,9 +222,15 @@ local function applyDaySnapshot(dayId)
 	end
 	if allocBar then
 		allocBar:Set(snap.Allocation, 100, snap.AllocationBadge)
+		if snap.AllocationSub and allocBar.SetDesc then
+			allocBar:SetDesc(snap.AllocationSub)
+		end
 	end
 	if utilBar then
 		utilBar:Set(snap.Utilization, 100, snap.Utilization >= 75 and "Heavy" or "Nominal")
+		if snap.UtilSub and utilBar.SetDesc then
+			utilBar:SetDesc(snap.UtilSub)
+		end
 	end
 	if profileCard then
 		profileCard:SetStatus("Snapshot: " .. snap.Title, "Success")
@@ -303,7 +310,7 @@ heroSection:AddCardGrid({
 -- ─── Performance Analytics (Left Column) ─────────────────────────────────────
 local perfSection = dashboardTab:AddSection({
 	Title = "Performance Analytics",
-	Subtitle = "Toggle between smooth spline curves and columnar distribution.",
+	Subtitle = "Spline curves and columnar distribution.",
 	Icon = "trending-up",
 	Side = "Left",
 })
@@ -360,7 +367,7 @@ barChart:SetVisible(false)
 -- ─── Allocation & Capacity (Right Column) ────────────────────────────────────
 local healthSection = dashboardTab:AddSection({
 	Title = "Allocation & Capacity",
-	Subtitle = "Live throughput telemetry, APR bounds, and simulation.",
+	Subtitle = "Live telemetry, APR bounds, and day snapshots.",
 	Icon = "gauge",
 	Side = "Right",
 })
@@ -428,6 +435,9 @@ local function pushTelemetryTick()
 		if telemetryTable then
 			telemetryTable:SetRows(currentRows)
 		end
+	end
+	if liveHealthLabel and liveHealthLabel.SetStatus then
+		liveHealthLabel:SetStatus("#" .. tostring(tickCounter) .. " · " .. (currentRows[1] and currentRows[1].Latency or "12 ms"), "Optimal", "Success")
 	end
 end
 
@@ -618,7 +628,7 @@ local layoutSub = controlsTab:AddSubTab({ Title = "Layout & Rich", Icon = "layer
 -- ─── SubTab 1: Interactive ───────────────────────────────────────────────────
 local switchesSection = interactiveSub:AddSection({
 	Title = "Switches & Actions",
-	Subtitle = "Toggles with inline keybinds, checkboxes, and action variants.",
+	Subtitle = "Toggles, checkboxes, and action buttons.",
 	Icon = "toggle",
 	Side = "Left",
 })
@@ -725,7 +735,7 @@ switchesSection:AddButtonGroup({
 
 local rangeSection = interactiveSub:AddSection({
 	Title = "Sliders & Lock State",
-	Subtitle = "Continuous sliders, dual-thumb ranges, steppers, and lock guards.",
+	Subtitle = "Sliders, dual-thumb ranges, steppers, and locks.",
 	Icon = "sliders",
 	Side = "Right",
 })
@@ -797,7 +807,7 @@ rangeSection:AddToggle({
 -- ─── SubTab 2: Inputs & Pickers ──────────────────────────────────────────────
 local selectionSection = pickersSub:AddSection({
 	Title = "Menus & Hotkeys",
-	Subtitle = "Single/multi searchable dropdowns, segmented tabs, and keybinds.",
+	Subtitle = "Searchable dropdowns, segments, and keybinds.",
 	Icon = "list",
 	Side = "Left",
 })
@@ -919,7 +929,7 @@ selectionSection:AddKeybind({
 
 local inputSection = pickersSub:AddSection({
 	Title = "Inputs & Color Studio",
-	Subtitle = "Text boxes, numeric filters, password masking, and HSV color picker.",
+	Subtitle = "Text inputs, numeric filters, and HSV color picker.",
 	Icon = "palette",
 	Side = "Right",
 })
@@ -978,7 +988,7 @@ inputSection:AddColorPicker({
 -- ─── SubTab 3: Layout & Rich ─────────────────────────────────────────────────
 local editorialSection = layoutSub:AddSection({
 	Title = "Typography & Accordion",
-	Subtitle = "Headers, copyable labels, rich paragraphs, and nested containers.",
+	Subtitle = "Labels, rich paragraphs, and nested accordions.",
 	Icon = "type",
 	Side = "Left",
 })
@@ -990,22 +1000,84 @@ editorialSection:AddHeader({
 	Uppercase = true,
 })
 
-editorialSection:AddLabel({
-	Title = "Runtime Signature",
-	Value = "Bali Core v" .. Bali.Version,
+local runtimeSigLabel = editorialSection:AddLabel({
+	Title = "Runtime",
+	Value = "v" .. Bali.Version,
 	Icon = "cpu",
+	StatusDot = true,
+	DotColor = "Success",
 	Badge = "Verified",
 	BadgeColor = "Success",
 	Copyable = true,
 	CopyValue = "Bali-Core-v" .. Bali.Version,
 })
 
-editorialSection:AddParagraph({
+liveHealthLabel = editorialSection:AddLabel({
+	Title = "Cluster Health",
+	Value = "99.98%",
+	Icon = "activity",
+	StatusDot = true,
+	DotColor = "Success",
+	Badge = "Optimal",
+	BadgeColor = "Success",
+})
+
+local archParagraph = editorialSection:AddParagraph({
 	Title = "Obsidian Glass Architecture",
 	Content = "Layers stack inside an isolated ZIndex hierarchy with directional glass strokes, radial corner blooms, live theme subscriptions, and Lucide vector sprite icons.",
 	Icon = "info",
 	AccentBar = true,
 	Tags = { "Glassmorphism", "Lucide 48px", "Luau" },
+})
+
+local STATUS_MODES = {
+	Optimal = {
+		Value = "99.98%",
+		Badge = "Optimal",
+		Color = "Success",
+		Icon = "shield-check",
+		Title = "Obsidian Glass Architecture",
+		Content = "All 38 telemetry nodes operating within nominal latency budgets. Dynamic labels, paragraphs, and Lucide sprites synchronize live.",
+		Tags = { { "Nominal", "Success" }, "Glassmorphism", "Luau" },
+	},
+	Elevated = {
+		Value = "48 ms p95",
+		Badge = "Elevated",
+		Color = "Warning",
+		Icon = "triangle-alert",
+		Title = "Elevated Relay Load",
+		Content = "Secondary Pacific relay experiencing burst queueing. Backpressure throttling automatically engaged without UI frame drops.",
+		Tags = { { "Throttled", "Warning" }, "ap-tokyo", "Auto-Scale" },
+	},
+	Incident = {
+		Value = "Failover",
+		Badge = "Incident",
+		Color = "Error",
+		Icon = "circle-alert",
+		Title = "Active Failover Routing",
+		Content = "Primary digest node offline; traffic cleanly rerouted to Virginia standby replica while state buffers checkpoint.",
+		Tags = { { "Failover", "Error" }, "us-east-02", "Protected" },
+	},
+}
+
+editorialSection:AddSegmented({
+	Title = "Live Status Simulation",
+	Description = "Dynamically updates label & paragraph status, tags, and accent color.",
+	Icon = "activity",
+	Values = { "Optimal", "Elevated", "Incident" },
+	Default = "Optimal",
+	Callback = function(mode)
+		local spec = STATUS_MODES[mode]
+		if not spec then
+			return
+		end
+		liveHealthLabel:SetStatus(spec.Value, spec.Badge, spec.Color)
+		archParagraph:SetTitle(spec.Title)
+		archParagraph:SetContent(spec.Content)
+		archParagraph:SetTags(spec.Tags)
+		archParagraph:SetColor(spec.Color)
+		archParagraph:SetIcon(spec.Icon)
+	end,
 })
 
 editorialSection:AddDivider({
@@ -1055,41 +1127,78 @@ diagAccordion:AddButton({
 
 local mediaSection = layoutSub:AddSection({
 	Title = "Code & Visual Assets",
-	Subtitle = "Syntax-formatted code snippets and glassmorphic media frames.",
+	Subtitle = "Syntax code blocks and glassmorphic media frames.",
 	Icon = "code",
 	Side = "Right",
 })
 
-mediaSection:AddCodeBlock({
-	Title = "Luau Quickstart",
-	Code = [[local Bali = require("Bali")
+local QUICKSTART_SNIPPETS = {
+	["Quickstart"] = {
+		Title = "Luau Quickstart",
+		Code = [[local Bali = require("Bali")
 
 local win = Bali:CreateWindow({
 	Title = "Bali Suite",
-	Theme = "Midnight",
+	Theme = "Graphite",
 	Blur = true,
-	ToggleKey = Enum.KeyCode.RightShift,
 })
 
 local tab = win:AddTab({ Title = "Overview", Icon = "dashboard" })
 local sec = tab:AddSection({ Title = "Controls", Side = "Left" })
-
-sec:AddToggle({ Title = "Enabled", Default = true })
-sec:AddDropdown({
-	Title = "Mode",
-	Mode = "Inline",
-	Values = { "Balanced", "Fast", "Safe" },
-	Default = "Balanced",
+sec:AddToggle({ Title = "Enabled", Default = true })]],
+	},
+	["Live Status API"] = {
+		Title = "Live Status API (Luau)",
+		Code = [[local status = sec:AddLabel({
+	Title = "Cluster Status",
+	Value = "14 ms",
+	StatusDot = true,
+	Badge = "Optimal",
+	BadgeColor = "Success",
 })
-win:Notify({ Title = "Ready", Content = "Bali initialized.", Type = "Success" })]],
+
+status:SetStatus("48 ms", "Elevated", "Warning")
+card:SetColor("Warning")
+card:SetTags({ { "Elevated", "Warning" }, "Relay" })]],
+	},
+	["JSON Config"] = {
+		Title = "Workspace Profile (JSON)",
+		Code = [[{
+	"theme": "Graphite",
+	"blur": true,
+	"blurIntensity": 12,
+	"notificationPosition": "BottomRight",
+	"hud": {
+		"watermark": true,
+		"keybindList": "ActiveOnly"
+	}
+}]],
+	},
+}
+
+local quickstartCode = mediaSection:AddCodeBlock({
+	Title = QUICKSTART_SNIPPETS["Quickstart"].Title,
+	Code = QUICKSTART_SNIPPETS["Quickstart"].Code,
 	LineNumbers = true,
-	MaxHeight = 180,
+	MaxHeight = 226,
+})
+
+mediaSection:AddSegmented({
+	Title = "Code Snippet",
+	Values = { "Quickstart", "Live Status API", "JSON Config" },
+	Default = "Quickstart",
+	Callback = function(choice)
+		local snippet = QUICKSTART_SNIPPETS[choice]
+		if snippet and quickstartCode then
+			quickstartCode:SetTitle(snippet.Title)
+			quickstartCode:SetCode(snippet.Code)
+		end
+	end,
 })
 
 mediaSection:AddBanner({
 	Title = "Bali Obsidian Architecture",
 	Caption = "1024px high-DPI Lucide icon atlas, procedural frosted glass, and spring-damped transitions",
-	Badge = "v4.0 HD",
 	Icon = "sparkles",
 	Overlay = true,
 	Image = Bali.Assets.Get("Banner") or Bali.Assets.Get("Atlas") or "rbxassetid://0",
@@ -1109,7 +1218,7 @@ local systemTab = window:AddTab({
 
 local toastsSection = systemTab:AddSection({
 	Title = "Toast Notifications",
-	Subtitle = "Stacking notifications with severity variants, actions, and error boundary.",
+	Subtitle = "Stacking toasts, action buttons, and error states.",
 	Icon = "bell",
 	Side = "Left",
 })
@@ -1169,7 +1278,8 @@ toastsSection:AddButton({
 toastsSection:AddButton({
 	Title = "Interactive Action Toast",
 	Icon = "sparkles",
-	Variant = "Primary",
+	Variant = "Default",
+	Badge = "Action",
 	Callback = function()
 		Bali:Notify({
 			Title = "Update Package Ready",
@@ -1199,6 +1309,31 @@ toastsSection:AddButton({
 })
 
 toastsSection:AddButton({
+	Title = "Live Updating Toast",
+	Description = "Spawns an Info toast and upgrades it in-place to Success via :Update().",
+	Icon = "refresh",
+	Badge = "Live",
+	Callback = function()
+		local handle = Bali:Notify({
+			Title = "Synchronizing Cluster...",
+			Content = "Step 1/2 · Handshaking edge nodes...",
+			Type = "Info",
+			Duration = 5,
+		})
+		task.delay(1.2, function()
+			if handle and handle.Update then
+				handle:Update({
+					Title = "Cluster Synchronized",
+					Content = "Step 2/2 · All 38 nodes verified in 14ms.",
+					Type = "Success",
+					Duration = 3.5,
+				})
+			end
+		end)
+	end,
+})
+
+toastsSection:AddButton({
 	Title = "Test Error Boundary",
 	Description = "Triggers Util.SafeCall failure to preview automatic error toasts.",
 	Icon = "bug",
@@ -1212,7 +1347,7 @@ toastsSection:AddButton({
 
 local modalsSection = systemTab:AddSection({
 	Title = "Modals, Loaders & Tools",
-	Subtitle = "Centered glass dialogs, splash loaders, key gate, and Command Palette.",
+	Subtitle = "Glass dialogs, loaders, key gate, and palette.",
 	Icon = "command",
 	Side = "Right",
 })

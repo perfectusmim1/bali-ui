@@ -101,7 +101,7 @@ local function createLockOverlay(frame, cornerRadius)
 		Name = "LockOverlay",
 		Size = UDim2.fromScale(1, 1),
 		Position = UDim2.fromScale(0, 0),
-		BackgroundTransparency = 0.14,
+		BackgroundTransparency = 0.22,
 		Theme = { BackgroundColor3 = "Background" },
 		Corner = cornerRadius or 10,
 		Active = true,
@@ -112,17 +112,17 @@ local function createLockOverlay(frame, cornerRadius)
 
 	local pill = Create.New("Frame", {
 		Name = "LockPill",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -12, 0.5, 0),
 		Size = UDim2.fromOffset(0, 0),
 		AutomaticSize = Enum.AutomaticSize.XY,
-		Theme = { BackgroundColor3 = "Card" },
-		BackgroundTransparency = 0.04,
+		Theme = { BackgroundColor3 = "Elevated" },
+		BackgroundTransparency = 0,
 		Corner = UDim.new(1, 0),
-		Padding = { 4, 10, 4, 10 },
+		Padding = { 5, 11, 5, 11 },
 		Stroke = {
 			Theme = { Color = "Stroke" },
-			Transparency = 0.78,
+			Transparency = 0.65,
 			Thickness = 1,
 		},
 		ZIndex = 31,
@@ -517,8 +517,8 @@ function Base.Row(parent, options, rightWidth)
 		local measureW = reservedRight > 0 and reservedRight or naturalRightW
 		local actualW = right.Visible and math.max(reservedRight, measureW) or 0
 		local availLeft = bodyW - 24 - actualW - 10 - (iconWidth > 0 and (iconWidth + 10) or 0)
-		local stackRight = (options.StackRight == true) or (options.StackRight ~= false and actualW >= 100 and bodyW > 0 and availLeft < 132)
-		local compactStack = stackRight and (reservedRight > 0 and reservedRight < 130 or (reservedRight <= 0 and actualW > 0 and actualW < 130))
+		local stackRight = (options.StackRight == true) or (options.StackRight ~= false and actualW >= 132 and bodyW > 0 and availLeft < 104)
+		local compactStack = stackRight and (options._compactStack == true or (reservedRight > 0 and reservedRight < 130) or (reservedRight <= 0 and actualW > 0 and actualW < 130))
 
 		if rightConstraint then
 			if stackRight or bodyW <= 180 or titleText == "" then

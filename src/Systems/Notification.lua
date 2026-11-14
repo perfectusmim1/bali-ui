@@ -121,6 +121,18 @@ function Notification.Init(targetLayer)
 		return Notification
 	end
 
+	-- Migrate existing active toast container seamlessly to the new host layer
+	if container and container.Parent and targetLayer and targetLayer.Parent then
+		rootMaid:Clean()
+		layer = targetLayer
+		container.Parent = targetLayer
+		applyPositionLayout()
+		rootMaid:Give(layer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			applyPositionLayout()
+		end))
+		return Notification
+	end
+
 	for index = #activeToasts, 1, -1 do
 		local toast = activeToasts[index]
 		if toast and toast.Dismiss then
@@ -239,28 +251,54 @@ function Notification.Notify(opts)
 		Parent = container,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		ClipsDescendants = true,
+		ClipsDescendants = false,
 		BackgroundTransparency = 1,
 		LayoutOrder = noteId,
 		ZIndex = 401,
 	})
 
+	local cardShell = Create.New("Frame", {
+		Name = "CardShell",
+		Parent = wrapper,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		ClipsDescendants = false,
+		BackgroundTransparency = 1,
+		ZIndex = 401,
+	})
+
+	local shadowDesc = Assets.Shadow()
+	local shadowInset = shadowDesc.Inset or 24
+	Create.New("ImageLabel", {
+		Name = "Shadow",
+		Parent = cardShell,
+		Image = shadowDesc.Image,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = shadowDesc.Slice,
+		Position = UDim2.fromOffset(-shadowInset, -shadowInset + 4),
+		Size = UDim2.new(1, shadowInset * 2, 1, shadowInset * 2),
+		BackgroundTransparency = 1,
+		Theme = {
+			ImageColor3 = "Shadow",
+			ImageTransparency = "ShadowTransparency",
+		},
+		ZIndex = 401,
+	})
+
 	local card = Create.New("Frame", {
 		Name = "Card",
-		Parent = wrapper,
+		Parent = cardShell,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Corner = 12,
 		ClipsDescendants = true,
+		BackgroundTransparency = 0,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = function(t)
-				return math.min(t.CardTransparency, 0.06)
-			end,
 		},
 		ZIndex = 402,
 	})
-	Create.GlassStroke(card, 0.06)
+	Create.GlassStroke(card, 0.08)
 
 	local glowId = Assets.Get("Glow")
 	local glowImg = nil
@@ -268,8 +306,8 @@ function Notification.Notify(opts)
 		glowImg = Create.New("ImageLabel", {
 			Name = "Glow",
 			Parent = card,
-			Size = UDim2.fromOffset(200, 72),
-			Position = UDim2.fromOffset(-50, -24),
+			Size = UDim2.fromOffset(145, 54),
+			Position = UDim2.fromOffset(8, 3),
 			Corner = 12,
 			Image = glowId,
 			ScaleType = Enum.ScaleType.Stretch,
@@ -283,7 +321,26 @@ function Notification.Notify(opts)
 		})
 	end
 
-	-- Left vertical accent bar removed in favor of modern icon-badge silhouette
+	local accentBar = Create.New("Frame", {
+		Name = "AccentBar",
+		Parent = card,
+		Size = UDim2.new(1, -20, 0, 2),
+		Position = UDim2.new(0, 10, 0, 0),
+		BackgroundTransparency = 0.12,
+		Corner = UDim.new(1, 0),
+		Theme = { BackgroundColor3 = typeMeta.ColorKey },
+		ZIndex = 405,
+	})
+	local barGrad = Instance.new("UIGradient")
+	barGrad.Rotation = 0
+	barGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.08, 0.35),
+		NumberSequenceKeypoint.new(0.22, 0),
+		NumberSequenceKeypoint.new(0.55, 0.3),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	barGrad.Parent = accentBar
 
 	local body = Create.New("Frame", {
 		Name = "Body",
@@ -291,34 +348,29 @@ function Notification.Notify(opts)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		Padding = { 12, 12, 14, 14 },
+		Padding = { 12, 12, 15, 12 },
 		ZIndex = 404,
 	})
-	Create.List(body, { Direction = Enum.FillDirection.Vertical, Gap = 6 })
-
-	local header = Create.New("Frame", {
-		Name = "Header",
-		Parent = body,
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		LayoutOrder = 1,
-		ZIndex = 405,
-	})
+	local bodyPad = body:FindFirstChildOfClass("UIPadding")
 
 	local iconBadge = Create.New("Frame", {
 		Name = "IconBadge",
-		Parent = header,
-		Size = UDim2.fromOffset(22, 22),
-		Position = UDim2.fromOffset(0, 0),
-		Corner = 7,
-		BackgroundTransparency = 0.84,
+		Parent = body,
+		Size = UDim2.fromOffset(32, 32),
+		Position = UDim2.fromOffset(0, 1),
+		Corner = 9,
+		BackgroundTransparency = 0.86,
 		Theme = { BackgroundColor3 = typeMeta.ColorKey },
 		ZIndex = 406,
 	})
+	local iconStroke = Create.Stroke(iconBadge, {
+		Theme = { Color = typeMeta.ColorKey },
+		Transparency = 0.62,
+		Thickness = 1,
+	})
 
 	local iconObj = Icons.Create(opts.Icon or typeMeta.Icon, {
-		Size = UDim2.fromOffset(15, 15),
+		Size = UDim2.fromOffset(16, 16),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = typeMeta.ColorKey,
@@ -326,11 +378,32 @@ function Notification.Notify(opts)
 		Parent = iconBadge,
 	})
 
+	local contentCol = Create.New("Frame", {
+		Name = "ContentCol",
+		Parent = body,
+		Position = UDim2.fromOffset(44, 0),
+		Size = UDim2.new(1, -44, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		ZIndex = 405,
+	})
+	Create.List(contentCol, { Direction = Enum.FillDirection.Vertical, Gap = 4 })
+
+	local header = Create.New("Frame", {
+		Name = "Header",
+		Parent = contentCol,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		LayoutOrder = 1,
+		ZIndex = 405,
+	})
+
 	local titleLabel = Create.Text({
 		Name = "Title",
 		Parent = header,
-		Position = UDim2.fromOffset(30, 2),
-		Size = UDim2.new(1, -56, 0, 0),
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(1, -28, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Text = titleText,
 		TextWrapped = true,
@@ -344,7 +417,7 @@ function Notification.Notify(opts)
 		Name = "Close",
 		Parent = header,
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, 0, 0, 0),
+		Position = UDim2.new(1, 2, 0, -2),
 		Size = UDim2.fromOffset(22, 22),
 		Corner = 6,
 		BackgroundTransparency = 1,
@@ -375,8 +448,8 @@ function Notification.Notify(opts)
 
 	local descLabel = Create.Text({
 		Name = "Description",
-		Parent = body,
-		Size = UDim2.new(1, 0, 0, 0),
+		Parent = contentCol,
+		Size = UDim2.new(1, -6, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Text = bodyText,
 		TextWrapped = true,
@@ -390,12 +463,16 @@ function Notification.Notify(opts)
 
 	local actionsRow = nil
 	if type(opts.Actions) == "table" and #opts.Actions > 0 then
+		if bodyPad then
+			bodyPad.PaddingBottom = UDim.new(0, 18)
+		end
 		actionsRow = Create.New("Frame", {
 			Name = "Actions",
-			Parent = body,
+			Parent = contentCol,
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
+			Padding = { 3, 0, 0, 0 },
 			LayoutOrder = 3,
 			ZIndex = 405,
 		})
@@ -450,12 +527,12 @@ function Notification.Notify(opts)
 		Name = "ProgressTrack",
 		Parent = card,
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -4),
-		Size = UDim2.new(1, -24, 0, 2),
-		Corner = 999,
+		Position = UDim2.new(0.5, 0, 1, -5),
+		Size = UDim2.new(1, -24, 0, 3),
+		Corner = UDim.new(1, 0),
 		ClipsDescendants = true,
-		BackgroundTransparency = 0.85,
-		Theme = { BackgroundColor3 = "Stroke" },
+		BackgroundTransparency = 0.15,
+		Theme = { BackgroundColor3 = "Field" },
 		ZIndex = 405,
 	})
 
@@ -463,6 +540,8 @@ function Notification.Notify(opts)
 		Name = "Fill",
 		Parent = progressTrack,
 		Size = UDim2.fromScale(1, 1),
+		Corner = UDim.new(1, 0),
+		BackgroundTransparency = 0.04,
 		Theme = { BackgroundColor3 = typeMeta.ColorKey },
 		ZIndex = 406,
 	})
@@ -518,16 +597,19 @@ function Notification.Notify(opts)
 		if immediate or Tween.Reduced then
 			finalize()
 		else
+			local isTop = currentPosition == "TopRight" or currentPosition == "TopLeft"
 			local isLeft = currentPosition == "BottomLeft" or currentPosition == "TopLeft"
-			local slideOutX = isLeft and -48 or 48
+			local slideOutX = isLeft and -24 or 24
+			local slideOutY = isTop and -10 or 10
 			if wrapper and wrapper.Parent then
 				local h = math.max(wrapper.AbsoluteSize.Y, card.AbsoluteSize.Y)
+				wrapper.ClipsDescendants = true
 				wrapper.AutomaticSize = Enum.AutomaticSize.None
 				wrapper.Size = UDim2.new(1, 0, 0, h)
 				Tween.Play(wrapper, { Size = UDim2.new(1, 0, 0, 0) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			end
-			Tween.Play(card, { Position = UDim2.fromOffset(slideOutX, 0) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-			Transition.Unmount(card, 1, finalize, { NoPositionTween = true })
+			Tween.Play(cardShell, { Position = UDim2.fromOffset(slideOutX, slideOutY) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			Transition.Unmount(cardShell, 1, finalize, { NoPositionTween = true })
 		end
 	end
 
@@ -617,6 +699,8 @@ function Notification.Notify(opts)
 			historyEntry.Type = noteType
 			-- Accent styling updated via iconBadge/icon/progressBar below
 			Theme.Bind(iconBadge, { BackgroundColor3 = typeMeta.ColorKey })
+			Theme.Bind(iconStroke, { Color = typeMeta.ColorKey })
+			Theme.Bind(accentBar, { BackgroundColor3 = typeMeta.ColorKey })
 			Theme.Bind(progressFill, { BackgroundColor3 = typeMeta.ColorKey })
 			Icons.SetColor(iconObj, typeMeta.ColorKey)
 			if glowImg then
@@ -665,9 +749,11 @@ function Notification.Notify(opts)
 	end))
 
 	table.insert(activeToasts, toast)
+	local isTop = currentPosition == "TopRight" or currentPosition == "TopLeft"
 	local isLeft = currentPosition == "BottomLeft" or currentPosition == "TopLeft"
-	local slideInX = isLeft and -48 or 48
-	Transition.SlideFade(card, 0, slideInX)
+	local slideInY = isTop and -18 or 18
+	local slideInX = isLeft and -28 or 28
+	Transition.SlideFade(cardShell, slideInY, slideInX)
 	startTimer(totalDuration)
 
 	return toast

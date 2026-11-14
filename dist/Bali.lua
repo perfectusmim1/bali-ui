@@ -1166,8 +1166,8 @@ Theme.Presets = {
 		Field = rgb(21, 21, 23),
 		FieldHover = rgb(28, 28, 31),
 		Text = rgb(250, 250, 252),
-		SubText = rgb(180, 182, 192),
-		Muted = rgb(138, 140, 150),
+		SubText = rgb(198, 202, 214),
+		Muted = rgb(158, 162, 176),
 		ToggleOff = rgb(58, 58, 62),
 	}),
 	Aurora = preset({
@@ -3495,10 +3495,17 @@ local function collectMatches(query)
 
 				if best then
 					local elemType = tostring(entry.Type or "Control")
-					local badge = elemType
-					if elemType == "Button" then
-						badge = "Run"
-					elseif (elemType == "Toggle" or elemType == "Checkbox") and entry.Element and type(entry.Element.Get) == "function" then
+					local badgeMap = {
+						Button = "Run",
+						ColorPicker = "Color Picker",
+						RangeSlider = "Range Slider",
+						ProgressBar = "Progress",
+						ButtonRow = "Buttons",
+						CardGrid = "Cards",
+						StatCard = "Stat",
+					}
+					local badge = badgeMap[elemType] or elemType
+					if (elemType == "Toggle" or elemType == "Checkbox") and entry.Element and type(entry.Element.Get) == "function" then
 						local ok, val = pcall(entry.Element.Get, entry.Element)
 						if ok then
 							badge = val and "ON" or "OFF"
@@ -3630,9 +3637,9 @@ local function rebuildResults(query)
 			Parent = row,
 			Visible = false,
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.fromScale(0, 0.5),
-			Size = UDim2.fromOffset(3, 22),
-			Corner = 2,
+			Position = UDim2.new(0, 4, 0.5, 0),
+			Size = UDim2.fromOffset(2, 18),
+			Corner = UDim.new(1, 0),
 			Theme = { BackgroundColor3 = "Accent" },
 			ZIndex = 314,
 		})
@@ -3814,15 +3821,13 @@ local function ensureBuilt()
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Corner = 14,
 		ClipsDescendants = true,
+		BackgroundTransparency = 0,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = function(t)
-				return math.min(t.CardTransparency, 0.04)
-			end,
 		},
 		ZIndex = 305,
 	})
-	Create.GlassStroke(modal, 0.06)
+	Create.GlassStroke(modal, 0.12)
 
 	local inputSink = Create.New("TextButton", {
 		Name = "InputSink",
@@ -3915,7 +3920,7 @@ local function ensureBuilt()
 		Corner = 6,
 		BackgroundTransparency = 0.2,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Text = "ESC",
+		Text = "Esc",
 		Font = "SemiBold",
 		TextSize = 10,
 		Color = "SubText",
@@ -3951,7 +3956,9 @@ local function ensureBuilt()
 		Parent = listWrap,
 		Size = UDim2.new(1, 0, 0, 220),
 		BackgroundTransparency = 1,
-		ScrollBarThickness = 3,
+		ScrollBarThickness = 2,
+		ScrollBarImageTransparency = 0.45,
+		ClipsDescendants = true,
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		Padding = { 6, 8, 6, 8 },
@@ -3976,22 +3983,30 @@ local function ensureBuilt()
 	local footer = Create.New("Frame", {
 		Name = "Footer",
 		Parent = body,
-		Size = UDim2.new(1, 0, 0, 28),
-		BackgroundTransparency = 0.35,
-		Padding = { 0, 14, 0, 14 },
+		Size = UDim2.new(1, 0, 0, 30),
+		BackgroundTransparency = 0.18,
 		Theme = { BackgroundColor3 = "Field" },
 		LayoutOrder = 4,
 		ZIndex = 309,
+	})
+	Create.New("Frame", {
+		Name = "Divider",
+		Parent = footer,
+		Size = UDim2.new(1, 0, 0, 1),
+		BackgroundTransparency = 0.86,
+		Theme = { BackgroundColor3 = "Stroke" },
+		ZIndex = 310,
 	})
 
 	footerHint = Create.Text({
 		Name = "Hint",
 		Parent = footer,
 		Size = UDim2.fromScale(1, 1),
+		Padding = { 0, 16, 0, 16 },
 		Text = Util.IsTouchDevice() and "Tap any result to jump or execute" or "Up / Down to navigate   •   Enter to execute   •   Esc to close",
 		Font = "Regular",
 		TextSize = 11,
-		Color = "Muted",
+		Color = "SubText",
 		ZIndex = 310,
 	})
 
@@ -4062,7 +4077,7 @@ function CommandPalette.Open()
 	backdrop:SetAttribute("_BaliClosing", nil)
 	backdrop.Visible = true
 	backdrop.BackgroundTransparency = 1
-	Tween.Play(backdrop, { BackgroundTransparency = Theme.Current.OverlayTransparency }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	Tween.Play(backdrop, { BackgroundTransparency = 0.22 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 	searchBox.Text = ""
 	rebuildResults("")
@@ -5909,15 +5924,15 @@ local function ensureBuilt()
 		Create.New("ImageLabel", {
 			Name = "Glow",
 			Parent = panel,
-			Size = UDim2.fromOffset(170, 80),
-			Position = UDim2.fromOffset(-40, -30),
+			Size = UDim2.fromOffset(130, 48),
+			Position = UDim2.fromOffset(8, 4),
 			Corner = 12,
 			Image = glowId,
 			ScaleType = Enum.ScaleType.Stretch,
 			Theme = {
 				ImageColor3 = "Accent",
 				ImageTransparency = function(t)
-					return math.min(t.GlowTransparency + 0.05, 0.94)
+					return math.min(t.GlowTransparency + 0.08, 0.95)
 				end,
 			},
 			ZIndex = 340,
@@ -6021,7 +6036,8 @@ local function ensureBuilt()
 		Text = "No active keybinds",
 		Font = "Regular",
 		TextSize = 11,
-		Color = "Muted",
+		Color = "SubText",
+		TextTransparency = 0.25,
 		LayoutOrder = 999999,
 		ZIndex = 343,
 	})
@@ -6302,6 +6318,18 @@ function Notification.Init(targetLayer)
 		return Notification
 	end
 
+	-- Migrate existing active toast container seamlessly to the new host layer
+	if container and container.Parent and targetLayer and targetLayer.Parent then
+		rootMaid:Clean()
+		layer = targetLayer
+		container.Parent = targetLayer
+		applyPositionLayout()
+		rootMaid:Give(layer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			applyPositionLayout()
+		end))
+		return Notification
+	end
+
 	for index = #activeToasts, 1, -1 do
 		local toast = activeToasts[index]
 		if toast and toast.Dismiss then
@@ -6420,28 +6448,54 @@ function Notification.Notify(opts)
 		Parent = container,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		ClipsDescendants = true,
+		ClipsDescendants = false,
 		BackgroundTransparency = 1,
 		LayoutOrder = noteId,
 		ZIndex = 401,
 	})
 
+	local cardShell = Create.New("Frame", {
+		Name = "CardShell",
+		Parent = wrapper,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		ClipsDescendants = false,
+		BackgroundTransparency = 1,
+		ZIndex = 401,
+	})
+
+	local shadowDesc = Assets.Shadow()
+	local shadowInset = shadowDesc.Inset or 24
+	Create.New("ImageLabel", {
+		Name = "Shadow",
+		Parent = cardShell,
+		Image = shadowDesc.Image,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = shadowDesc.Slice,
+		Position = UDim2.fromOffset(-shadowInset, -shadowInset + 4),
+		Size = UDim2.new(1, shadowInset * 2, 1, shadowInset * 2),
+		BackgroundTransparency = 1,
+		Theme = {
+			ImageColor3 = "Shadow",
+			ImageTransparency = "ShadowTransparency",
+		},
+		ZIndex = 401,
+	})
+
 	local card = Create.New("Frame", {
 		Name = "Card",
-		Parent = wrapper,
+		Parent = cardShell,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Corner = 12,
 		ClipsDescendants = true,
+		BackgroundTransparency = 0,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = function(t)
-				return math.min(t.CardTransparency, 0.06)
-			end,
 		},
 		ZIndex = 402,
 	})
-	Create.GlassStroke(card, 0.06)
+	Create.GlassStroke(card, 0.08)
 
 	local glowId = Assets.Get("Glow")
 	local glowImg = nil
@@ -6449,8 +6503,8 @@ function Notification.Notify(opts)
 		glowImg = Create.New("ImageLabel", {
 			Name = "Glow",
 			Parent = card,
-			Size = UDim2.fromOffset(200, 72),
-			Position = UDim2.fromOffset(-50, -24),
+			Size = UDim2.fromOffset(145, 54),
+			Position = UDim2.fromOffset(8, 3),
 			Corner = 12,
 			Image = glowId,
 			ScaleType = Enum.ScaleType.Stretch,
@@ -6464,7 +6518,26 @@ function Notification.Notify(opts)
 		})
 	end
 
-	-- Left vertical accent bar removed in favor of modern icon-badge silhouette
+	local accentBar = Create.New("Frame", {
+		Name = "AccentBar",
+		Parent = card,
+		Size = UDim2.new(1, -20, 0, 2),
+		Position = UDim2.new(0, 10, 0, 0),
+		BackgroundTransparency = 0.12,
+		Corner = UDim.new(1, 0),
+		Theme = { BackgroundColor3 = typeMeta.ColorKey },
+		ZIndex = 405,
+	})
+	local barGrad = Instance.new("UIGradient")
+	barGrad.Rotation = 0
+	barGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.08, 0.35),
+		NumberSequenceKeypoint.new(0.22, 0),
+		NumberSequenceKeypoint.new(0.55, 0.3),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	barGrad.Parent = accentBar
 
 	local body = Create.New("Frame", {
 		Name = "Body",
@@ -6472,34 +6545,29 @@ function Notification.Notify(opts)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		Padding = { 12, 12, 14, 14 },
+		Padding = { 12, 12, 15, 12 },
 		ZIndex = 404,
 	})
-	Create.List(body, { Direction = Enum.FillDirection.Vertical, Gap = 6 })
-
-	local header = Create.New("Frame", {
-		Name = "Header",
-		Parent = body,
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		LayoutOrder = 1,
-		ZIndex = 405,
-	})
+	local bodyPad = body:FindFirstChildOfClass("UIPadding")
 
 	local iconBadge = Create.New("Frame", {
 		Name = "IconBadge",
-		Parent = header,
-		Size = UDim2.fromOffset(22, 22),
-		Position = UDim2.fromOffset(0, 0),
-		Corner = 7,
-		BackgroundTransparency = 0.84,
+		Parent = body,
+		Size = UDim2.fromOffset(32, 32),
+		Position = UDim2.fromOffset(0, 1),
+		Corner = 9,
+		BackgroundTransparency = 0.86,
 		Theme = { BackgroundColor3 = typeMeta.ColorKey },
 		ZIndex = 406,
 	})
+	local iconStroke = Create.Stroke(iconBadge, {
+		Theme = { Color = typeMeta.ColorKey },
+		Transparency = 0.62,
+		Thickness = 1,
+	})
 
 	local iconObj = Icons.Create(opts.Icon or typeMeta.Icon, {
-		Size = UDim2.fromOffset(15, 15),
+		Size = UDim2.fromOffset(16, 16),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = typeMeta.ColorKey,
@@ -6507,11 +6575,32 @@ function Notification.Notify(opts)
 		Parent = iconBadge,
 	})
 
+	local contentCol = Create.New("Frame", {
+		Name = "ContentCol",
+		Parent = body,
+		Position = UDim2.fromOffset(44, 0),
+		Size = UDim2.new(1, -44, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		ZIndex = 405,
+	})
+	Create.List(contentCol, { Direction = Enum.FillDirection.Vertical, Gap = 4 })
+
+	local header = Create.New("Frame", {
+		Name = "Header",
+		Parent = contentCol,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		LayoutOrder = 1,
+		ZIndex = 405,
+	})
+
 	local titleLabel = Create.Text({
 		Name = "Title",
 		Parent = header,
-		Position = UDim2.fromOffset(30, 2),
-		Size = UDim2.new(1, -56, 0, 0),
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(1, -28, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Text = titleText,
 		TextWrapped = true,
@@ -6525,7 +6614,7 @@ function Notification.Notify(opts)
 		Name = "Close",
 		Parent = header,
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, 0, 0, 0),
+		Position = UDim2.new(1, 2, 0, -2),
 		Size = UDim2.fromOffset(22, 22),
 		Corner = 6,
 		BackgroundTransparency = 1,
@@ -6556,8 +6645,8 @@ function Notification.Notify(opts)
 
 	local descLabel = Create.Text({
 		Name = "Description",
-		Parent = body,
-		Size = UDim2.new(1, 0, 0, 0),
+		Parent = contentCol,
+		Size = UDim2.new(1, -6, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Text = bodyText,
 		TextWrapped = true,
@@ -6571,12 +6660,16 @@ function Notification.Notify(opts)
 
 	local actionsRow = nil
 	if type(opts.Actions) == "table" and #opts.Actions > 0 then
+		if bodyPad then
+			bodyPad.PaddingBottom = UDim.new(0, 18)
+		end
 		actionsRow = Create.New("Frame", {
 			Name = "Actions",
-			Parent = body,
+			Parent = contentCol,
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
+			Padding = { 3, 0, 0, 0 },
 			LayoutOrder = 3,
 			ZIndex = 405,
 		})
@@ -6631,12 +6724,12 @@ function Notification.Notify(opts)
 		Name = "ProgressTrack",
 		Parent = card,
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -4),
-		Size = UDim2.new(1, -24, 0, 2),
-		Corner = 999,
+		Position = UDim2.new(0.5, 0, 1, -5),
+		Size = UDim2.new(1, -24, 0, 3),
+		Corner = UDim.new(1, 0),
 		ClipsDescendants = true,
-		BackgroundTransparency = 0.85,
-		Theme = { BackgroundColor3 = "Stroke" },
+		BackgroundTransparency = 0.15,
+		Theme = { BackgroundColor3 = "Field" },
 		ZIndex = 405,
 	})
 
@@ -6644,6 +6737,8 @@ function Notification.Notify(opts)
 		Name = "Fill",
 		Parent = progressTrack,
 		Size = UDim2.fromScale(1, 1),
+		Corner = UDim.new(1, 0),
+		BackgroundTransparency = 0.04,
 		Theme = { BackgroundColor3 = typeMeta.ColorKey },
 		ZIndex = 406,
 	})
@@ -6699,16 +6794,19 @@ function Notification.Notify(opts)
 		if immediate or Tween.Reduced then
 			finalize()
 		else
+			local isTop = currentPosition == "TopRight" or currentPosition == "TopLeft"
 			local isLeft = currentPosition == "BottomLeft" or currentPosition == "TopLeft"
-			local slideOutX = isLeft and -48 or 48
+			local slideOutX = isLeft and -24 or 24
+			local slideOutY = isTop and -10 or 10
 			if wrapper and wrapper.Parent then
 				local h = math.max(wrapper.AbsoluteSize.Y, card.AbsoluteSize.Y)
+				wrapper.ClipsDescendants = true
 				wrapper.AutomaticSize = Enum.AutomaticSize.None
 				wrapper.Size = UDim2.new(1, 0, 0, h)
 				Tween.Play(wrapper, { Size = UDim2.new(1, 0, 0, 0) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			end
-			Tween.Play(card, { Position = UDim2.fromOffset(slideOutX, 0) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-			Transition.Unmount(card, 1, finalize, { NoPositionTween = true })
+			Tween.Play(cardShell, { Position = UDim2.fromOffset(slideOutX, slideOutY) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			Transition.Unmount(cardShell, 1, finalize, { NoPositionTween = true })
 		end
 	end
 
@@ -6798,6 +6896,8 @@ function Notification.Notify(opts)
 			historyEntry.Type = noteType
 			-- Accent styling updated via iconBadge/icon/progressBar below
 			Theme.Bind(iconBadge, { BackgroundColor3 = typeMeta.ColorKey })
+			Theme.Bind(iconStroke, { Color = typeMeta.ColorKey })
+			Theme.Bind(accentBar, { BackgroundColor3 = typeMeta.ColorKey })
 			Theme.Bind(progressFill, { BackgroundColor3 = typeMeta.ColorKey })
 			Icons.SetColor(iconObj, typeMeta.ColorKey)
 			if glowImg then
@@ -6846,9 +6946,11 @@ function Notification.Notify(opts)
 	end))
 
 	table.insert(activeToasts, toast)
+	local isTop = currentPosition == "TopRight" or currentPosition == "TopLeft"
 	local isLeft = currentPosition == "BottomLeft" or currentPosition == "TopLeft"
-	local slideInX = isLeft and -48 or 48
-	Transition.SlideFade(card, 0, slideInX)
+	local slideInY = isTop and -18 or 18
+	local slideInX = isLeft and -28 or 28
+	Transition.SlideFade(cardShell, slideInY, slideInX)
 	startTimer(totalDuration)
 
 	return toast
@@ -7460,11 +7562,11 @@ local function readPlayerCount()
 end
 
 local function formatStats()
-	if customText ~= nil then
-		return tostring(customText)
+	local parts = {}
+	if customText ~= nil and customText ~= "" then
+		table.insert(parts, tostring(customText))
 	end
 
-	local parts = {}
 	local cfg = statsConfig
 
 	if cfg.FPS == true then
@@ -8996,7 +9098,7 @@ function Chart.new(parent, opts, ctx)
 					Name = "Bar_" .. i,
 					Size = UDim2.fromOffset(barW, barH),
 					Position = UDim2.fromOffset(xLeft, yTop),
-					Corner = math.min(4, math.floor(barW * 0.4)),
+					Corner = math.min(8, math.max(4, math.floor(barW * 0.45))),
 					ZIndex = 2,
 					Parent = geomLayer,
 				})
@@ -9339,7 +9441,7 @@ function ProgressBar.new(parent, opts, ctx)
 	local track = Create.New("Frame", {
 		Name = "Track",
 		Size = UDim2.new(1, 0, 0, barHeight),
-		Corner = 999,
+		Corner = UDim.new(1, 0),
 		ClipsDescendants = true,
 		LayoutOrder = 2,
 		Theme = { BackgroundColor3 = "Field" },
@@ -9351,7 +9453,7 @@ function ProgressBar.new(parent, opts, ctx)
 	local fill = Create.New("Frame", {
 		Name = "Fill",
 		Size = UDim2.fromScale(ratio, 1),
-		Corner = 999,
+		Corner = UDim.new(1, 0),
 		Parent = track,
 	})
 
@@ -9382,6 +9484,8 @@ function ProgressBar.new(parent, opts, ctx)
 			Parent = content,
 		})
 	end
+	self.DescLabel = secondaryLabel
+	self.SecondaryLabel = secondaryLabel
 
 	if self.BindUI then
 		self:BindUI({
@@ -10141,17 +10245,17 @@ function CardGrid.new(parent, opts, ctx)
 			entry.Button.BackgroundColor3 = Color3.new(1, 1, 1)
 			Theme.Unbind(entry.Button, "BackgroundColor3")
 			Theme.Unbind(entry.Button, "BackgroundTransparency")
-			entry.Button.BackgroundTransparency = 0.04
-			entry.Button:SetAttribute("_BaliRestBg", 0.04)
-			entry.Button:SetAttribute("_BaliCascadeBg", 0.04)
+			entry.Button.BackgroundTransparency = 0.14
+			entry.Button:SetAttribute("_BaliRestBg", 0.14)
+			entry.Button:SetAttribute("_BaliCascadeBg", 0.14)
 			entry.Gradient.Enabled = true
 			entry.Gradient.Color = Theme.AccentSequence()
 			Theme.Bind(entry.Stroke, {
 				Color = "Accent",
-				Transparency = function() return 0.25 end,
+				Transparency = function() return 0.22 end,
 			})
-			entry.Stroke:SetAttribute("_BaliRestStr", 0.25)
-			entry.Stroke:SetAttribute("_BaliCascadeStroke", 0.25)
+			entry.Stroke:SetAttribute("_BaliRestStr", 0.22)
+			entry.Stroke:SetAttribute("_BaliCascadeStroke", 0.22)
 			Theme.Bind(entry.TitleLabel, { TextColor3 = "AccentText" })
 			if entry.IconObj then
 				Icons.SetColor(entry.IconObj, "AccentText")
@@ -10505,7 +10609,7 @@ local function createLockOverlay(frame, cornerRadius)
 		Name = "LockOverlay",
 		Size = UDim2.fromScale(1, 1),
 		Position = UDim2.fromScale(0, 0),
-		BackgroundTransparency = 0.14,
+		BackgroundTransparency = 0.22,
 		Theme = { BackgroundColor3 = "Background" },
 		Corner = cornerRadius or 10,
 		Active = true,
@@ -10516,17 +10620,17 @@ local function createLockOverlay(frame, cornerRadius)
 
 	local pill = Create.New("Frame", {
 		Name = "LockPill",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -12, 0.5, 0),
 		Size = UDim2.fromOffset(0, 0),
 		AutomaticSize = Enum.AutomaticSize.XY,
-		Theme = { BackgroundColor3 = "Card" },
-		BackgroundTransparency = 0.04,
+		Theme = { BackgroundColor3 = "Elevated" },
+		BackgroundTransparency = 0,
 		Corner = UDim.new(1, 0),
-		Padding = { 4, 10, 4, 10 },
+		Padding = { 5, 11, 5, 11 },
 		Stroke = {
 			Theme = { Color = "Stroke" },
-			Transparency = 0.78,
+			Transparency = 0.65,
 			Thickness = 1,
 		},
 		ZIndex = 31,
@@ -10921,8 +11025,8 @@ function Base.Row(parent, options, rightWidth)
 		local measureW = reservedRight > 0 and reservedRight or naturalRightW
 		local actualW = right.Visible and math.max(reservedRight, measureW) or 0
 		local availLeft = bodyW - 24 - actualW - 10 - (iconWidth > 0 and (iconWidth + 10) or 0)
-		local stackRight = (options.StackRight == true) or (options.StackRight ~= false and actualW >= 100 and bodyW > 0 and availLeft < 132)
-		local compactStack = stackRight and (reservedRight > 0 and reservedRight < 130 or (reservedRight <= 0 and actualW > 0 and actualW < 130))
+		local stackRight = (options.StackRight == true) or (options.StackRight ~= false and actualW >= 132 and bodyW > 0 and availLeft < 104)
+		local compactStack = stackRight and (options._compactStack == true or (reservedRight > 0 and reservedRight < 130) or (reservedRight <= 0 and actualW > 0 and actualW < 130))
 
 		if rightConstraint then
 			if stackRight or bodyW <= 180 or titleText == "" then
@@ -11277,7 +11381,11 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 			stroke.Transparency = 0.25
 		end
 		if label then
-			Theme.Bind(label, { TextColor3 = "Error" })
+			Theme.Bind(label, {
+				TextColor3 = function(t)
+					return Util.LerpColor(t.Error, Color3.new(1, 1, 1), 0.42)
+				end,
+			})
 		end
 		if iconObj then
 			Icons.SetColor(iconObj, "Error")
@@ -11314,7 +11422,11 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 			stroke.Transparency = isHovered and 0.35 or 0.55
 		end
 		if label then
-			Theme.Bind(label, { TextColor3 = "Error" })
+			Theme.Bind(label, {
+				TextColor3 = function(t)
+					return Util.LerpColor(t.Error, Color3.new(1, 1, 1), 0.42)
+				end,
+			})
 		end
 		if iconObj then
 			Icons.SetColor(iconObj, "Error")
@@ -11464,6 +11576,9 @@ function Button.new(parent, opts, ctx)
 			elseif variant == "Primary" then
 				Theme.Bind(row.DescLabel, { TextColor3 = "AccentText" })
 				row.DescLabel.TextTransparency = 0.18
+			elseif variant == "Danger" then
+				Theme.Bind(row.DescLabel, { TextColor3 = "SubText" })
+				row.DescLabel.TextTransparency = element.Disabled and 0.48 or 0.25
 			else
 				Theme.Bind(row.DescLabel, { TextColor3 = "SubText" })
 				row.DescLabel.TextTransparency = element.Disabled and 0.48 or 0
@@ -11961,7 +12076,7 @@ function ColorPicker.new(parent, opts, ctx)
 
 	local self = Base.New("ColorPicker", parent, opts, ctx)
 	local rowParent = (typeof(self.Frame) == "Instance") and self.Frame or parent
-	local rightWidth = 104
+	local rightWidth = 92
 	local rowOpts = table.clone(opts)
 	if rowOpts.IconBadge == nil then
 		rowOpts.IconBadge = false
@@ -12026,7 +12141,7 @@ function ColorPicker.new(parent, opts, ctx)
 
 	local pillHex = Create.Text({
 		Name = "HexPreview",
-		Size = UDim2.new(1, -34, 1, 0),
+		Size = UDim2.new(1, -28, 1, 0),
 		Text = "#" .. Util.ToHex(currentColor),
 		TextSize = 11,
 		Color = "SubText",
@@ -12037,7 +12152,7 @@ function ColorPicker.new(parent, opts, ctx)
 
 	local pillSwatchBg = Create.New("Frame", {
 		Name = "SwatchBg",
-		Size = UDim2.fromOffset(26, 18),
+		Size = UDim2.fromOffset(22, 18),
 		Position = UDim2.new(1, 0, 0.5, 0),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Corner = 5,
@@ -12059,22 +12174,20 @@ function ColorPicker.new(parent, opts, ctx)
 	-- Floating Popover (236px wide)
 	local shadowInfo = Assets.Shadow()
 	local shadowInset = shadowInfo.Inset or 24
+	local initialPopH = hasAlpha and 322 or 294
 	local popover = Create.New("Frame", {
 		Name = popupId,
-		Size = UDim2.fromOffset(236, 100),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.fromOffset(236, initialPopH),
 		Active = true,
 		Visible = false,
 		ZIndex = 110,
 		Corner = 12,
+		BackgroundTransparency = 0,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = function(t)
-				return math.min(t.CardTransparency or 0.12, 0.03)
-			end,
 		},
 	})
-	Create.GlassStroke(popover, 0.06)
+	Create.GlassStroke(popover, 0.08)
 
 	Create.New("TextButton", {
 		Name = "InputSink",
@@ -12112,6 +12225,12 @@ function ColorPicker.new(parent, opts, ctx)
 		Parent = popover,
 	})
 	Create.List(body, { Gap = 10 })
+	self.Maid:Give(body:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		local bh = body.AbsoluteSize.Y
+		if bh > 0 then
+			popover.Size = UDim2.fromOffset(236, bh)
+		end
+	end))
 
 	-- 1. Header row (Title + Rainbow pill)
 	local header = Create.New("Frame", {
@@ -12248,7 +12367,7 @@ function ColorPicker.new(parent, opts, ctx)
 		Position = UDim2.new(1, 0, 0, 0),
 		AnchorPoint = Vector2.new(1, 0),
 		BackgroundColor3 = Color3.new(1, 1, 1),
-		Corner = 6,
+		Corner = UDim.new(1, 0),
 		ZIndex = 112,
 		Parent = canvasRow,
 	})
@@ -12291,31 +12410,55 @@ function ColorPicker.new(parent, opts, ctx)
 			Size = UDim2.new(1, -40, 0, 14),
 			Position = UDim2.fromScale(0, 0.5),
 			AnchorPoint = Vector2.new(0, 0.5),
-			Corner = 6,
+			Corner = UDim.new(1, 0),
 			ZIndex = 112,
 			Theme = { BackgroundColor3 = "Field" },
 			Parent = alphaRow,
 		})
 		Create.Stroke(alphaBar, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
 
+		local alphaCheckerClip = Create.New("Frame", {
+			Name = "AlphaChecker",
+			Size = UDim2.new(1, -6, 0, 10),
+			Position = UDim2.fromScale(0.5, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			ClipsDescendants = true,
+			ZIndex = 112,
+			Parent = alphaBar,
+		})
+		for col = 0, 33 do
+			local row = col % 2
+			Create.New("Frame", {
+				Size = UDim2.fromOffset(5, 5),
+				Position = UDim2.fromOffset(col * 5, row * 5),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.86,
+				BorderSizePixel = 0,
+				ZIndex = 112,
+				Parent = alphaCheckerClip,
+			})
+		end
+
 		alphaFill = Create.New("Frame", {
 			Name = "AlphaFill",
 			Size = UDim2.fromScale(1, 1),
 			BackgroundColor3 = currentColor,
-			Corner = 6,
+			Corner = UDim.new(1, 0),
 			ZIndex = 113,
 			Parent = alphaBar,
 		})
 		local alphaGrad = Instance.new("UIGradient")
 		alphaGrad.Rotation = 0
-		alphaGrad.Transparency = NumberSequence.new(0, 1)
+		alphaGrad.Transparency = NumberSequence.new(1, 0)
 		alphaGrad.Parent = alphaFill
 
+		local initialOpacity = 1 - currentAlpha
 		alphaThumb = Create.New("Frame", {
 			Name = "AlphaThumb",
 			Size = UDim2.fromOffset(7, 18),
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(currentAlpha, 0.5),
+			Position = UDim2.fromScale(initialOpacity, 0.5),
 			Corner = 999,
 			ZIndex = 114,
 			Theme = { BackgroundColor3 = "Knob" },
@@ -12328,7 +12471,7 @@ function ColorPicker.new(parent, opts, ctx)
 			Size = UDim2.fromOffset(34, 18),
 			Position = UDim2.new(1, 0, 0.5, 0),
 			AnchorPoint = Vector2.new(1, 0.5),
-			Text = string.format("%d%%", math.floor(currentAlpha * 100 + 0.5)),
+			Text = string.format("%d%%", math.floor(initialOpacity * 100 + 0.5)),
 			TextSize = 10,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			Color = "SubText",
@@ -12342,7 +12485,7 @@ function ColorPicker.new(parent, opts, ctx)
 	-- 4. Live Editable #HEX & R,G,B Inputs
 	local inputsRow = Create.New("Frame", {
 		Name = "InputsRow",
-		Size = UDim2.new(1, 0, 0, 28),
+		Size = UDim2.new(1, 0, 0, 38),
 		BackgroundTransparency = 1,
 		LayoutOrder = 4,
 		ZIndex = 112,
@@ -12354,16 +12497,41 @@ function ColorPicker.new(parent, opts, ctx)
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 
-	local function makeInputField(name, width, layoutOrder, initialText)
+	local function makeInputField(name, caption, width, layoutOrder, initialText)
+		local col = Create.New("Frame", {
+			Name = name .. "Col",
+			Size = UDim2.fromOffset(width, 38),
+			LayoutOrder = layoutOrder,
+			BackgroundTransparency = 1,
+			ZIndex = 112,
+			Parent = inputsRow,
+		})
+		Create.List(col, {
+			Direction = Enum.FillDirection.Vertical,
+			Gap = 3,
+			HAlign = Enum.HorizontalAlignment.Center,
+		})
+		Create.Text({
+			Name = "Caption",
+			Size = UDim2.new(1, 0, 0, 10),
+			LayoutOrder = 1,
+			Text = caption,
+			Font = "SemiBold",
+			TextSize = 9,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Color = "SubText",
+			ZIndex = 112,
+			Parent = col,
+		})
 		local boxWrap = Create.New("Frame", {
 			Name = name .. "Wrap",
-			Size = UDim2.fromOffset(width, 26),
-			LayoutOrder = layoutOrder,
+			Size = UDim2.new(1, 0, 0, 24),
+			LayoutOrder = 2,
 			Corner = 6,
 			Padding = { 0, 5, 0, 5 },
 			ZIndex = 112,
 			Theme = { BackgroundColor3 = "Field" },
-			Parent = inputsRow,
+			Parent = col,
 		})
 		local stroke = Create.Stroke(boxWrap, {
 			Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
@@ -12390,19 +12558,23 @@ function ColorPicker.new(parent, opts, ctx)
 		return box
 	end
 
-	local hexInput = makeInputField("Hex", 78, 1, "#" .. Util.ToHex(currentColor))
-	local rInput = makeInputField("R", 40, 2, tostring(math.floor(currentColor.R * 255 + 0.5)))
-	local gInput = makeInputField("G", 40, 3, tostring(math.floor(currentColor.G * 255 + 0.5)))
-	local bInput = makeInputField("B", 40, 4, tostring(math.floor(currentColor.B * 255 + 0.5)))
+	local initR = math.floor(currentColor.R * 255 + 0.5)
+	local initG = math.floor(currentColor.G * 255 + 0.5)
+	local initB = math.floor(currentColor.B * 255 + 0.5)
+	local hexInput = makeInputField("Hex", "HEX", 80, 1, string.format("#%02X%02X%02X", initR, initG, initB))
+	local rInput = makeInputField("R", "R", 40, 2, tostring(initR))
+	local gInput = makeInputField("G", "G", 40, 3, tostring(initG))
+	local bInput = makeInputField("B", "B", 40, 4, tostring(initB))
 
 	-- 5. Quick Preset Swatches (6 per row)
 	local presetsList = type(opts.Presets) == "table" and #opts.Presets > 0 and opts.Presets or DEFAULT_PRESETS
+	local presetEntries = {}
 	local presetWrap = Create.New("Frame", {
 		Name = "Presets",
 		Size = UDim2.new(1, 0, 0, 24),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		Padding = { 2, 2, 2, 2 },
+		Padding = { 2, 0, 2, 0 },
 		LayoutOrder = 5,
 		ZIndex = 112,
 		Parent = body,
@@ -12413,12 +12585,17 @@ function ColorPicker.new(parent, opts, ctx)
 		Wraps = true,
 	})
 
-	local function syncVisuals()
-		currentColor = Color3.fromHSV(hue, sat, val)
+	local function syncVisuals(recomputeFromHSV)
+		if recomputeFromHSV == true then
+			currentColor = Color3.fromHSV(hue, sat, val)
+		end
 		self.Value = currentColor
 		self.Alpha = currentAlpha
 
-		local hexStr = "#" .. Util.ToHex(currentColor)
+		local r = math.floor(currentColor.R * 255 + 0.5)
+		local g = math.floor(currentColor.G * 255 + 0.5)
+		local b = math.floor(currentColor.B * 255 + 0.5)
+		local hexStr = string.format("#%02X%02X%02X", r, g, b)
 		pillHex.Text = hexStr
 		pillSwatch.BackgroundColor3 = currentColor
 		pillSwatch.BackgroundTransparency = hasAlpha and currentAlpha or 0
@@ -12431,27 +12608,46 @@ function ColorPicker.new(parent, opts, ctx)
 		hueThumb.Position = UDim2.fromScale(0.5, hue)
 
 		if hasAlpha and alphaFill and alphaThumb and alphaLabel then
+			local opacity = 1 - currentAlpha
 			alphaFill.BackgroundColor3 = currentColor
-			alphaThumb.Position = UDim2.fromScale(currentAlpha, 0.5)
-			alphaLabel.Text = string.format("%d%%", math.floor(currentAlpha * 100 + 0.5))
+			alphaThumb.Position = UDim2.fromScale(opacity, 0.5)
+			alphaLabel.Text = string.format("%d%%", math.floor(opacity * 100 + 0.5))
 		end
 
 		if not hexInput:IsFocused() then
 			hexInput.Text = hexStr
 		end
 		if not rInput:IsFocused() then
-			rInput.Text = tostring(math.floor(currentColor.R * 255 + 0.5))
+			rInput.Text = tostring(r)
 		end
 		if not gInput:IsFocused() then
-			gInput.Text = tostring(math.floor(currentColor.G * 255 + 0.5))
+			gInput.Text = tostring(g)
 		end
 		if not bInput:IsFocused() then
-			bInput.Text = tostring(math.floor(currentColor.B * 255 + 0.5))
+			bInput.Text = tostring(b)
+		end
+
+		local strokeFallback = Theme.Current.Stroke
+		local strokeAlpha = Theme.Current.StrokeTransparency
+		for _, entry in ipairs(presetEntries) do
+			local c = entry.Color
+			local matched = math.abs(c.R - currentColor.R) < 0.025
+				and math.abs(c.G - currentColor.G) < 0.025
+				and math.abs(c.B - currentColor.B) < 0.025
+			if matched then
+				entry.Stroke.Color = Color3.new(1, 1, 1)
+				entry.Stroke.Transparency = 0.08
+				entry.Stroke.Thickness = 1.5
+			else
+				entry.Stroke.Color = strokeFallback
+				entry.Stroke.Transparency = strokeAlpha
+				entry.Stroke.Thickness = 1
+			end
 		end
 	end
 
-	local function fireChanged(silent)
-		syncVisuals()
+	local function fireChanged(silent, recomputeFromHSV)
+		syncVisuals(recomputeFromHSV)
 		if not silent then
 			local alphaArg = hasAlpha and currentAlpha or nil
 			if opts.Callback then
@@ -12487,7 +12683,7 @@ function ColorPicker.new(parent, opts, ctx)
 		stopRainbowLoop()
 		rainbowConn = Services.RunService.RenderStepped:Connect(function(dt)
 			hue = (hue + dt * 0.18) % 1
-			fireChanged(false)
+			fireChanged(false, true)
 		end)
 	end
 
@@ -12514,17 +12710,21 @@ function ColorPicker.new(parent, opts, ctx)
 		local col = parseColorInput(entry, Theme.Current.Accent)
 		local sw = Create.New("TextButton", {
 			Name = "Preset_" .. idx,
-			Size = UDim2.fromOffset(28, 20),
+			Size = UDim2.fromOffset(30, 20),
 			LayoutOrder = idx,
 			Text = "",
 			AutoButtonColor = false,
 			BackgroundTransparency = 0,
 			BackgroundColor3 = col,
-			Corner = 5,
+			Corner = 6,
 			ZIndex = 113,
 			Parent = presetWrap,
 		})
-		Create.Stroke(sw, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
+		local swStroke = Create.Stroke(sw, {
+			Color = Theme.Current.Stroke,
+			Transparency = Theme.Current.StrokeTransparency,
+		})
+		table.insert(presetEntries, { Color = col, Stroke = swStroke })
 		sw.Activated:Connect(function()
 			if isDisabledOrLocked(self) then
 				return
@@ -12550,19 +12750,20 @@ function ColorPicker.new(parent, opts, ctx)
 			if aSize.X > 0 and aSize.Y > 0 then
 				sat = Util.Clamp((pos.X - aPos.X) / aSize.X, 0, 1)
 				val = 1 - Util.Clamp((pos.Y - aPos.Y) / aSize.Y, 0, 1)
-				fireChanged(false)
+				fireChanged(false, true)
 			end
 		elseif activeDrag == "Hue" then
 			local aPos, aSize = hueBar.AbsolutePosition, hueBar.AbsoluteSize
 			if aSize.Y > 0 then
 				hue = Util.Clamp((pos.Y - aPos.Y) / aSize.Y, 0, 1)
-				fireChanged(false)
+				fireChanged(false, true)
 			end
 		elseif activeDrag == "Alpha" and alphaBar then
 			local aPos, aSize = alphaBar.AbsolutePosition, alphaBar.AbsoluteSize
 			if aSize.X > 0 then
-				currentAlpha = Util.Clamp((pos.X - aPos.X) / aSize.X, 0, 1)
-				fireChanged(false)
+				local opacity = Util.Clamp((pos.X - aPos.X) / aSize.X, 0, 1)
+				currentAlpha = 1 - opacity
+				fireChanged(false, false)
 			end
 		end
 	end
@@ -12673,7 +12874,7 @@ function ColorPicker.new(parent, opts, ctx)
 				popover.Parent = layer
 				local view = layer.AbsoluteSize
 				local aPos, aSize = swatchPill.AbsolutePosition, swatchPill.AbsoluteSize
-				local popH = math.max(popover.AbsoluteSize.Y, hasAlpha and 272 or 244)
+				local popH = math.max(popover.AbsoluteSize.Y, hasAlpha and 322 or 294)
 				local px = Util.Clamp(aPos.X + aSize.X - 236, 8, math.max(8, view.X - 244))
 				local py = aPos.Y + aSize.Y + 6
 				if py + popH > view.Y - 8 then
@@ -12749,9 +12950,10 @@ function ColorPicker.new(parent, opts, ctx)
 			silent = silentArg == true
 		end
 
+		currentColor = nextColor
 		hue, sat, val = Color3.toHSV(nextColor)
 		currentAlpha = nextAlpha
-		fireChanged(silent == true)
+		fireChanged(silent == true, false)
 	end
 
 	function self:Get()
@@ -12828,6 +13030,9 @@ function ColorPicker.new(parent, opts, ctx)
 
 	syncVisuals()
 	updateRainbowVisuals()
+	self.Maid:Give(Theme.Changed:Connect(function()
+		syncVisuals(false)
+	end))
 	if rainbowEnabled then
 		startRainbowLoop()
 	end
@@ -13139,14 +13344,12 @@ function Dropdown.new(parent, opts, ctx)
 		Visible = false,
 		ZIndex = 110,
 		Corner = 10,
+		BackgroundTransparency = 0,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = function(t)
-				return math.min(t.CardTransparency or 0.12, 0.04)
-			end,
 		},
 	})
-	Create.GlassStroke(popup, 0.06)
+	Create.GlassStroke(popup, 0.12)
 
 	Create.New("TextButton", {
 		Name = "InputSink",
@@ -13574,7 +13777,7 @@ function Dropdown.new(parent, opts, ctx)
 
 		local layerH = (ctx.PopupLayer and ctx.PopupLayer.AbsoluteSize.Y > 0) and ctx.PopupLayer.AbsoluteSize.Y or 680
 		local anchorW = (trigger.AbsoluteSize.X > 0) and trigger.AbsoluteSize.X or 168
-		local width = Util.Clamp(math.max(anchorW + 76, 248), 248, 320)
+		local width = (anchorW >= 180) and anchorW or Util.Clamp(math.max(anchorW + 40, 200), 200, 252)
 		local totalH = math.min(16 + searchH + listH, math.max(120, layerH - 16))
 		listH = math.max(36, totalH - 16 - searchH)
 
@@ -15001,11 +15204,17 @@ function Keybind.new(parent, opts, ctx)
 		Text = "",
 		Corner = 7,
 		Padding = { 0, 8, 0, 8 },
+		BackgroundTransparency = 0.45,
 		Theme = { BackgroundColor3 = "Field" },
 		Parent = controls,
 	})
 	local modeStroke = Create.Stroke(modePill, {
-		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+		Theme = {
+			Color = "Stroke",
+			Transparency = function(t)
+				return math.min((t.StrokeTransparency or 0.85) + 0.08, 0.94)
+			end,
+		},
 	})
 	local modeLabel = Create.Text({
 		Name = "ModeText",
@@ -15596,13 +15805,41 @@ function Segmented.new(parent, opts, ctx)
 			Gap = 8,
 		})
 
+		local headerParent = body
+		local textLayoutOrder = 1
+		local hasHeaderIcon = type(opts.Icon) == "string" and opts.Icon ~= "" and titleText ~= ""
+		if hasHeaderIcon then
+			local headerRow = Create.New("Frame", {
+				Name = "HeaderRow",
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				LayoutOrder = 1,
+				Parent = body,
+			})
+			Create.List(headerRow, {
+				Direction = Enum.FillDirection.Horizontal,
+				Gap = 10,
+				VAlign = Enum.VerticalAlignment.Center,
+			})
+			Icons.Create(opts.Icon, {
+				Name = "Icon",
+				Size = UDim2.fromOffset(18, 18),
+				Color = "SubText",
+				LayoutOrder = 1,
+				Parent = headerRow,
+			})
+			headerParent = headerRow
+			textLayoutOrder = 2
+		end
+
 		local textCol = Create.New("Frame", {
 			Name = "TextColumn",
-			Size = UDim2.new(1, 0, 0, 0),
+			Size = hasHeaderIcon and UDim2.new(1, -28, 0, 0) or UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
-			LayoutOrder = 1,
-			Parent = body,
+			LayoutOrder = textLayoutOrder,
+			Parent = headerParent,
 		})
 		Create.List(textCol, {
 			Direction = Enum.FillDirection.Vertical,
@@ -15672,7 +15909,7 @@ function Segmented.new(parent, opts, ctx)
 		Name = "Indicator",
 		Size = UDim2.new(0, 0, 1, 0),
 		Position = UDim2.fromScale(0, 0),
-		Corner = 7,
+		Corner = 6,
 		ZIndex = 2,
 		Visible = false,
 		Parent = inner,
@@ -15797,7 +16034,7 @@ function Segmented.new(parent, opts, ctx)
 				Name = "Seg_" .. i,
 				Size = UDim2.new(1 / n, widthOffset, 1, 0),
 				BackgroundTransparency = 1,
-				Corner = 7,
+				Corner = 6,
 				Padding = { 0, 6, 0, 6 },
 				Text = "",
 				AutoButtonColor = false,
@@ -16229,7 +16466,7 @@ function Slider.new(parent, opts, ctx)
 
 	local track = Create.New("Frame", {
 		Name = "Track",
-		Size = UDim2.new(1, 0, 0, 5),
+		Size = UDim2.new(1, 0, 0, 6),
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.fromScale(0, 0.5),
 		Theme = { BackgroundColor3 = "ToggleOff" },
@@ -16594,7 +16831,7 @@ function RangeSlider.new(parent, opts, ctx)
 
 	local track = Create.New("Frame", {
 		Name = "Track",
-		Size = UDim2.new(1, 0, 0, 5),
+		Size = UDim2.new(1, 0, 0, 6),
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.fromScale(0, 0.5),
 		Theme = { BackgroundColor3 = "ToggleOff" },
@@ -17063,9 +17300,7 @@ function Label.new(parent, opts, ctx)
 	if rowOpts.IconBadge == nil then
 		rowOpts.IconBadge = false
 	end
-	if rowOpts.StackRight == nil then
-		rowOpts.StackRight = false
-	end
+	rowOpts._compactStack = true
 
 	local row = Base.Row(parent, rowOpts, 0)
 	element:BindUI(row)
@@ -17076,6 +17311,17 @@ function Label.new(parent, opts, ctx)
 		HAlign = Enum.HorizontalAlignment.Right,
 		Gap = 6,
 	})
+
+	local statusDot = Create.New("Frame", {
+		Name = "StatusDot",
+		Size = UDim2.fromOffset(8, 8),
+		Corner = UDim.new(1, 0),
+		Theme = { BackgroundColor3 = opts.DotColor or opts.BadgeColor or "Success" },
+		Visible = (opts.StatusDot == true or opts.DotColor ~= nil),
+		LayoutOrder = 0,
+		Parent = row.Right,
+	})
+	element.Maid:Give(Transition.Pulse(statusDot, "BackgroundTransparency", 0, 0.35, 1.8))
 
 	local valueText = opts.Value ~= nil and tostring(opts.Value) or (opts.Text ~= nil and tostring(opts.Text) or "")
 	element.Value = valueText
@@ -17201,6 +17447,30 @@ function Label.new(parent, opts, ctx)
 		end
 	end
 
+	function element:SetDot(colorKey, visible)
+		if visible == false then
+			statusDot.Visible = false
+			return
+		end
+		statusDot.Visible = true
+		if typeof(colorKey) == "Color3" then
+			Theme.Unbind(statusDot, "BackgroundColor3")
+			statusDot.BackgroundColor3 = colorKey
+		elseif type(colorKey) == "string" and colorKey ~= "" then
+			Theme.Bind(statusDot, { BackgroundColor3 = colorKey })
+		end
+	end
+
+	function element:SetStatus(valueTextArg, badgeText, colorKey)
+		if valueTextArg ~= nil then
+			self:SetValue(valueTextArg)
+		end
+		if badgeText ~= nil then
+			self:SetBadge(badgeText, colorKey)
+		end
+		self:SetDot(colorKey or opts.DotColor or opts.BadgeColor or "Success", true)
+	end
+
 	return element
 end
 
@@ -17211,33 +17481,51 @@ function Paragraph.new(parent, opts, ctx)
 	opts = Util.Options(opts, {}, "Title")
 	local element = Base.New("Paragraph", parent, opts, ctx)
 
-	local card = Base.Card(parent, { Padding = 0 })
+	local card = Base.Card(parent, { Padding = 0, ClipsDescendants = true })
 	local accentColor = opts.Color or "Accent"
 	local showBar = (opts.AccentBar ~= false)
 
+	local glow = nil
+	local bar = nil
+	local barGrad = nil
+	local iconBadge = nil
+
 	if showBar then
-		local bar = Create.New("Frame", {
+		local glowAsset = Assets and Assets.Get and Assets.Get("Glow")
+		if glowAsset and Assets.Available then
+			glow = Create.New("ImageLabel", {
+				Name = "Glow",
+				Image = glowAsset,
+				Size = UDim2.fromOffset(170, 72),
+				Position = UDim2.fromOffset(8, 2),
+				BackgroundTransparency = 1,
+				ImageTransparency = 0.88,
+				ZIndex = 0,
+				Parent = card.Frame,
+			})
+		end
+
+		bar = Create.New("Frame", {
 			Name = "AccentBar",
-			Size = UDim2.new(0, 3, 1, -18),
-			Position = UDim2.fromOffset(10, 9),
+			Size = UDim2.new(1, -20, 0, 2),
+			Position = UDim2.new(0, 10, 0, 0),
 			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 0.12,
 			Corner = UDim.new(1, 0),
 			ZIndex = 3,
 			Parent = card.Frame,
 		})
-		if typeof(accentColor) == "Color3" then
-			bar.BackgroundColor3 = accentColor
-		elseif accentColor ~= "Accent" then
-			Theme.Bind(bar, { BackgroundColor3 = accentColor })
-		else
-			local grad = Instance.new("UIGradient")
-			grad.Rotation = 90
-			grad.Color = Theme.AccentSequence()
-			grad.Parent = bar
-			element.Maid:Give(Theme.Changed:Connect(function(t)
-				grad.Color = Theme.AccentSequence(t)
-			end))
-		end
+		barGrad = Instance.new("UIGradient")
+		barGrad.Rotation = 0
+		barGrad.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.08, 0.35),
+			NumberSequenceKeypoint.new(0.22, 0),
+			NumberSequenceKeypoint.new(0.52, 0.25),
+			NumberSequenceKeypoint.new(0.85, 0.82),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		barGrad.Parent = bar
 	end
 
 	local body = Create.New("Frame", {
@@ -17245,7 +17533,7 @@ function Paragraph.new(parent, opts, ctx)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		Padding = { 12, 12, 12, showBar and 22 or 12 },
+		Padding = { 13, 14, 12, 14 },
 		ZIndex = 2,
 		Parent = card.Frame,
 	})
@@ -17276,10 +17564,40 @@ function Paragraph.new(parent, opts, ctx)
 
 	local iconWidth = 0
 	if opts.Icon and opts.Icon ~= "" and opts.Icon ~= false then
-		local badge = Base.IconBadge(header, opts.Icon, accentColor)
-		badge.Frame.LayoutOrder = 1
+		iconBadge = Base.IconBadge(header, opts.Icon, accentColor)
+		iconBadge.Frame.LayoutOrder = 1
 		iconWidth = 30
 	end
+
+	local function applyAccentColor(colorSpec, themeTable)
+		accentColor = colorSpec or "Accent"
+		local activeTheme = themeTable or Theme.Current
+		if glow then
+			if typeof(accentColor) == "Color3" then
+				Theme.Unbind(glow, "ImageColor3")
+				glow.ImageColor3 = accentColor
+			else
+				Theme.Bind(glow, { ImageColor3 = accentColor })
+			end
+		end
+		if barGrad then
+			if typeof(accentColor) == "Color3" then
+				barGrad.Color = ColorSequence.new(accentColor)
+			elseif accentColor == "Accent" then
+				barGrad.Color = Theme.AccentSequence(activeTheme)
+			else
+				barGrad.Color = ColorSequence.new(activeTheme[accentColor] or activeTheme.Accent)
+			end
+		end
+		if iconBadge and colorSpec ~= nil then
+			iconBadge:SetColor(accentColor)
+		end
+	end
+
+	applyAccentColor(accentColor)
+	element.Maid:Give(Theme.Changed:Connect(function(t)
+		applyAccentColor(accentColor, t)
+	end))
 
 	local titleLabel = Create.Text({
 		Name = "Title",
@@ -17437,6 +17755,16 @@ function Paragraph.new(parent, opts, ctx)
 		buildTags(tags)
 	end
 
+	function element:SetColor(newColor)
+		applyAccentColor(newColor)
+	end
+
+	function element:SetIcon(newIcon)
+		if iconBadge then
+			iconBadge:SetIcon(newIcon)
+		end
+	end
+
 	return element
 end
 
@@ -17466,6 +17794,7 @@ function Divider.new(parent, opts, ctx)
 	local leftLine = Create.New("Frame", {
 		Name = "LeftLine",
 		Size = labelText ~= "" and UDim2.new(0, 14, 0, 1) or UDim2.new(1, 0, 0, 1),
+		Corner = UDim.new(1, 0),
 		Theme = {
 			BackgroundColor3 = "Divider",
 			BackgroundTransparency = "DividerTransparency",
@@ -17490,6 +17819,7 @@ function Divider.new(parent, opts, ctx)
 	local rightLine = Create.New("Frame", {
 		Name = "RightLine",
 		Size = UDim2.new(1, -30, 0, 1),
+		Corner = UDim.new(1, 0),
 		Theme = {
 			BackgroundColor3 = "Divider",
 			BackgroundTransparency = "DividerTransparency",
@@ -17939,7 +18269,7 @@ function CodeBlock.new(parent, opts, ctx)
 		Parent = body,
 	})
 
-	local wrap = (opts.Wrap ~= false)
+	local wrap = (opts.Wrap == true)
 	local scroll = Create.New("ScrollingFrame", {
 		Name = "CodeScroll",
 		Size = UDim2.new(1, 0, 0, 0),
@@ -17959,7 +18289,7 @@ function CodeBlock.new(parent, opts, ctx)
 	})
 
 	local padTop = 8
-	local padBottom = wrap and 10 or 14
+	local padBottom = wrap and 14 or 18
 	local padLeft = 10
 	local padRight = 14
 
@@ -18007,11 +18337,13 @@ function CodeBlock.new(parent, opts, ctx)
 			if nl then
 				local seg = string.sub(src, startIdx, nl - 1)
 				seg = string.gsub(seg, "\r$", "")
+				seg = string.gsub(seg, "\t", "    ")
 				table.insert(out, seg)
 				startIdx = nl + 1
 			else
 				local seg = string.sub(src, startIdx)
 				seg = string.gsub(seg, "\r$", "")
+				seg = string.gsub(seg, "\t", "    ")
 				table.insert(out, seg)
 				break
 			end
@@ -18712,6 +19044,7 @@ local Create = require("Core/Create")
 local Icons = require("Core/Icons")
 local Transition = require("Core/Transition")
 local Input = require("Systems/Input")
+local KeybindList = require("Systems/KeybindList")
 local Base = require("Elements/Base")
 
 local ToggleModule = {}
@@ -18749,7 +19082,7 @@ function Toggle.new(parent, opts, ctx)
 		Size = UDim2.fromOffset(42, 22),
 		Theme = {
 			BackgroundColor3 = function(t)
-				return state and t.Accent or t.ToggleOff
+				return state and t.Accent or t.Field
 			end,
 		},
 		Corner = UDim.new(1, 0),
@@ -18763,7 +19096,7 @@ function Toggle.new(parent, opts, ctx)
 				return state and t.Accent or t.Stroke
 			end,
 			Transparency = function(t)
-				return state and 1 or math.min(0.42, t.StrokeTransparency)
+				return state and 1 or math.min(0.48, t.StrokeTransparency)
 			end,
 		},
 		Thickness = 1.2,
@@ -18771,10 +19104,10 @@ function Toggle.new(parent, opts, ctx)
 
 	local knob = Create.New("Frame", {
 		Name = "Knob",
-		Size = UDim2.fromOffset(18, 18),
+		Size = state and UDim2.fromOffset(18, 18) or UDim2.fromOffset(16, 16),
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, state and 22 or 2, 0.5, 0),
-		Theme = { BackgroundColor3 = "Knob" },
+		Position = UDim2.new(0, state and 22 or 3, 0.5, 0),
+		BackgroundColor3 = state and Theme.Current.Knob or (Theme.Current.Dark and Color3.fromRGB(186, 192, 206) or Theme.Current.Knob),
 		Corner = UDim.new(1, 0),
 		ZIndex = 3,
 		Parent = track,
@@ -18784,20 +19117,26 @@ function Toggle.new(parent, opts, ctx)
 	local currentKey = nil
 	local listening = false
 	local stopPulse = nil
+	local syncKeybindList = nil
 	local keyChip, keyStroke, keyLabel
 
 	local function applyVisual(animate)
-		local targetPos = UDim2.new(0, state and 22 or 2, 0.5, 0)
-		local targetTrackBg = state and Theme.Current.Accent or Theme.Current.ToggleOff
+		local targetPos = UDim2.new(0, state and 22 or 3, 0.5, 0)
+		local targetSize = state and UDim2.fromOffset(18, 18) or UDim2.fromOffset(16, 16)
+		local targetKnobColor = state and Theme.Current.Knob or (Theme.Current.Dark and Color3.fromRGB(186, 192, 206) or Theme.Current.Knob)
+		local targetTrackBg = state and Theme.Current.Accent or Theme.Current.Field
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
-		local targetStrokeTrans = state and 1 or math.min(0.42, Theme.Current.StrokeTransparency)
+		local targetStrokeTrans = state and 1 or math.min(0.48, Theme.Current.StrokeTransparency)
 
 		if animate then
 			Tween.Spring(knob, { Position = targetPos }, Tween.Fast + 0.08)
-			Tween.Play(knob, { Size = UDim2.fromOffset(22, 18) }, 0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			Tween.Play(knob, {
+				Size = UDim2.fromOffset(22, state and 18 or 16),
+				BackgroundColor3 = targetKnobColor,
+			}, 0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			task.delay(0.07, function()
 				if knob.Parent and not element._destroyed then
-					Tween.Spring(knob, { Size = UDim2.fromOffset(18, 18) }, 0.13)
+					Tween.Spring(knob, { Size = state and UDim2.fromOffset(18, 18) or UDim2.fromOffset(16, 16) }, 0.13)
 				end
 			end)
 			Tween.Play(track, { BackgroundColor3 = targetTrackBg }, Tween.Fast, Enum.EasingStyle.Quad)
@@ -18807,6 +19146,8 @@ function Toggle.new(parent, opts, ctx)
 			}, Tween.Fast, Enum.EasingStyle.Quad)
 		else
 			knob.Position = targetPos
+			knob.Size = targetSize
+			knob.BackgroundColor3 = targetKnobColor
 			track.BackgroundColor3 = targetTrackBg
 			trackStroke.Color = targetStrokeColor
 			trackStroke.Transparency = targetStrokeTrans
@@ -18830,7 +19171,8 @@ function Toggle.new(parent, opts, ctx)
 			Name = "KeyChip",
 			Size = UDim2.fromOffset(0, 22),
 			AutomaticSize = Enum.AutomaticSize.X,
-			Theme = { BackgroundColor3 = "Field" },
+			BackgroundTransparency = 0.12,
+			Theme = { BackgroundColor3 = "TileHover" },
 			Corner = 6,
 			Padding = { 0, 7, 0, 7 },
 			Text = "",
@@ -18841,7 +19183,8 @@ function Toggle.new(parent, opts, ctx)
 		})
 
 		keyStroke = Create.Stroke(keyChip, {
-			Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+			Theme = { Color = "Stroke" },
+			Transparency = 0.48,
 			Thickness = 1,
 		})
 
@@ -18858,13 +19201,14 @@ function Toggle.new(parent, opts, ctx)
 			Parent = keyChip,
 		})
 
-		element.Maid:Give(Transition.Hover(keyChip, keyChip, "Field", "FieldHover", keyStroke))
+		element.Maid:Give(Transition.Hover(keyChip, keyChip, "TileHover", "FieldHover", keyStroke))
 
 		local function syncChip()
 			if not listening then
 				keyLabel.Text = Util.KeyName(currentKey)
 				Theme.Bind(keyLabel, { TextColor3 = currentKey and "Text" or "Muted" })
-				Theme.Bind(keyStroke, { Color = "Stroke", Transparency = "StrokeTransparency" })
+				Theme.Bind(keyStroke, { Color = "Stroke" })
+				keyStroke.Transparency = 0.48
 			end
 			local chipW = math.max(28, math.ceil(keyChip.AbsoluteSize.X))
 			row:SetRightWidth(42 + 6 + chipW)
@@ -18885,6 +19229,19 @@ function Toggle.new(parent, opts, ctx)
 			syncChip()
 		end
 
+		local syncList = opts.SyncList ~= false
+		syncKeybindList = function()
+			if not syncList or not KeybindList or not KeybindList.Update then
+				return
+			end
+			KeybindList.Update(bindId, {
+				Title = tostring(element.Title or opts.Title or "Toggle"),
+				KeyName = Util.KeyName(currentKey),
+				Mode = "Toggle",
+				Active = state,
+			})
+		end
+
 		inputHandle = Input.RegisterKeybind(bindId, currentKey, function(active)
 			if element._destroyed or element.Disabled or element.Locked then
 				if inputHandle then
@@ -18896,6 +19253,15 @@ function Toggle.new(parent, opts, ctx)
 		end, "Toggle")
 		inputHandle.SetActive(state, true)
 
+		if syncList and KeybindList and KeybindList.Register then
+			KeybindList.Register(bindId, {
+				Title = tostring(opts.Title or "Toggle"),
+				KeyName = Util.KeyName(currentKey),
+				Mode = "Toggle",
+				Active = state,
+			})
+		end
+
 		element.Maid:Give(function()
 			if listening then
 				Input.CancelCapture()
@@ -18904,6 +19270,9 @@ function Toggle.new(parent, opts, ctx)
 			if inputHandle then
 				inputHandle.Destroy()
 				inputHandle = nil
+			end
+			if syncList and KeybindList and KeybindList.Unregister then
+				KeybindList.Unregister(bindId)
 			end
 		end)
 
@@ -18939,6 +19308,7 @@ function Toggle.new(parent, opts, ctx)
 				if inputHandle then
 					inputHandle.SetKey(currentKey)
 				end
+				syncKeybindList()
 				syncChip()
 				element.Changed:Fire(state, currentKey)
 			end)
@@ -18985,6 +19355,9 @@ function Toggle.new(parent, opts, ctx)
 		if inputHandle then
 			inputHandle.SetActive(state, true)
 		end
+		if syncKeybindList then
+			syncKeybindList()
+		end
 		if changed and not silent then
 			self.Changed:Fire(state)
 			if type(opts.Callback) == "function" then
@@ -19012,6 +19385,9 @@ function Toggle.new(parent, opts, ctx)
 		currentKey = Util.ResolveKey(key)
 		if inputHandle then
 			inputHandle.SetKey(currentKey)
+		end
+		if syncKeybindList then
+			syncKeybindList()
 		end
 		if keyLabel then
 			keyLabel.Text = Util.KeyName(currentKey)
@@ -20291,8 +20667,8 @@ function Loader.LoadingScreen(parentGui, options)
 	Create.List(progressBlock, { Gap = 6 })
 
 	local track = Create.New("Frame", {
-		Size = UDim2.new(1, 0, 0, 6),
-		Corner = 999,
+		Size = UDim2.new(1, 0, 0, 5),
+		Corner = UDim.new(1, 0),
 		Theme = { BackgroundColor3 = "Field" },
 		ClipsDescendants = true,
 		LayoutOrder = 1,
@@ -20301,7 +20677,7 @@ function Loader.LoadingScreen(parentGui, options)
 
 	local fill = Create.New("Frame", {
 		Size = UDim2.fromScale(0, 1),
-		Corner = 999,
+		Corner = UDim.new(1, 0),
 		Theme = { BackgroundColor3 = "Accent" },
 		Parent = track,
 	})
@@ -22052,14 +22428,14 @@ function Loader.KeySystem(parentGui, options)
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0.5, 66),
 		Size = UDim2.fromOffset(220, 6),
-		Corner = 99,
+		Corner = UDim.new(1, 0),
 		Theme = { BackgroundColor3 = "Tile" },
 		ClipsDescendants = true,
 		Parent = successView,
 	})
 	local sFill = Create.New("Frame", {
 		Size = UDim2.fromScale(0, 1),
-		Corner = 99,
+		Corner = UDim.new(1, 0),
 		Theme = { BackgroundColor3 = "Accent" },
 		Parent = sTrack,
 	})
@@ -22914,7 +23290,8 @@ local function createFlowController(tab, parent, subTab)
 		BorderSizePixel = 0,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
-		ScrollBarThickness = 3,
+		ScrollBarThickness = 2,
+		ScrollBarImageTransparency = 0.45,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		Theme = { ScrollBarImageColor3 = "Muted" },
 		Padding = (window and window.IsMobileMode and window:IsMobileMode()) and { 10, 10, 14, 10 } or { 14, 16, 18, 16 },
@@ -23134,13 +23511,26 @@ function Tab.new(window, options)
 	local indicator = Create.New("Frame", {
 		Name = "Indicator",
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 0, 0.5, 0),
-		Size = UDim2.fromOffset(3, 0),
-		Corner = 2,
-		Theme = { BackgroundColor3 = "Accent" },
+		Position = UDim2.new(0, 4, 0.5, 0),
+		Size = UDim2.fromOffset(2, 0),
+		Corner = UDim.new(1, 0),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.12,
 		ZIndex = 3,
 		Parent = button,
 	})
+	local indGradient = Instance.new("UIGradient")
+	indGradient.Rotation = 90
+	indGradient.Color = Theme.AccentSequence()
+	indGradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 0.35),
+	})
+	indGradient.Parent = indicator
+	maid:Give(Theme.Changed:Connect(function(theme)
+		indGradient.Color = Theme.AccentSequence(theme)
+	end))
 
 	local iconInst = Icons.Create(options.Icon, {
 		Name = "Icon",
@@ -23263,9 +23653,17 @@ function Tab.new(window, options)
 		Gap = 4,
 		VAlign = Enum.VerticalAlignment.Center,
 	})
-	maid:Give(subTabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		subTabScroll.CanvasSize = UDim2.fromOffset(subTabLayout.AbsoluteContentSize.X + 4, 0)
-	end))
+	local function syncSubTabWrapSize()
+		local contentW = subTabLayout.AbsoluteContentSize.X + 4
+		subTabScroll.CanvasSize = UDim2.fromOffset(contentW, 0)
+		if contentW > 4 then
+			local pageW = page.AbsoluteSize.X
+			local maxW = (pageW > 64) and (pageW - 32) or 9999
+			subTabWrap.Size = UDim2.fromOffset(math.min(contentW + 6, maxW), 36)
+		end
+	end
+	maid:Give(subTabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(syncSubTabWrapSize))
+	maid:Give(page:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncSubTabWrapSize))
 
 	local subPageHolder = Create.New("Frame", {
 		Name = "SubPages",
@@ -23405,11 +23803,11 @@ function Tab:SetCompact(compact, instant)
 		end
 	end
 	if self._indicator then
-		self._indicator.Position = UDim2.new(0, compact and 2 or 0, 0.5, 0)
+		self._indicator.Position = UDim2.new(0, compact and 5 or 4, 0.5, 0)
 		if self.Selected then
-			self._indicator.Size = compact and UDim2.fromOffset(2, 14) or UDim2.fromOffset(3, 18)
+			self._indicator.Size = compact and UDim2.fromOffset(2, 12) or UDim2.fromOffset(2, 14)
 		else
-			self._indicator.Size = compact and UDim2.fromOffset(2, 0) or UDim2.fromOffset(3, 0)
+			self._indicator.Size = UDim2.fromOffset(2, 0)
 		end
 	end
 end
@@ -23418,8 +23816,8 @@ function Tab:_setActiveVisual(active, instant)
 	self.Selected = active == true
 	local fillT = active and 0.8 or 1
 	local strokeT = active and 0.68 or 1
-	local indW = self._compact and 2 or 3
-	local indH = active and (self._compact and 14 or 18) or 0
+	local indW = 2
+	local indH = active and (self._compact and 12 or 14) or 0
 	local indSize = UDim2.fromOffset(indW, indH)
 
 	if active then
@@ -24123,13 +24521,20 @@ function Window.new(screenGui, options)
 		Thickness = 1,
 	})
 
+	local brandCollapsedFlag = Create.New("Frame", {
+		Name = "_BrandCollapsedFlag",
+		Size = UDim2.new(),
+		BackgroundTransparency = 1,
+		Visible = isCollapsed,
+		Parent = brandBadge,
+	})
 	local brandLogoIcon = Icons.Create(options.Icon or "bali-logo", {
 		Name = "BrandLogoIcon",
 		Size = UDim2.fromOffset(customBrandIcon and 18 or 22, customBrandIcon and 18 or 22),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = customBrandIcon and "Accent" or Color3.fromRGB(255, 255, 255),
-		Visible = not isCollapsed,
+		Visible = true,
 		Parent = brandBadge,
 	})
 	local brandExpandIcon = Icons.Create("panel-left", {
@@ -24138,13 +24543,20 @@ function Window.new(screenGui, options)
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = "Text",
-		Visible = isCollapsed,
+		Visible = false,
 		Parent = brandBadge,
 	})
 	local brandBadgeHovered = false
 	local function applyBrandBadgeSurface(theme, animate)
 		local t = theme or Theme.Current
-		local collapsedNow = brandExpandIcon and brandExpandIcon.Visible == true
+		local showExpand = (brandCollapsedFlag and brandCollapsedFlag.Visible == true) and brandBadgeHovered
+		if brandLogoIcon then
+			brandLogoIcon.Visible = not showExpand
+		end
+		if brandExpandIcon then
+			brandExpandIcon.Visible = showExpand
+		end
+		local collapsedNow = showExpand
 		local lightModeLogo = (t and t.Dark == false) and not customBrandIcon and not collapsedNow
 		local targetBgColor = lightModeLogo and Color3.fromRGB(24, 24, 32) or ((t and t.TileHover) or Color3.fromRGB(37, 37, 46))
 		local targetBgTrans = lightModeLogo and (brandBadgeHovered and 0.04 or 0.12) or (brandBadgeHovered and 0.86 or 1)
@@ -24246,7 +24658,7 @@ function Window.new(screenGui, options)
 		Theme = { Color = "Stroke" },
 		Transparency = 1,
 	})
-	Icons.Create("chevron-left", {
+	Icons.Create("panel-left", {
 		Size = UDim2.fromOffset(14, 14),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -24340,7 +24752,7 @@ function Window.new(screenGui, options)
 		end)
 
 		local userText = Create.New("Frame", {
-			Size = UDim2.new(1, -34, 0, 0),
+			Size = UDim2.new(1, -38, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = 2,
@@ -24362,9 +24774,9 @@ function Window.new(screenGui, options)
 			Font = "SemiBold",
 			TextSize = 11,
 			Color = "Text",
-			Size = UDim2.new(1, 0, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			TextWrapped = true,
+			Size = UDim2.new(1, 0, 0, 14),
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
 			LayoutOrder = 2,
 			Parent = userText,
 		})
@@ -24396,10 +24808,11 @@ function Window.new(screenGui, options)
 	})
 
 	local searchPlaceholder = Create.Text({
-		Text = "Search...",
+		Text = "Search",
 		Font = "Regular",
 		TextSize = 12,
-		Color = "Muted",
+		Color = "SubText",
+		TextTransparency = 0.2,
 		Position = UDim2.fromOffset(32, 0),
 		Size = UDim2.new(1, -84, 1, 0),
 		TextTruncate = Enum.TextTruncate.AtEnd,
@@ -24513,8 +24926,16 @@ function Window.new(screenGui, options)
 		maid
 	)
 	local bellBtn = createActionButton(actionsWrap, "bell", "Notifications", 3, maid)
-	local minBtn = createActionButton(actionsWrap, "minus", "Minimize Window", 4, maid)
-	local closeBtn, closeIcon = createActionButton(actionsWrap, "x", "Close UI", 5, maid)
+	Create.New("Frame", {
+		Name = "ActionsDivider",
+		Size = UDim2.fromOffset(1, 16),
+		LayoutOrder = 4,
+		BackgroundTransparency = 0.82,
+		Theme = { BackgroundColor3 = "Stroke" },
+		Parent = actionsWrap,
+	})
+	local minBtn = createActionButton(actionsWrap, "minus", "Minimize Window", 5, maid)
+	local closeBtn, closeIcon = createActionButton(actionsWrap, "x", "Close UI", 6, maid)
 
 	-- Unread notification dot on Bell
 	local unreadDot = Create.New("Frame", {
@@ -24553,7 +24974,7 @@ function Window.new(screenGui, options)
 			BackgroundColor3 = "Tile",
 			BackgroundTransparency = "TileTransparency",
 		},
-		Visible = false,
+		Visible = isCollapsed,
 		LayoutOrder = 1,
 		Parent = breadcrumbWrap,
 	})
@@ -24604,7 +25025,7 @@ function Window.new(screenGui, options)
 	local resizeGrip = Create.New("Frame", {
 		Name = "ResizeGrip",
 		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -6, 1, -6),
+		Position = UDim2.new(1, -8, 1, -8),
 		Size = UDim2.fromOffset(16, 16),
 		BackgroundTransparency = 1,
 		ZIndex = 15,
@@ -25456,11 +25877,17 @@ function Window:ToggleSidebar(collapsed)
 
 	self._brandText.Visible = not collapsed
 	self._collapseBtn.Visible = not collapsed
+	local brandBadgeFrame = (self._brandLogoIcon and self._brandLogoIcon.Parent)
+		or (self._brandExpandIcon and self._brandExpandIcon.Parent)
+	local collapsedFlag = brandBadgeFrame and brandBadgeFrame:FindFirstChild("_BrandCollapsedFlag")
+	if collapsedFlag then
+		collapsedFlag.Visible = collapsed
+	end
 	if self._brandLogoIcon then
-		self._brandLogoIcon.Visible = not collapsed
+		self._brandLogoIcon.Visible = true
 	end
 	if self._brandExpandIcon then
-		self._brandExpandIcon.Visible = collapsed
+		self._brandExpandIcon.Visible = false
 	end
 	if self._syncBrandBadge then
 		task.defer(function()
@@ -25470,7 +25897,7 @@ function Window:ToggleSidebar(collapsed)
 		end)
 	end
 	if self._expandBtn then
-		self._expandBtn.Visible = false
+		self._expandBtn.Visible = collapsed
 	end
 	if self._searchPill then
 		self._searchPill.Visible = true
@@ -25880,7 +26307,7 @@ function SettingsTab.Build(window, options)
 	-- ─── Appearance (Left) ───────────────────────────────────────────────────
 	local appearance = tab:AddSection({
 		Title = "Appearance",
-		Subtitle = "Themes, accent palette, glass opacity, and motion.",
+		Subtitle = "Themes, accents, glass opacity, and motion.",
 		Icon = "palette",
 		Side = "Left",
 	})
@@ -26030,7 +26457,7 @@ function SettingsTab.Build(window, options)
 	-- ─── Interface & HUD (Right) ─────────────────────────────────────────────
 	local hud = tab:AddSection({
 		Title = "Interface & HUD",
-		Subtitle = "Toggle keybind, floating overlays, and toast placement.",
+		Subtitle = "Menu keybind, floating HUDs, and toast corner.",
 		Icon = "monitor",
 		Side = "Right",
 	})
@@ -26084,8 +26511,12 @@ function SettingsTab.Build(window, options)
 
 	local keybindModeSeg = hud:AddSegmented({
 		Title = "Keybind List Mode",
-		Icon = "list-checks",
-		Values = { "ActiveOnly", "All" },
+		Description = "Filter floating keybind overlay to active or all binds.",
+		Icon = "sliders",
+		Values = {
+			{ Title = "Active Only", Value = "ActiveOnly" },
+			{ Title = "All", Value = "All" },
+		},
 		Default = window._keybindListMode or "ActiveOnly",
 		Callback = function(mode)
 			if syncingTheme then
@@ -26102,7 +26533,12 @@ function SettingsTab.Build(window, options)
 	local notifDropdown = hud:AddDropdown({
 		Title = "Notification Position",
 		Icon = "bell",
-		Values = { "BottomRight", "TopRight", "BottomLeft", "TopLeft" },
+		Values = {
+			{ Title = "Bottom Right", Value = "BottomRight" },
+			{ Title = "Top Right", Value = "TopRight" },
+			{ Title = "Bottom Left", Value = "BottomLeft" },
+			{ Title = "Top Left", Value = "TopLeft" },
+		},
 		Default = window._notificationPosition or "BottomRight",
 		Callback = function(pos)
 			if syncingTheme then
@@ -26819,9 +27255,6 @@ function Bali:CreateWindow(opts)
 	options.ScreenGui = nil
 	options.OwnsScreenGui = false
 
-	-- Tear down any pre-window temporary notification host before Window takes over
-	self:_destroyNotifyLayer()
-
 	local userOnDestroy = options.OnDestroy
 	local createdWindow
 	options.OnDestroy = function()
@@ -26851,6 +27284,8 @@ function Bali:CreateWindow(opts)
 	end
 
 	createdWindow = Window.new(screenGui, options)
+	-- Clean up now-empty pre-window host after Window migrated NotificationLayer
+	self:_destroyNotifyLayer()
 	table.insert(self._windows, createdWindow)
 	self._notifyReady = true
 

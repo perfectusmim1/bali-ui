@@ -116,8 +116,8 @@ Theme.Presets = {
 		Field = rgb(21, 21, 23),
 		FieldHover = rgb(28, 28, 31),
 		Text = rgb(250, 250, 252),
-		SubText = rgb(180, 182, 192),
-		Muted = rgb(138, 140, 150),
+		SubText = rgb(198, 202, 214),
+		Muted = rgb(158, 162, 176),
 		ToggleOff = rgb(58, 58, 62),
 	}),
 	Aurora = preset({

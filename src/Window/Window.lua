@@ -402,13 +402,20 @@ function Window.new(screenGui, options)
 		Thickness = 1,
 	})
 
+	local brandCollapsedFlag = Create.New("Frame", {
+		Name = "_BrandCollapsedFlag",
+		Size = UDim2.new(),
+		BackgroundTransparency = 1,
+		Visible = isCollapsed,
+		Parent = brandBadge,
+	})
 	local brandLogoIcon = Icons.Create(options.Icon or "bali-logo", {
 		Name = "BrandLogoIcon",
 		Size = UDim2.fromOffset(customBrandIcon and 18 or 22, customBrandIcon and 18 or 22),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = customBrandIcon and "Accent" or Color3.fromRGB(255, 255, 255),
-		Visible = not isCollapsed,
+		Visible = true,
 		Parent = brandBadge,
 	})
 	local brandExpandIcon = Icons.Create("panel-left", {
@@ -417,13 +424,20 @@ function Window.new(screenGui, options)
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = "Text",
-		Visible = isCollapsed,
+		Visible = false,
 		Parent = brandBadge,
 	})
 	local brandBadgeHovered = false
 	local function applyBrandBadgeSurface(theme, animate)
 		local t = theme or Theme.Current
-		local collapsedNow = brandExpandIcon and brandExpandIcon.Visible == true
+		local showExpand = (brandCollapsedFlag and brandCollapsedFlag.Visible == true) and brandBadgeHovered
+		if brandLogoIcon then
+			brandLogoIcon.Visible = not showExpand
+		end
+		if brandExpandIcon then
+			brandExpandIcon.Visible = showExpand
+		end
+		local collapsedNow = showExpand
 		local lightModeLogo = (t and t.Dark == false) and not customBrandIcon and not collapsedNow
 		local targetBgColor = lightModeLogo and Color3.fromRGB(24, 24, 32) or ((t and t.TileHover) or Color3.fromRGB(37, 37, 46))
 		local targetBgTrans = lightModeLogo and (brandBadgeHovered and 0.04 or 0.12) or (brandBadgeHovered and 0.86 or 1)
@@ -525,7 +539,7 @@ function Window.new(screenGui, options)
 		Theme = { Color = "Stroke" },
 		Transparency = 1,
 	})
-	Icons.Create("chevron-left", {
+	Icons.Create("panel-left", {
 		Size = UDim2.fromOffset(14, 14),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -619,7 +633,7 @@ function Window.new(screenGui, options)
 		end)
 
 		local userText = Create.New("Frame", {
-			Size = UDim2.new(1, -34, 0, 0),
+			Size = UDim2.new(1, -38, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = 2,
@@ -641,9 +655,9 @@ function Window.new(screenGui, options)
 			Font = "SemiBold",
 			TextSize = 11,
 			Color = "Text",
-			Size = UDim2.new(1, 0, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			TextWrapped = true,
+			Size = UDim2.new(1, 0, 0, 14),
+			TextWrapped = false,
+			TextTruncate = Enum.TextTruncate.AtEnd,
 			LayoutOrder = 2,
 			Parent = userText,
 		})
@@ -675,10 +689,11 @@ function Window.new(screenGui, options)
 	})
 
 	local searchPlaceholder = Create.Text({
-		Text = "Search...",
+		Text = "Search",
 		Font = "Regular",
 		TextSize = 12,
-		Color = "Muted",
+		Color = "SubText",
+		TextTransparency = 0.2,
 		Position = UDim2.fromOffset(32, 0),
 		Size = UDim2.new(1, -84, 1, 0),
 		TextTruncate = Enum.TextTruncate.AtEnd,
@@ -792,8 +807,16 @@ function Window.new(screenGui, options)
 		maid
 	)
 	local bellBtn = createActionButton(actionsWrap, "bell", "Notifications", 3, maid)
-	local minBtn = createActionButton(actionsWrap, "minus", "Minimize Window", 4, maid)
-	local closeBtn, closeIcon = createActionButton(actionsWrap, "x", "Close UI", 5, maid)
+	Create.New("Frame", {
+		Name = "ActionsDivider",
+		Size = UDim2.fromOffset(1, 16),
+		LayoutOrder = 4,
+		BackgroundTransparency = 0.82,
+		Theme = { BackgroundColor3 = "Stroke" },
+		Parent = actionsWrap,
+	})
+	local minBtn = createActionButton(actionsWrap, "minus", "Minimize Window", 5, maid)
+	local closeBtn, closeIcon = createActionButton(actionsWrap, "x", "Close UI", 6, maid)
 
 	-- Unread notification dot on Bell
 	local unreadDot = Create.New("Frame", {
@@ -832,7 +855,7 @@ function Window.new(screenGui, options)
 			BackgroundColor3 = "Tile",
 			BackgroundTransparency = "TileTransparency",
 		},
-		Visible = false,
+		Visible = isCollapsed,
 		LayoutOrder = 1,
 		Parent = breadcrumbWrap,
 	})
@@ -883,7 +906,7 @@ function Window.new(screenGui, options)
 	local resizeGrip = Create.New("Frame", {
 		Name = "ResizeGrip",
 		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -6, 1, -6),
+		Position = UDim2.new(1, -8, 1, -8),
 		Size = UDim2.fromOffset(16, 16),
 		BackgroundTransparency = 1,
 		ZIndex = 15,
@@ -1735,11 +1758,17 @@ function Window:ToggleSidebar(collapsed)
 
 	self._brandText.Visible = not collapsed
 	self._collapseBtn.Visible = not collapsed
+	local brandBadgeFrame = (self._brandLogoIcon and self._brandLogoIcon.Parent)
+		or (self._brandExpandIcon and self._brandExpandIcon.Parent)
+	local collapsedFlag = brandBadgeFrame and brandBadgeFrame:FindFirstChild("_BrandCollapsedFlag")
+	if collapsedFlag then
+		collapsedFlag.Visible = collapsed
+	end
 	if self._brandLogoIcon then
-		self._brandLogoIcon.Visible = not collapsed
+		self._brandLogoIcon.Visible = true
 	end
 	if self._brandExpandIcon then
-		self._brandExpandIcon.Visible = collapsed
+		self._brandExpandIcon.Visible = false
 	end
 	if self._syncBrandBadge then
 		task.defer(function()
@@ -1749,7 +1778,7 @@ function Window:ToggleSidebar(collapsed)
 		end)
 	end
 	if self._expandBtn then
-		self._expandBtn.Visible = false
+		self._expandBtn.Visible = collapsed
 	end
 	if self._searchPill then
 		self._searchPill.Visible = true

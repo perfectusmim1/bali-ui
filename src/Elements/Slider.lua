@@ -271,7 +271,7 @@ function Slider.new(parent, opts, ctx)
 
 	local track = Create.New("Frame", {
 		Name = "Track",
-		Size = UDim2.new(1, 0, 0, 5),
+		Size = UDim2.new(1, 0, 0, 6),
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.fromScale(0, 0.5),
 		Theme = { BackgroundColor3 = "ToggleOff" },
@@ -636,7 +636,7 @@ function RangeSlider.new(parent, opts, ctx)
 
 	local track = Create.New("Frame", {
 		Name = "Track",
-		Size = UDim2.new(1, 0, 0, 5),
+		Size = UDim2.new(1, 0, 0, 6),
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.fromScale(0, 0.5),
 		Theme = { BackgroundColor3 = "ToggleOff" },

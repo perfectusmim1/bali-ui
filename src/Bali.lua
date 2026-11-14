@@ -314,9 +314,6 @@ function Bali:CreateWindow(opts)
 	options.ScreenGui = nil
 	options.OwnsScreenGui = false
 
-	-- Tear down any pre-window temporary notification host before Window takes over
-	self:_destroyNotifyLayer()
-
 	local userOnDestroy = options.OnDestroy
 	local createdWindow
 	options.OnDestroy = function()
@@ -346,6 +343,8 @@ function Bali:CreateWindow(opts)
 	end
 
 	createdWindow = Window.new(screenGui, options)
+	-- Clean up now-empty pre-window host after Window migrated NotificationLayer
+	self:_destroyNotifyLayer()
 	table.insert(self._windows, createdWindow)
 	self._notifyReady = true
 

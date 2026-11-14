@@ -34,7 +34,7 @@ function SettingsTab.Build(window, options)
 	-- ─── Appearance (Left) ───────────────────────────────────────────────────
 	local appearance = tab:AddSection({
 		Title = "Appearance",
-		Subtitle = "Themes, accent palette, glass opacity, and motion.",
+		Subtitle = "Themes, accents, glass opacity, and motion.",
 		Icon = "palette",
 		Side = "Left",
 	})
@@ -184,7 +184,7 @@ function SettingsTab.Build(window, options)
 	-- ─── Interface & HUD (Right) ─────────────────────────────────────────────
 	local hud = tab:AddSection({
 		Title = "Interface & HUD",
-		Subtitle = "Toggle keybind, floating overlays, and toast placement.",
+		Subtitle = "Menu keybind, floating HUDs, and toast corner.",
 		Icon = "monitor",
 		Side = "Right",
 	})
@@ -238,8 +238,12 @@ function SettingsTab.Build(window, options)
 
 	local keybindModeSeg = hud:AddSegmented({
 		Title = "Keybind List Mode",
-		Icon = "list-checks",
-		Values = { "ActiveOnly", "All" },
+		Description = "Filter floating keybind overlay to active or all binds.",
+		Icon = "sliders",
+		Values = {
+			{ Title = "Active Only", Value = "ActiveOnly" },
+			{ Title = "All", Value = "All" },
+		},
 		Default = window._keybindListMode or "ActiveOnly",
 		Callback = function(mode)
 			if syncingTheme then
@@ -256,7 +260,12 @@ function SettingsTab.Build(window, options)
 	local notifDropdown = hud:AddDropdown({
 		Title = "Notification Position",
 		Icon = "bell",
-		Values = { "BottomRight", "TopRight", "BottomLeft", "TopLeft" },
+		Values = {
+			{ Title = "Bottom Right", Value = "BottomRight" },
+			{ Title = "Top Right", Value = "TopRight" },
+			{ Title = "Bottom Left", Value = "BottomLeft" },
+			{ Title = "Top Left", Value = "TopLeft" },
+		},
 		Default = window._notificationPosition or "BottomRight",
 		Callback = function(pos)
 			if syncingTheme then

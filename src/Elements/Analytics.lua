@@ -862,7 +862,7 @@ function Chart.new(parent, opts, ctx)
 					Name = "Bar_" .. i,
 					Size = UDim2.fromOffset(barW, barH),
 					Position = UDim2.fromOffset(xLeft, yTop),
-					Corner = math.min(4, math.floor(barW * 0.4)),
+					Corner = math.min(8, math.max(4, math.floor(barW * 0.45))),
 					ZIndex = 2,
 					Parent = geomLayer,
 				})
@@ -1205,7 +1205,7 @@ function ProgressBar.new(parent, opts, ctx)
 	local track = Create.New("Frame", {
 		Name = "Track",
 		Size = UDim2.new(1, 0, 0, barHeight),
-		Corner = 999,
+		Corner = UDim.new(1, 0),
 		ClipsDescendants = true,
 		LayoutOrder = 2,
 		Theme = { BackgroundColor3 = "Field" },
@@ -1217,7 +1217,7 @@ function ProgressBar.new(parent, opts, ctx)
 	local fill = Create.New("Frame", {
 		Name = "Fill",
 		Size = UDim2.fromScale(ratio, 1),
-		Corner = 999,
+		Corner = UDim.new(1, 0),
 		Parent = track,
 	})
 
@@ -1248,6 +1248,8 @@ function ProgressBar.new(parent, opts, ctx)
 			Parent = content,
 		})
 	end
+	self.DescLabel = secondaryLabel
+	self.SecondaryLabel = secondaryLabel
 
 	if self.BindUI then
 		self:BindUI({
@@ -2007,17 +2009,17 @@ function CardGrid.new(parent, opts, ctx)
 			entry.Button.BackgroundColor3 = Color3.new(1, 1, 1)
 			Theme.Unbind(entry.Button, "BackgroundColor3")
 			Theme.Unbind(entry.Button, "BackgroundTransparency")
-			entry.Button.BackgroundTransparency = 0.04
-			entry.Button:SetAttribute("_BaliRestBg", 0.04)
-			entry.Button:SetAttribute("_BaliCascadeBg", 0.04)
+			entry.Button.BackgroundTransparency = 0.14
+			entry.Button:SetAttribute("_BaliRestBg", 0.14)
+			entry.Button:SetAttribute("_BaliCascadeBg", 0.14)
 			entry.Gradient.Enabled = true
 			entry.Gradient.Color = Theme.AccentSequence()
 			Theme.Bind(entry.Stroke, {
 				Color = "Accent",
-				Transparency = function() return 0.25 end,
+				Transparency = function() return 0.22 end,
 			})
-			entry.Stroke:SetAttribute("_BaliRestStr", 0.25)
-			entry.Stroke:SetAttribute("_BaliCascadeStroke", 0.25)
+			entry.Stroke:SetAttribute("_BaliRestStr", 0.22)
+			entry.Stroke:SetAttribute("_BaliCascadeStroke", 0.22)
 			Theme.Bind(entry.TitleLabel, { TextColor3 = "AccentText" })
 			if entry.IconObj then
 				Icons.SetColor(entry.IconObj, "AccentText")

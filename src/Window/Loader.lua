@@ -233,8 +233,8 @@ function Loader.LoadingScreen(parentGui, options)
 	Create.List(progressBlock, { Gap = 6 })
 
 	local track = Create.New("Frame", {
-		Size = UDim2.new(1, 0, 0, 6),
-		Corner = 999,
+		Size = UDim2.new(1, 0, 0, 5),
+		Corner = UDim.new(1, 0),
 		Theme = { BackgroundColor3 = "Field" },
 		ClipsDescendants = true,
 		LayoutOrder = 1,
@@ -243,7 +243,7 @@ function Loader.LoadingScreen(parentGui, options)
 
 	local fill = Create.New("Frame", {
 		Size = UDim2.fromScale(0, 1),
-		Corner = 999,
+		Corner = UDim.new(1, 0),
 		Theme = { BackgroundColor3 = "Accent" },
 		Parent = track,
 	})
@@ -1994,14 +1994,14 @@ function Loader.KeySystem(parentGui, options)
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0.5, 66),
 		Size = UDim2.fromOffset(220, 6),
-		Corner = 99,
+		Corner = UDim.new(1, 0),
 		Theme = { BackgroundColor3 = "Tile" },
 		ClipsDescendants = true,
 		Parent = successView,
 	})
 	local sFill = Create.New("Frame", {
 		Size = UDim2.fromScale(0, 1),
-		Corner = 99,
+		Corner = UDim.new(1, 0),
 		Theme = { BackgroundColor3 = "Accent" },
 		Parent = sTrack,
 	})

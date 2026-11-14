@@ -26,7 +26,11 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 			stroke.Transparency = 0.25
 		end
 		if label then
-			Theme.Bind(label, { TextColor3 = "Error" })
+			Theme.Bind(label, {
+				TextColor3 = function(t)
+					return Util.LerpColor(t.Error, Color3.new(1, 1, 1), 0.42)
+				end,
+			})
 		end
 		if iconObj then
 			Icons.SetColor(iconObj, "Error")
@@ -63,7 +67,11 @@ local function applyButtonVariant(btnFrame, stroke, label, iconObj, grad, varian
 			stroke.Transparency = isHovered and 0.35 or 0.55
 		end
 		if label then
-			Theme.Bind(label, { TextColor3 = "Error" })
+			Theme.Bind(label, {
+				TextColor3 = function(t)
+					return Util.LerpColor(t.Error, Color3.new(1, 1, 1), 0.42)
+				end,
+			})
 		end
 		if iconObj then
 			Icons.SetColor(iconObj, "Error")
@@ -213,6 +221,9 @@ function Button.new(parent, opts, ctx)
 			elseif variant == "Primary" then
 				Theme.Bind(row.DescLabel, { TextColor3 = "AccentText" })
 				row.DescLabel.TextTransparency = 0.18
+			elseif variant == "Danger" then
+				Theme.Bind(row.DescLabel, { TextColor3 = "SubText" })
+				row.DescLabel.TextTransparency = element.Disabled and 0.48 or 0.25
 			else
 				Theme.Bind(row.DescLabel, { TextColor3 = "SubText" })
 				row.DescLabel.TextTransparency = element.Disabled and 0.48 or 0

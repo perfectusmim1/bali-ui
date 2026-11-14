@@ -245,15 +245,15 @@ local function ensureBuilt()
 		Create.New("ImageLabel", {
 			Name = "Glow",
 			Parent = panel,
-			Size = UDim2.fromOffset(170, 80),
-			Position = UDim2.fromOffset(-40, -30),
+			Size = UDim2.fromOffset(130, 48),
+			Position = UDim2.fromOffset(8, 4),
 			Corner = 12,
 			Image = glowId,
 			ScaleType = Enum.ScaleType.Stretch,
 			Theme = {
 				ImageColor3 = "Accent",
 				ImageTransparency = function(t)
-					return math.min(t.GlowTransparency + 0.05, 0.94)
+					return math.min(t.GlowTransparency + 0.08, 0.95)
 				end,
 			},
 			ZIndex = 340,
@@ -357,7 +357,8 @@ local function ensureBuilt()
 		Text = "No active keybinds",
 		Font = "Regular",
 		TextSize = 11,
-		Color = "Muted",
+		Color = "SubText",
+		TextTransparency = 0.25,
 		LayoutOrder = 999999,
 		ZIndex = 343,
 	})

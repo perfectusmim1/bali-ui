@@ -89,7 +89,8 @@ local function createFlowController(tab, parent, subTab)
 		BorderSizePixel = 0,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
-		ScrollBarThickness = 3,
+		ScrollBarThickness = 2,
+		ScrollBarImageTransparency = 0.45,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		Theme = { ScrollBarImageColor3 = "Muted" },
 		Padding = (window and window.IsMobileMode and window:IsMobileMode()) and { 10, 10, 14, 10 } or { 14, 16, 18, 16 },
@@ -309,13 +310,26 @@ function Tab.new(window, options)
 	local indicator = Create.New("Frame", {
 		Name = "Indicator",
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 0, 0.5, 0),
-		Size = UDim2.fromOffset(3, 0),
-		Corner = 2,
-		Theme = { BackgroundColor3 = "Accent" },
+		Position = UDim2.new(0, 4, 0.5, 0),
+		Size = UDim2.fromOffset(2, 0),
+		Corner = UDim.new(1, 0),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.12,
 		ZIndex = 3,
 		Parent = button,
 	})
+	local indGradient = Instance.new("UIGradient")
+	indGradient.Rotation = 90
+	indGradient.Color = Theme.AccentSequence()
+	indGradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 0.35),
+	})
+	indGradient.Parent = indicator
+	maid:Give(Theme.Changed:Connect(function(theme)
+		indGradient.Color = Theme.AccentSequence(theme)
+	end))
 
 	local iconInst = Icons.Create(options.Icon, {
 		Name = "Icon",
@@ -438,9 +452,17 @@ function Tab.new(window, options)
 		Gap = 4,
 		VAlign = Enum.VerticalAlignment.Center,
 	})
-	maid:Give(subTabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		subTabScroll.CanvasSize = UDim2.fromOffset(subTabLayout.AbsoluteContentSize.X + 4, 0)
-	end))
+	local function syncSubTabWrapSize()
+		local contentW = subTabLayout.AbsoluteContentSize.X + 4
+		subTabScroll.CanvasSize = UDim2.fromOffset(contentW, 0)
+		if contentW > 4 then
+			local pageW = page.AbsoluteSize.X
+			local maxW = (pageW > 64) and (pageW - 32) or 9999
+			subTabWrap.Size = UDim2.fromOffset(math.min(contentW + 6, maxW), 36)
+		end
+	end
+	maid:Give(subTabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(syncSubTabWrapSize))
+	maid:Give(page:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncSubTabWrapSize))
 
 	local subPageHolder = Create.New("Frame", {
 		Name = "SubPages",
@@ -580,11 +602,11 @@ function Tab:SetCompact(compact, instant)
 		end
 	end
 	if self._indicator then
-		self._indicator.Position = UDim2.new(0, compact and 2 or 0, 0.5, 0)
+		self._indicator.Position = UDim2.new(0, compact and 5 or 4, 0.5, 0)
 		if self.Selected then
-			self._indicator.Size = compact and UDim2.fromOffset(2, 14) or UDim2.fromOffset(3, 18)
+			self._indicator.Size = compact and UDim2.fromOffset(2, 12) or UDim2.fromOffset(2, 14)
 		else
-			self._indicator.Size = compact and UDim2.fromOffset(2, 0) or UDim2.fromOffset(3, 0)
+			self._indicator.Size = UDim2.fromOffset(2, 0)
 		end
 	end
 end
@@ -593,8 +615,8 @@ function Tab:_setActiveVisual(active, instant)
 	self.Selected = active == true
 	local fillT = active and 0.8 or 1
 	local strokeT = active and 0.68 or 1
-	local indW = self._compact and 2 or 3
-	local indH = active and (self._compact and 14 or 18) or 0
+	local indW = 2
+	local indH = active and (self._compact and 12 or 14) or 0
 	local indSize = UDim2.fromOffset(indW, indH)
 
 	if active then

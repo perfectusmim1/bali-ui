@@ -71,13 +71,41 @@ function Segmented.new(parent, opts, ctx)
 			Gap = 8,
 		})
 
+		local headerParent = body
+		local textLayoutOrder = 1
+		local hasHeaderIcon = type(opts.Icon) == "string" and opts.Icon ~= "" and titleText ~= ""
+		if hasHeaderIcon then
+			local headerRow = Create.New("Frame", {
+				Name = "HeaderRow",
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				LayoutOrder = 1,
+				Parent = body,
+			})
+			Create.List(headerRow, {
+				Direction = Enum.FillDirection.Horizontal,
+				Gap = 10,
+				VAlign = Enum.VerticalAlignment.Center,
+			})
+			Icons.Create(opts.Icon, {
+				Name = "Icon",
+				Size = UDim2.fromOffset(18, 18),
+				Color = "SubText",
+				LayoutOrder = 1,
+				Parent = headerRow,
+			})
+			headerParent = headerRow
+			textLayoutOrder = 2
+		end
+
 		local textCol = Create.New("Frame", {
 			Name = "TextColumn",
-			Size = UDim2.new(1, 0, 0, 0),
+			Size = hasHeaderIcon and UDim2.new(1, -28, 0, 0) or UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
-			LayoutOrder = 1,
-			Parent = body,
+			LayoutOrder = textLayoutOrder,
+			Parent = headerParent,
 		})
 		Create.List(textCol, {
 			Direction = Enum.FillDirection.Vertical,
@@ -147,7 +175,7 @@ function Segmented.new(parent, opts, ctx)
 		Name = "Indicator",
 		Size = UDim2.new(0, 0, 1, 0),
 		Position = UDim2.fromScale(0, 0),
-		Corner = 7,
+		Corner = 6,
 		ZIndex = 2,
 		Visible = false,
 		Parent = inner,
@@ -272,7 +300,7 @@ function Segmented.new(parent, opts, ctx)
 				Name = "Seg_" .. i,
 				Size = UDim2.new(1 / n, widthOffset, 1, 0),
 				BackgroundTransparency = 1,
-				Corner = 7,
+				Corner = 6,
 				Padding = { 0, 6, 0, 6 },
 				Text = "",
 				AutoButtonColor = false,

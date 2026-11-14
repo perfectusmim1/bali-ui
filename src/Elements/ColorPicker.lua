@@ -86,7 +86,7 @@ function ColorPicker.new(parent, opts, ctx)
 
 	local self = Base.New("ColorPicker", parent, opts, ctx)
 	local rowParent = (typeof(self.Frame) == "Instance") and self.Frame or parent
-	local rightWidth = 104
+	local rightWidth = 92
 	local rowOpts = table.clone(opts)
 	if rowOpts.IconBadge == nil then
 		rowOpts.IconBadge = false
@@ -151,7 +151,7 @@ function ColorPicker.new(parent, opts, ctx)
 
 	local pillHex = Create.Text({
 		Name = "HexPreview",
-		Size = UDim2.new(1, -34, 1, 0),
+		Size = UDim2.new(1, -28, 1, 0),
 		Text = "#" .. Util.ToHex(currentColor),
 		TextSize = 11,
 		Color = "SubText",
@@ -162,7 +162,7 @@ function ColorPicker.new(parent, opts, ctx)
 
 	local pillSwatchBg = Create.New("Frame", {
 		Name = "SwatchBg",
-		Size = UDim2.fromOffset(26, 18),
+		Size = UDim2.fromOffset(22, 18),
 		Position = UDim2.new(1, 0, 0.5, 0),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Corner = 5,
@@ -184,22 +184,20 @@ function ColorPicker.new(parent, opts, ctx)
 	-- Floating Popover (236px wide)
 	local shadowInfo = Assets.Shadow()
 	local shadowInset = shadowInfo.Inset or 24
+	local initialPopH = hasAlpha and 322 or 294
 	local popover = Create.New("Frame", {
 		Name = popupId,
-		Size = UDim2.fromOffset(236, 100),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.fromOffset(236, initialPopH),
 		Active = true,
 		Visible = false,
 		ZIndex = 110,
 		Corner = 12,
+		BackgroundTransparency = 0,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = function(t)
-				return math.min(t.CardTransparency or 0.12, 0.03)
-			end,
 		},
 	})
-	Create.GlassStroke(popover, 0.06)
+	Create.GlassStroke(popover, 0.08)
 
 	Create.New("TextButton", {
 		Name = "InputSink",
@@ -237,6 +235,12 @@ function ColorPicker.new(parent, opts, ctx)
 		Parent = popover,
 	})
 	Create.List(body, { Gap = 10 })
+	self.Maid:Give(body:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		local bh = body.AbsoluteSize.Y
+		if bh > 0 then
+			popover.Size = UDim2.fromOffset(236, bh)
+		end
+	end))
 
 	-- 1. Header row (Title + Rainbow pill)
 	local header = Create.New("Frame", {
@@ -373,7 +377,7 @@ function ColorPicker.new(parent, opts, ctx)
 		Position = UDim2.new(1, 0, 0, 0),
 		AnchorPoint = Vector2.new(1, 0),
 		BackgroundColor3 = Color3.new(1, 1, 1),
-		Corner = 6,
+		Corner = UDim.new(1, 0),
 		ZIndex = 112,
 		Parent = canvasRow,
 	})
@@ -416,31 +420,55 @@ function ColorPicker.new(parent, opts, ctx)
 			Size = UDim2.new(1, -40, 0, 14),
 			Position = UDim2.fromScale(0, 0.5),
 			AnchorPoint = Vector2.new(0, 0.5),
-			Corner = 6,
+			Corner = UDim.new(1, 0),
 			ZIndex = 112,
 			Theme = { BackgroundColor3 = "Field" },
 			Parent = alphaRow,
 		})
 		Create.Stroke(alphaBar, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
 
+		local alphaCheckerClip = Create.New("Frame", {
+			Name = "AlphaChecker",
+			Size = UDim2.new(1, -6, 0, 10),
+			Position = UDim2.fromScale(0.5, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			ClipsDescendants = true,
+			ZIndex = 112,
+			Parent = alphaBar,
+		})
+		for col = 0, 33 do
+			local row = col % 2
+			Create.New("Frame", {
+				Size = UDim2.fromOffset(5, 5),
+				Position = UDim2.fromOffset(col * 5, row * 5),
+				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 0.86,
+				BorderSizePixel = 0,
+				ZIndex = 112,
+				Parent = alphaCheckerClip,
+			})
+		end
+
 		alphaFill = Create.New("Frame", {
 			Name = "AlphaFill",
 			Size = UDim2.fromScale(1, 1),
 			BackgroundColor3 = currentColor,
-			Corner = 6,
+			Corner = UDim.new(1, 0),
 			ZIndex = 113,
 			Parent = alphaBar,
 		})
 		local alphaGrad = Instance.new("UIGradient")
 		alphaGrad.Rotation = 0
-		alphaGrad.Transparency = NumberSequence.new(0, 1)
+		alphaGrad.Transparency = NumberSequence.new(1, 0)
 		alphaGrad.Parent = alphaFill
 
+		local initialOpacity = 1 - currentAlpha
 		alphaThumb = Create.New("Frame", {
 			Name = "AlphaThumb",
 			Size = UDim2.fromOffset(7, 18),
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(currentAlpha, 0.5),
+			Position = UDim2.fromScale(initialOpacity, 0.5),
 			Corner = 999,
 			ZIndex = 114,
 			Theme = { BackgroundColor3 = "Knob" },
@@ -453,7 +481,7 @@ function ColorPicker.new(parent, opts, ctx)
 			Size = UDim2.fromOffset(34, 18),
 			Position = UDim2.new(1, 0, 0.5, 0),
 			AnchorPoint = Vector2.new(1, 0.5),
-			Text = string.format("%d%%", math.floor(currentAlpha * 100 + 0.5)),
+			Text = string.format("%d%%", math.floor(initialOpacity * 100 + 0.5)),
 			TextSize = 10,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			Color = "SubText",
@@ -467,7 +495,7 @@ function ColorPicker.new(parent, opts, ctx)
 	-- 4. Live Editable #HEX & R,G,B Inputs
 	local inputsRow = Create.New("Frame", {
 		Name = "InputsRow",
-		Size = UDim2.new(1, 0, 0, 28),
+		Size = UDim2.new(1, 0, 0, 38),
 		BackgroundTransparency = 1,
 		LayoutOrder = 4,
 		ZIndex = 112,
@@ -479,16 +507,41 @@ function ColorPicker.new(parent, opts, ctx)
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 
-	local function makeInputField(name, width, layoutOrder, initialText)
+	local function makeInputField(name, caption, width, layoutOrder, initialText)
+		local col = Create.New("Frame", {
+			Name = name .. "Col",
+			Size = UDim2.fromOffset(width, 38),
+			LayoutOrder = layoutOrder,
+			BackgroundTransparency = 1,
+			ZIndex = 112,
+			Parent = inputsRow,
+		})
+		Create.List(col, {
+			Direction = Enum.FillDirection.Vertical,
+			Gap = 3,
+			HAlign = Enum.HorizontalAlignment.Center,
+		})
+		Create.Text({
+			Name = "Caption",
+			Size = UDim2.new(1, 0, 0, 10),
+			LayoutOrder = 1,
+			Text = caption,
+			Font = "SemiBold",
+			TextSize = 9,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Color = "SubText",
+			ZIndex = 112,
+			Parent = col,
+		})
 		local boxWrap = Create.New("Frame", {
 			Name = name .. "Wrap",
-			Size = UDim2.fromOffset(width, 26),
-			LayoutOrder = layoutOrder,
+			Size = UDim2.new(1, 0, 0, 24),
+			LayoutOrder = 2,
 			Corner = 6,
 			Padding = { 0, 5, 0, 5 },
 			ZIndex = 112,
 			Theme = { BackgroundColor3 = "Field" },
-			Parent = inputsRow,
+			Parent = col,
 		})
 		local stroke = Create.Stroke(boxWrap, {
 			Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
@@ -515,19 +568,23 @@ function ColorPicker.new(parent, opts, ctx)
 		return box
 	end
 
-	local hexInput = makeInputField("Hex", 78, 1, "#" .. Util.ToHex(currentColor))
-	local rInput = makeInputField("R", 40, 2, tostring(math.floor(currentColor.R * 255 + 0.5)))
-	local gInput = makeInputField("G", 40, 3, tostring(math.floor(currentColor.G * 255 + 0.5)))
-	local bInput = makeInputField("B", 40, 4, tostring(math.floor(currentColor.B * 255 + 0.5)))
+	local initR = math.floor(currentColor.R * 255 + 0.5)
+	local initG = math.floor(currentColor.G * 255 + 0.5)
+	local initB = math.floor(currentColor.B * 255 + 0.5)
+	local hexInput = makeInputField("Hex", "HEX", 80, 1, string.format("#%02X%02X%02X", initR, initG, initB))
+	local rInput = makeInputField("R", "R", 40, 2, tostring(initR))
+	local gInput = makeInputField("G", "G", 40, 3, tostring(initG))
+	local bInput = makeInputField("B", "B", 40, 4, tostring(initB))
 
 	-- 5. Quick Preset Swatches (6 per row)
 	local presetsList = type(opts.Presets) == "table" and #opts.Presets > 0 and opts.Presets or DEFAULT_PRESETS
+	local presetEntries = {}
 	local presetWrap = Create.New("Frame", {
 		Name = "Presets",
 		Size = UDim2.new(1, 0, 0, 24),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		Padding = { 2, 2, 2, 2 },
+		Padding = { 2, 0, 2, 0 },
 		LayoutOrder = 5,
 		ZIndex = 112,
 		Parent = body,
@@ -538,12 +595,17 @@ function ColorPicker.new(parent, opts, ctx)
 		Wraps = true,
 	})
 
-	local function syncVisuals()
-		currentColor = Color3.fromHSV(hue, sat, val)
+	local function syncVisuals(recomputeFromHSV)
+		if recomputeFromHSV == true then
+			currentColor = Color3.fromHSV(hue, sat, val)
+		end
 		self.Value = currentColor
 		self.Alpha = currentAlpha
 
-		local hexStr = "#" .. Util.ToHex(currentColor)
+		local r = math.floor(currentColor.R * 255 + 0.5)
+		local g = math.floor(currentColor.G * 255 + 0.5)
+		local b = math.floor(currentColor.B * 255 + 0.5)
+		local hexStr = string.format("#%02X%02X%02X", r, g, b)
 		pillHex.Text = hexStr
 		pillSwatch.BackgroundColor3 = currentColor
 		pillSwatch.BackgroundTransparency = hasAlpha and currentAlpha or 0
@@ -556,27 +618,46 @@ function ColorPicker.new(parent, opts, ctx)
 		hueThumb.Position = UDim2.fromScale(0.5, hue)
 
 		if hasAlpha and alphaFill and alphaThumb and alphaLabel then
+			local opacity = 1 - currentAlpha
 			alphaFill.BackgroundColor3 = currentColor
-			alphaThumb.Position = UDim2.fromScale(currentAlpha, 0.5)
-			alphaLabel.Text = string.format("%d%%", math.floor(currentAlpha * 100 + 0.5))
+			alphaThumb.Position = UDim2.fromScale(opacity, 0.5)
+			alphaLabel.Text = string.format("%d%%", math.floor(opacity * 100 + 0.5))
 		end
 
 		if not hexInput:IsFocused() then
 			hexInput.Text = hexStr
 		end
 		if not rInput:IsFocused() then
-			rInput.Text = tostring(math.floor(currentColor.R * 255 + 0.5))
+			rInput.Text = tostring(r)
 		end
 		if not gInput:IsFocused() then
-			gInput.Text = tostring(math.floor(currentColor.G * 255 + 0.5))
+			gInput.Text = tostring(g)
 		end
 		if not bInput:IsFocused() then
-			bInput.Text = tostring(math.floor(currentColor.B * 255 + 0.5))
+			bInput.Text = tostring(b)
+		end
+
+		local strokeFallback = Theme.Current.Stroke
+		local strokeAlpha = Theme.Current.StrokeTransparency
+		for _, entry in ipairs(presetEntries) do
+			local c = entry.Color
+			local matched = math.abs(c.R - currentColor.R) < 0.025
+				and math.abs(c.G - currentColor.G) < 0.025
+				and math.abs(c.B - currentColor.B) < 0.025
+			if matched then
+				entry.Stroke.Color = Color3.new(1, 1, 1)
+				entry.Stroke.Transparency = 0.08
+				entry.Stroke.Thickness = 1.5
+			else
+				entry.Stroke.Color = strokeFallback
+				entry.Stroke.Transparency = strokeAlpha
+				entry.Stroke.Thickness = 1
+			end
 		end
 	end
 
-	local function fireChanged(silent)
-		syncVisuals()
+	local function fireChanged(silent, recomputeFromHSV)
+		syncVisuals(recomputeFromHSV)
 		if not silent then
 			local alphaArg = hasAlpha and currentAlpha or nil
 			if opts.Callback then
@@ -612,7 +693,7 @@ function ColorPicker.new(parent, opts, ctx)
 		stopRainbowLoop()
 		rainbowConn = Services.RunService.RenderStepped:Connect(function(dt)
 			hue = (hue + dt * 0.18) % 1
-			fireChanged(false)
+			fireChanged(false, true)
 		end)
 	end
 
@@ -639,17 +720,21 @@ function ColorPicker.new(parent, opts, ctx)
 		local col = parseColorInput(entry, Theme.Current.Accent)
 		local sw = Create.New("TextButton", {
 			Name = "Preset_" .. idx,
-			Size = UDim2.fromOffset(28, 20),
+			Size = UDim2.fromOffset(30, 20),
 			LayoutOrder = idx,
 			Text = "",
 			AutoButtonColor = false,
 			BackgroundTransparency = 0,
 			BackgroundColor3 = col,
-			Corner = 5,
+			Corner = 6,
 			ZIndex = 113,
 			Parent = presetWrap,
 		})
-		Create.Stroke(sw, { Theme = { Color = "Stroke", Transparency = "StrokeTransparency" } })
+		local swStroke = Create.Stroke(sw, {
+			Color = Theme.Current.Stroke,
+			Transparency = Theme.Current.StrokeTransparency,
+		})
+		table.insert(presetEntries, { Color = col, Stroke = swStroke })
 		sw.Activated:Connect(function()
 			if isDisabledOrLocked(self) then
 				return
@@ -675,19 +760,20 @@ function ColorPicker.new(parent, opts, ctx)
 			if aSize.X > 0 and aSize.Y > 0 then
 				sat = Util.Clamp((pos.X - aPos.X) / aSize.X, 0, 1)
 				val = 1 - Util.Clamp((pos.Y - aPos.Y) / aSize.Y, 0, 1)
-				fireChanged(false)
+				fireChanged(false, true)
 			end
 		elseif activeDrag == "Hue" then
 			local aPos, aSize = hueBar.AbsolutePosition, hueBar.AbsoluteSize
 			if aSize.Y > 0 then
 				hue = Util.Clamp((pos.Y - aPos.Y) / aSize.Y, 0, 1)
-				fireChanged(false)
+				fireChanged(false, true)
 			end
 		elseif activeDrag == "Alpha" and alphaBar then
 			local aPos, aSize = alphaBar.AbsolutePosition, alphaBar.AbsoluteSize
 			if aSize.X > 0 then
-				currentAlpha = Util.Clamp((pos.X - aPos.X) / aSize.X, 0, 1)
-				fireChanged(false)
+				local opacity = Util.Clamp((pos.X - aPos.X) / aSize.X, 0, 1)
+				currentAlpha = 1 - opacity
+				fireChanged(false, false)
 			end
 		end
 	end
@@ -798,7 +884,7 @@ function ColorPicker.new(parent, opts, ctx)
 				popover.Parent = layer
 				local view = layer.AbsoluteSize
 				local aPos, aSize = swatchPill.AbsolutePosition, swatchPill.AbsoluteSize
-				local popH = math.max(popover.AbsoluteSize.Y, hasAlpha and 272 or 244)
+				local popH = math.max(popover.AbsoluteSize.Y, hasAlpha and 322 or 294)
 				local px = Util.Clamp(aPos.X + aSize.X - 236, 8, math.max(8, view.X - 244))
 				local py = aPos.Y + aSize.Y + 6
 				if py + popH > view.Y - 8 then
@@ -874,9 +960,10 @@ function ColorPicker.new(parent, opts, ctx)
 			silent = silentArg == true
 		end
 
+		currentColor = nextColor
 		hue, sat, val = Color3.toHSV(nextColor)
 		currentAlpha = nextAlpha
-		fireChanged(silent == true)
+		fireChanged(silent == true, false)
 	end
 
 	function self:Get()
@@ -953,6 +1040,9 @@ function ColorPicker.new(parent, opts, ctx)
 
 	syncVisuals()
 	updateRainbowVisuals()
+	self.Maid:Give(Theme.Changed:Connect(function()
+		syncVisuals(false)
+	end))
 	if rainbowEnabled then
 		startRainbowLoop()
 	end
