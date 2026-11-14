@@ -18,7 +18,8 @@ local Util = require("Core/Util")
 local MAX_VISIBLE = 5
 local MAX_HISTORY = 50
 local DEFAULT_DURATION = 4.5
-local TOAST_MAX_WIDTH = 336
+local TOAST_MAX_WIDTH = 296
+local TOAST_MIN_HEIGHT = 76
 
 local Notification = {
 	History = {},
@@ -104,7 +105,7 @@ local function ensureContainer()
 
 	listLayout = Create.List(container, {
 		Direction = Enum.FillDirection.Vertical,
-		Gap = 10,
+		Gap = 8,
 	})
 
 	applyPositionLayout()
@@ -249,8 +250,8 @@ function Notification.Notify(opts)
 	local wrapper = Create.New("Frame", {
 		Name = "Toast_" .. tostring(noteId),
 		Parent = container,
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, TOAST_MIN_HEIGHT + 2),
+		AutomaticSize = Enum.AutomaticSize.None,
 		ClipsDescendants = false,
 		BackgroundTransparency = 1,
 		LayoutOrder = noteId,
@@ -260,8 +261,8 @@ function Notification.Notify(opts)
 	local cardShell = Create.New("Frame", {
 		Name = "CardShell",
 		Parent = wrapper,
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, TOAST_MIN_HEIGHT + 2),
+		AutomaticSize = Enum.AutomaticSize.None,
 		ClipsDescendants = false,
 		BackgroundTransparency = 1,
 		ZIndex = 401,
@@ -290,15 +291,54 @@ function Notification.Notify(opts)
 		Parent = cardShell,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		Corner = 12,
+		Corner = 14,
 		ClipsDescendants = true,
-		BackgroundTransparency = 0,
+		BackgroundTransparency = 0.08,
 		Theme = {
 			BackgroundColor3 = "Card",
+			BackgroundTransparency = function(t)
+				return math.clamp((t.CardTransparency or 0.06) + 0.04, 0.06, 0.14)
+			end,
 		},
 		ZIndex = 402,
 	})
-	Create.GlassStroke(card, 0.08)
+	local cardMinConst = Instance.new("UISizeConstraint")
+	cardMinConst.MinSize = Vector2.new(0, TOAST_MIN_HEIGHT)
+	cardMinConst.Parent = card
+	Create.GlassStroke(card, 0.12)
+
+	local glassSheen = Create.New("Frame", {
+		Name = "GlassSheen",
+		Parent = card,
+		Size = UDim2.fromScale(1, 1),
+		Corner = 14,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.94,
+		ZIndex = 402,
+	})
+	local sheenGrad = Instance.new("UIGradient")
+	sheenGrad.Rotation = 125
+	sheenGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.45, 0.65),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	sheenGrad.Parent = glassSheen
+
+	local noiseId = Assets.Get("Noise")
+	if noiseId then
+		Create.New("ImageLabel", {
+			Name = "Noise",
+			Parent = card,
+			Size = UDim2.fromScale(1, 1),
+			Corner = 14,
+			Image = noiseId,
+			ScaleType = Enum.ScaleType.Tile,
+			TileSize = UDim2.fromOffset(128, 128),
+			ImageTransparency = 0.965,
+			ZIndex = 402,
+		})
+	end
 
 	local glowId = Assets.Get("Glow")
 	local glowImg = nil
@@ -306,15 +346,15 @@ function Notification.Notify(opts)
 		glowImg = Create.New("ImageLabel", {
 			Name = "Glow",
 			Parent = card,
-			Size = UDim2.fromOffset(145, 54),
-			Position = UDim2.fromOffset(8, 3),
-			Corner = 12,
+			Size = UDim2.new(0, 185, 1, 0),
+			Position = UDim2.fromOffset(-14, 0),
+			Corner = 14,
 			Image = glowId,
 			ScaleType = Enum.ScaleType.Stretch,
 			Theme = {
 				ImageColor3 = typeMeta.ColorKey,
 				ImageTransparency = function(t)
-					return math.min(t.GlowTransparency + 0.04, 0.94)
+					return math.min((t.GlowTransparency or 0.82) + 0.02, 0.91)
 				end,
 			},
 			ZIndex = 402,
@@ -324,9 +364,9 @@ function Notification.Notify(opts)
 	local accentBar = Create.New("Frame", {
 		Name = "AccentBar",
 		Parent = card,
-		Size = UDim2.new(1, -20, 0, 2),
-		Position = UDim2.new(0, 10, 0, 0),
-		BackgroundTransparency = 0.12,
+		Size = UDim2.new(1, -28, 0, 1),
+		Position = UDim2.new(0, 14, 0, 0),
+		BackgroundTransparency = 0.18,
 		Corner = UDim.new(1, 0),
 		Theme = { BackgroundColor3 = typeMeta.ColorKey },
 		ZIndex = 405,
@@ -335,9 +375,9 @@ function Notification.Notify(opts)
 	barGrad.Rotation = 0
 	barGrad.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.08, 0.35),
-		NumberSequenceKeypoint.new(0.22, 0),
-		NumberSequenceKeypoint.new(0.55, 0.3),
+		NumberSequenceKeypoint.new(0.12, 0.25),
+		NumberSequenceKeypoint.new(0.3, 0),
+		NumberSequenceKeypoint.new(0.7, 0.35),
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	barGrad.Parent = accentBar
@@ -348,7 +388,7 @@ function Notification.Notify(opts)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		Padding = { 12, 12, 15, 12 },
+		Padding = { 14, 14, 16, 14 },
 		ZIndex = 404,
 	})
 	local bodyPad = body:FindFirstChildOfClass("UIPadding")
@@ -356,21 +396,37 @@ function Notification.Notify(opts)
 	local iconBadge = Create.New("Frame", {
 		Name = "IconBadge",
 		Parent = body,
-		Size = UDim2.fromOffset(32, 32),
-		Position = UDim2.fromOffset(0, 1),
-		Corner = 9,
-		BackgroundTransparency = 0.86,
+		Size = UDim2.fromOffset(40, 40),
+		Position = UDim2.fromOffset(0, 2),
+		Corner = 11,
+		BackgroundTransparency = 0.83,
 		Theme = { BackgroundColor3 = typeMeta.ColorKey },
 		ZIndex = 406,
 	})
+	local iconBadgeGrad = Instance.new("UIGradient")
+	iconBadgeGrad.Rotation = 90
+	iconBadgeGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(1, 0.35),
+	})
+	iconBadgeGrad.Parent = iconBadge
+
 	local iconStroke = Create.Stroke(iconBadge, {
 		Theme = { Color = typeMeta.ColorKey },
-		Transparency = 0.62,
+		Transparency = 0.45,
 		Thickness = 1,
 	})
+	local iconStrokeGrad = Instance.new("UIGradient")
+	iconStrokeGrad.Rotation = 90
+	iconStrokeGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.6, 0.45),
+		NumberSequenceKeypoint.new(1, 0.8),
+	})
+	iconStrokeGrad.Parent = iconStroke
 
 	local iconObj = Icons.Create(opts.Icon or typeMeta.Icon, {
-		Size = UDim2.fromOffset(16, 16),
+		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = typeMeta.ColorKey,
@@ -381,13 +437,13 @@ function Notification.Notify(opts)
 	local contentCol = Create.New("Frame", {
 		Name = "ContentCol",
 		Parent = body,
-		Position = UDim2.fromOffset(44, 0),
-		Size = UDim2.new(1, -44, 0, 0),
+		Position = UDim2.fromOffset(52, 0),
+		Size = UDim2.new(1, -52, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		ZIndex = 405,
 	})
-	Create.List(contentCol, { Direction = Enum.FillDirection.Vertical, Gap = 4 })
+	Create.List(contentCol, { Direction = Enum.FillDirection.Vertical, Gap = 5 })
 
 	local header = Create.New("Frame", {
 		Name = "Header",
@@ -403,12 +459,13 @@ function Notification.Notify(opts)
 		Name = "Title",
 		Parent = header,
 		Position = UDim2.fromOffset(0, 0),
-		Size = UDim2.new(1, -28, 0, 0),
+		Size = UDim2.new(1, -30, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Text = titleText,
 		TextWrapped = true,
-		Font = "SemiBold",
-		TextSize = 13,
+		Font = "Bold",
+		TextSize = 15,
+		LineHeight = 1.12,
 		Color = "Text",
 		ZIndex = 406,
 	})
@@ -417,16 +474,17 @@ function Notification.Notify(opts)
 		Name = "Close",
 		Parent = header,
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, 2, 0, -2),
-		Size = UDim2.fromOffset(22, 22),
-		Corner = 6,
-		BackgroundTransparency = 1,
-		Theme = { BackgroundColor3 = "TileHover" },
+		Position = UDim2.new(1, 2, 0, -1),
+		Size = UDim2.fromOffset(24, 24),
+		Corner = 7,
+		BackgroundTransparency = 0.78,
+		Theme = { BackgroundColor3 = "Tile" },
 		Text = "",
 		ZIndex = 406,
 	})
+	Create.GlassStroke(closeBtn, 0.02)
 	local closeIcon = Icons.Create("x", {
-		Size = UDim2.fromOffset(14, 14),
+		Size = UDim2.fromOffset(13, 13),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = "Muted",
@@ -438,23 +496,25 @@ function Notification.Notify(opts)
 		if Util.IsTouchDevice() then
 			return
 		end
-		Tween.Play(closeBtn, { BackgroundTransparency = 0.2, BackgroundColor3 = Theme.Current.TileHover }, Tween.Fast)
+		Tween.Play(closeBtn, { BackgroundTransparency = 0.25, BackgroundColor3 = Theme.Current.TileHover }, Tween.Fast)
 		Icons.SetColor(closeIcon, "Text")
 	end))
 	toastMaid:Give(closeBtn.MouseLeave:Connect(function()
-		Tween.Play(closeBtn, { BackgroundTransparency = 1 }, Tween.Fast)
+		Tween.Play(closeBtn, { BackgroundTransparency = 0.78, BackgroundColor3 = Theme.Current.Tile }, Tween.Fast)
 		Icons.SetColor(closeIcon, "Muted")
 	end))
 
 	local descLabel = Create.Text({
 		Name = "Description",
 		Parent = contentCol,
-		Size = UDim2.new(1, -6, 0, 0),
+		Size = UDim2.new(1, -4, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Text = bodyText,
 		TextWrapped = true,
-		Font = "Regular",
-		TextSize = 12,
+		Font = "Medium",
+		TextSize = 13,
+		LineHeight = 1.18,
+		TextTransparency = 0.05,
 		Color = "SubText",
 		Visible = bodyText ~= "",
 		LayoutOrder = 2,
@@ -464,7 +524,7 @@ function Notification.Notify(opts)
 	local actionsRow = nil
 	if type(opts.Actions) == "table" and #opts.Actions > 0 then
 		if bodyPad then
-			bodyPad.PaddingBottom = UDim.new(0, 18)
+			bodyPad.PaddingBottom = UDim.new(0, 20)
 		end
 		actionsRow = Create.New("Frame", {
 			Name = "Actions",
@@ -488,15 +548,15 @@ function Notification.Notify(opts)
 				local btn = Create.New("TextButton", {
 					Name = "Action_" .. tostring(idx),
 					Parent = actionsRow,
-					Size = UDim2.fromOffset(0, 26),
+					Size = UDim2.fromOffset(0, 28),
 					AutomaticSize = Enum.AutomaticSize.X,
-					Corner = 7,
-					Padding = { 0, 10, 0, 10 },
+					Corner = 8,
+					Padding = { 0, 12, 0, 12 },
 					LayoutOrder = idx,
 					Text = tostring(action.Title or "Action"),
 					TextXAlignment = Enum.TextXAlignment.Center,
 					Font = "SemiBold",
-					TextSize = 11,
+					TextSize = 12,
 					Theme = isPrimary and {
 						BackgroundColor3 = "Accent",
 						TextColor3 = "AccentText",
@@ -527,12 +587,12 @@ function Notification.Notify(opts)
 		Name = "ProgressTrack",
 		Parent = card,
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -5),
-		Size = UDim2.new(1, -24, 0, 3),
+		Position = UDim2.new(0.5, 0, 1, -4),
+		Size = UDim2.new(1, -28, 0, 2),
 		Corner = UDim.new(1, 0),
-		ClipsDescendants = true,
-		BackgroundTransparency = 0.15,
-		Theme = { BackgroundColor3 = "Field" },
+		ClipsDescendants = false,
+		BackgroundTransparency = 0.76,
+		Theme = { BackgroundColor3 = "Stroke" },
 		ZIndex = 405,
 	})
 
@@ -541,10 +601,45 @@ function Notification.Notify(opts)
 		Parent = progressTrack,
 		Size = UDim2.fromScale(1, 1),
 		Corner = UDim.new(1, 0),
-		BackgroundTransparency = 0.04,
+		BackgroundTransparency = 0.05,
 		Theme = { BackgroundColor3 = typeMeta.ColorKey },
 		ZIndex = 406,
 	})
+	local fillGrad = Instance.new("UIGradient")
+	fillGrad.Rotation = 0
+	fillGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.38),
+		NumberSequenceKeypoint.new(0.65, 0.08),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	fillGrad.Parent = progressFill
+
+	local tipGlow = Create.New("Frame", {
+		Name = "TipGlow",
+		Parent = progressFill,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.fromScale(1, 0.5),
+		Size = UDim2.fromOffset(10, 4),
+		Corner = UDim.new(1, 0),
+		BackgroundTransparency = 0.35,
+		Theme = { BackgroundColor3 = typeMeta.ColorKey },
+		ZIndex = 407,
+	})
+
+	local function syncShellHeight()
+		if dismissed then
+			return
+		end
+		local h = math.max(TOAST_MIN_HEIGHT, math.ceil(card.AbsoluteSize.Y))
+		if math.abs(wrapper.Size.Y.Offset - h) > 0.5 then
+			wrapper.Size = UDim2.new(1, 0, 0, h)
+		end
+		if math.abs(cardShell.Size.Y.Offset - h) > 0.5 then
+			cardShell.Size = UDim2.new(1, 0, 0, h)
+		end
+	end
+	toastMaid:Give(card:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncShellHeight))
+	syncShellHeight()
 
 	-- Timer & hover-to-pause state
 	local totalDuration = tonumber(opts.Duration)
@@ -702,6 +797,7 @@ function Notification.Notify(opts)
 			Theme.Bind(iconStroke, { Color = typeMeta.ColorKey })
 			Theme.Bind(accentBar, { BackgroundColor3 = typeMeta.ColorKey })
 			Theme.Bind(progressFill, { BackgroundColor3 = typeMeta.ColorKey })
+			Theme.Bind(tipGlow, { BackgroundColor3 = typeMeta.ColorKey })
 			Icons.SetColor(iconObj, typeMeta.ColorKey)
 			if glowImg then
 				Theme.Bind(glowImg, { ImageColor3 = typeMeta.ColorKey })
@@ -719,6 +815,7 @@ function Notification.Notify(opts)
 			startTimer(newDur)
 		end
 
+		syncShellHeight()
 		Notification.Changed:Fire()
 	end
 

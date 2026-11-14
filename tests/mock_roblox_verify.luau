@@ -2500,6 +2500,49 @@ local toast = Bali:Notify({
 	},
 })
 assertTrue(toast ~= nil, "Notification created")
+do
+	local nLayer = screenGui:FindFirstChild("BaliNotificationLayer")
+	local nStack = nLayer and nLayer:FindFirstChild("BaliNotificationStack")
+	local firstCard = nStack and nStack:FindFirstChild("Card", true)
+	assertTrue(firstCard ~= nil and firstCard:FindFirstChild("GlassSheen") ~= nil, "Notification Card has obsidian GlassSheen layer")
+	local firstIcon = firstCard and firstCard:FindFirstChild("IconBadge", true)
+	assertTrue(firstIcon ~= nil and firstIcon.Size.X.Offset == 40, "Notification IconBadge uses 40x40 glass well")
+	local firstTitle = firstCard and firstCard:FindFirstChild("Title", true)
+	local firstDesc = firstCard and firstCard:FindFirstChild("Description", true)
+	assertTrue(firstTitle ~= nil and firstTitle.TextSize == 15, "Notification Title uses TextSize=15")
+	assertTrue(firstDesc ~= nil and firstDesc.TextSize == 13, "Notification Description uses TextSize=13")
+	local firstTrack = firstCard and firstCard:FindFirstChild("ProgressTrack", true)
+	assertTrue(firstTrack ~= nil and firstTrack.Size.Y.Offset == 2 and firstTrack.BackgroundTransparency > 0.6, "Notification ProgressTrack uses sleek 2px translucent rail")
+	local toast2 = Bali:Notify({
+		Title = "Second Toast",
+		Content = "Spacing check",
+		Type = "Info",
+		Duration = 4,
+	})
+	local toasts = {}
+	if nStack then
+		for _, ch in ipairs(nStack:GetChildren()) do
+			if ch:IsA("GuiObject") and string.sub(ch.Name, 1, 6) == "Toast_" and ch.Visible then
+				table.insert(toasts, ch)
+			end
+		end
+		table.sort(toasts, function(a, b)
+			return a.LayoutOrder < b.LayoutOrder
+		end)
+	end
+	assertTrue(#toasts >= 2, "Two stacked toasts visible for gap assertion")
+	if #toasts >= 2 then
+		local tA, tB = toasts[1], toasts[2]
+		local cA, cB = tA:FindFirstChild("Card", true), tB:FindFirstChild("Card", true)
+		assertTrue(cA ~= nil and math.abs(tA.AbsoluteSize.Y - cA.AbsoluteSize.Y) <= 1, "Toast wrapper height matches Card height without Shadow inflation")
+		assertTrue(cB ~= nil and math.abs(tB.AbsoluteSize.Y - cB.AbsoluteSize.Y) <= 1, "Second toast wrapper height matches Card height without Shadow inflation")
+		local gapPx = math.abs(cB.AbsolutePosition.Y - (cA.AbsolutePosition.Y + cA.AbsoluteSize.Y))
+		assertTrue(math.abs(gapPx - 8) <= 1, "Stacked notification gap is 8px (got " .. tostring(gapPx) .. ")")
+	end
+	if toast2 and toast2.Dismiss then
+		toast2:Dismiss(true)
+	end
+end
 if toast and toast.Update then
 	toast:Update({ Title = "Action Toast Updated", Content = "Updated body" })
 end
