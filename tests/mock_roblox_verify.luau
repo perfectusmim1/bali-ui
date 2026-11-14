@@ -2961,7 +2961,7 @@ if okLib and type(Bali2) == "table" then
 	-- Re-execution test in Studio mode
 	local sg2 = Bali2._screenGui
 	win2:Destroy()
-	stepClock(0.1, true)
+	stepClock(0.3, true)
 	assertTrue(sg2._destroyed or sg2.Parent == nil, "Studio ScreenGui destroyed cleanly on win2:Destroy()")
 
 	-- CreateWindow with integrated KeySystem gate (non-blocking test)

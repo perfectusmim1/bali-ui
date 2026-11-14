@@ -384,29 +384,30 @@ function Window.new(screenGui, options)
 		Parent = sidebarTop,
 	})
 
+	local customBrandIcon = options.Icon and options.Icon ~= "bali-logo" and options.Icon ~= "bali"
 	local brandBadge = Create.New("TextButton", {
 		Name = "BrandBadge",
-		Position = UDim2.fromOffset(3, 2),
+		Position = UDim2.fromOffset(2, 2),
 		Size = UDim2.fromOffset(32, 32),
 		Text = "",
 		AutoButtonColor = false,
 		Corner = 8,
-		Theme = { BackgroundColor3 = "Accent" },
-		BackgroundTransparency = 0.88,
+		BackgroundColor3 = Color3.fromRGB(37, 37, 46),
+		BackgroundTransparency = 1,
 		Parent = brandRow,
 	})
 	local brandStroke = Create.Stroke(brandBadge, {
-		Theme = { Color = "Accent" },
-		Transparency = 0.68,
+		Theme = { Color = "Stroke" },
+		Transparency = 1,
 		Thickness = 1,
 	})
 
 	local brandLogoIcon = Icons.Create(options.Icon or "bali-logo", {
 		Name = "BrandLogoIcon",
-		Size = UDim2.fromOffset(18, 18),
+		Size = UDim2.fromOffset(customBrandIcon and 18 or 22, customBrandIcon and 18 or 22),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "Accent",
+		Color = customBrandIcon and "Accent" or Color3.fromRGB(255, 255, 255),
 		Visible = not isCollapsed,
 		Parent = brandBadge,
 	})
@@ -419,13 +420,43 @@ function Window.new(screenGui, options)
 		Visible = isCollapsed,
 		Parent = brandBadge,
 	})
+	local brandBadgeHovered = false
+	local function applyBrandBadgeSurface(theme, animate)
+		local t = theme or Theme.Current
+		local collapsedNow = brandExpandIcon and brandExpandIcon.Visible == true
+		local lightModeLogo = (t and t.Dark == false) and not customBrandIcon and not collapsedNow
+		local targetBgColor = lightModeLogo and Color3.fromRGB(24, 24, 32) or ((t and t.TileHover) or Color3.fromRGB(37, 37, 46))
+		local targetBgTrans = lightModeLogo and (brandBadgeHovered and 0.04 or 0.12) or (brandBadgeHovered and 0.86 or 1)
+		local targetStrTrans = lightModeLogo and (brandBadgeHovered and 0.45 or 0.65) or (brandBadgeHovered and 0.62 or 1)
+
+		if animate and not Tween.Reduced then
+			Tween.Play(brandBadge, {
+				BackgroundColor3 = targetBgColor,
+				BackgroundTransparency = targetBgTrans,
+			}, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			Tween.Play(brandStroke, { Transparency = targetStrTrans }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		else
+			Tween.Play(brandBadge, {
+				BackgroundColor3 = targetBgColor,
+				BackgroundTransparency = targetBgTrans,
+			}, Tween.Instant)
+			Tween.Play(brandStroke, { Transparency = targetStrTrans }, Tween.Instant)
+			brandBadge.BackgroundColor3 = targetBgColor
+			brandBadge.BackgroundTransparency = targetBgTrans
+			brandStroke.Transparency = targetStrTrans
+		end
+	end
+	applyBrandBadgeSurface(Theme.Current, false)
+	maid:Give(Theme.Changed:Connect(function(theme)
+		applyBrandBadgeSurface(theme, false)
+	end))
 	maid:Give(brandBadge.MouseEnter:Connect(function()
-		Tween.Play(brandBadge, { BackgroundTransparency = 0.78 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-		Tween.Play(brandStroke, { Transparency = 0.38 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		brandBadgeHovered = true
+		applyBrandBadgeSurface(Theme.Current, true)
 	end))
 	maid:Give(brandBadge.MouseLeave:Connect(function()
-		Tween.Play(brandBadge, { BackgroundTransparency = 0.88 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-		Tween.Play(brandStroke, { Transparency = 0.68 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		brandBadgeHovered = false
+		applyBrandBadgeSurface(Theme.Current, true)
 	end))
 
 	local brandText = Create.New("Frame", {
@@ -635,10 +666,10 @@ function Window.new(screenGui, options)
 	})
 	maid:Give(Transition.Hover(searchPill, searchPill, "Field", "FieldHover", searchStroke))
 
-	Icons.Create("search", {
+	local searchIcon = Icons.Create("search", {
 		Size = UDim2.fromOffset(14, 14),
-		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 12, 0.5, 0),
+		AnchorPoint = isCollapsed and Vector2.new(0.5, 0.5) or Vector2.new(0, 0.5),
+		Position = isCollapsed and UDim2.fromScale(0.5, 0.5) or UDim2.new(0, 12, 0.5, 0),
 		Color = "SubText",
 		Parent = searchPill,
 	})
@@ -692,7 +723,7 @@ function Window.new(screenGui, options)
 		ScrollBarThickness = 2,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		Theme = { ScrollBarImageColor3 = "Muted" },
-		Padding = { 2, 8, 12, 8 },
+		Padding = { 2, 10, 12, 10 },
 		ZIndex = 3,
 		Parent = sidebar,
 	})
@@ -701,7 +732,7 @@ function Window.new(screenGui, options)
 	local function syncTabScrollBounds()
 		local topH = sidebarTop.AbsoluteSize.Y
 		tabScroll.Position = UDim2.fromOffset(0, topH)
-		tabScroll.Size = UDim2.new(1, -2, 1, -(topH + 10))
+		tabScroll.Size = UDim2.new(1, 0, 1, -(topH + 10))
 	end
 	maid:Give(sidebarTop:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncTabScrollBounds))
 	task.defer(syncTabScrollBounds)
@@ -930,10 +961,12 @@ function Window.new(screenGui, options)
 		_brandText = brandText,
 		_brandLogoIcon = brandLogoIcon,
 		_brandExpandIcon = brandExpandIcon,
+		_syncBrandBadge = applyBrandBadgeSurface,
 		_collapseBtn = collapseBtn,
 		_expandBtn = expandBtn,
 		_welcomeCard = welcomeCard,
 		_searchPill = searchPill,
+		_searchIcon = searchIcon,
 		_searchPlaceholder = searchPlaceholder,
 		_shortcutChip = shortcutChip,
 		_breadcrumbLabel = breadcrumbLabel,
@@ -1198,7 +1231,7 @@ function Window.new(screenGui, options)
 	maid:Give(closeBtn.Activated:Connect(function(input)
 		Transition.Ripple(closeBtn, input, "Error")
 		if self._destroyOnClose and not self._confirmClose then
-			self:Destroy()
+			self:Unload()
 			return
 		end
 		if not self._confirmClose then
@@ -1225,7 +1258,7 @@ function Window.new(screenGui, options)
 					Title = "Unload",
 					Variant = "Danger",
 					Callback = function()
-						self:Destroy()
+						self:Unload()
 					end,
 				},
 			},
@@ -1704,11 +1737,22 @@ function Window:ToggleSidebar(collapsed)
 	if self._brandExpandIcon then
 		self._brandExpandIcon.Visible = collapsed
 	end
+	if self._syncBrandBadge then
+		task.defer(function()
+			if not self._destroyed then
+				self._syncBrandBadge(Theme.Current, true)
+			end
+		end)
+	end
 	if self._expandBtn then
 		self._expandBtn.Visible = false
 	end
 	if self._searchPill then
-		self._searchPill.Visible = not collapsed
+		self._searchPill.Visible = true
+	end
+	if self._searchIcon then
+		self._searchIcon.AnchorPoint = collapsed and Vector2.new(0.5, 0.5) or Vector2.new(0, 0.5)
+		self._searchIcon.Position = collapsed and UDim2.fromScale(0.5, 0.5) or UDim2.new(0, 12, 0.5, 0)
 	end
 	self._searchPlaceholder.Visible = not collapsed
 	self._shortcutChip.Visible = not collapsed
@@ -1756,7 +1800,7 @@ end
 
 function Window:SetVisible(visible)
 	visible = visible == true
-	if self._destroyed or self._visible == visible then
+	if self._destroyed or self._unloading or self._visible == visible then
 		return
 	end
 	self._visible = visible
@@ -1766,50 +1810,6 @@ function Window:SetVisible(visible)
 	Blur.SetOpen(visible)
 
 	local wrapper = self.MainWrapper
-	local pill = self._mobileButton
-
-	local function getMinScale()
-		local sc = wrapper:FindFirstChild("_BaliMinScale")
-		if not sc then
-			sc = Instance.new("UIScale")
-			sc.Name = "_BaliMinScale"
-			sc.Scale = 1
-			sc.Parent = wrapper
-		end
-		return sc
-	end
-
-	local function clearMinScale()
-		local sc = wrapper and wrapper:FindFirstChild("_BaliMinScale")
-		if sc then
-			sc:Destroy()
-		end
-	end
-
-	local function computeMorphOrigin(restorePos, restoreSize)
-		local rw = restoreSize.X.Offset > 0 and restoreSize.X.Offset or wrapper.AbsoluteSize.X
-		local rh = restoreSize.Y.Offset > 0 and restoreSize.Y.Offset or wrapper.AbsoluteSize.Y
-		local rx = restorePos.X.Offset
-		local ry = restorePos.Y.Offset
-		local targetScale = 0.88
-		if pill and pill.Enabled then
-			local px, py, pw, ph = pill:GetRect()
-			local cx = rx + rw * 0.5
-			local cy = ry + rh * 0.5
-			local pcx = px + pw * 0.5
-			local pcy = py + ph * 0.5
-			local targetCx = cx + (pcx - cx) * 0.18
-			local targetCy = cy + (pcy - cy) * 0.18
-			return UDim2.fromOffset(
-				math.floor(targetCx - (rw * targetScale) * 0.5),
-				math.floor(targetCy - (rh * targetScale) * 0.5)
-			), targetScale
-		end
-		return UDim2.fromOffset(
-			math.floor(rx + (rw * (1 - targetScale)) * 0.5),
-			math.floor(ry - 14)
-		), targetScale
-	end
 
 	if self._mobileButton then
 		self._mobileButton:UpdateVisibility()
@@ -1826,20 +1826,21 @@ function Window:SetVisible(visible)
 
 		if not Tween.Reduced then
 			self._morphing = true
-			local morphDur = 0.30
+			local morphDur = 0.22
 			local restorePos = self._restorePos or wrapper.Position
 			local restoreSize = self._restoreSize or wrapper.Size
-			local targetPos, targetScale = computeMorphOrigin(restorePos, restoreSize)
-
-			self:_setAmbientChromeVisible(false)
-			local minScale = getMinScale()
-			Tween.Play(
-				minScale,
-				{ Scale = targetScale },
-				morphDur,
-				Enum.EasingStyle.Quint,
-				Enum.EasingDirection.Out
+			local targetPos = UDim2.new(
+				restorePos.X.Scale,
+				restorePos.X.Offset,
+				restorePos.Y.Scale,
+				restorePos.Y.Offset + 10
 			)
+
+			wrapper.Size = restoreSize
+			self.Sidebar.Visible = true
+			self.BodyArea.Visible = true
+			self:_setAmbientChromeVisible(true)
+
 			Tween.Play(
 				wrapper,
 				{ Position = targetPos },
@@ -1855,7 +1856,6 @@ function Window:SetVisible(visible)
 				wrapper.ZIndex = 2
 				wrapper.Position = restorePos
 				wrapper.Size = restoreSize
-				clearMinScale()
 				self.Sidebar.Visible = true
 				self.BodyArea.Visible = true
 				self:_setAmbientChromeVisible(true)
@@ -1872,29 +1872,24 @@ function Window:SetVisible(visible)
 	else
 		if not Tween.Reduced then
 			self._morphing = true
-			local morphDur = 0.30
+			local morphDur = 0.22
 			local restorePos = self._restorePos or wrapper.Position
 			local restoreSize = self._restoreSize or wrapper.Size
-			local startPos, startScale = computeMorphOrigin(restorePos, restoreSize)
+			local startPos = UDim2.new(
+				restorePos.X.Scale,
+				restorePos.X.Offset,
+				restorePos.Y.Scale,
+				restorePos.Y.Offset + 10
+			)
 
 			wrapper.Position = startPos
 			wrapper.Size = restoreSize
-			local minScale = getMinScale()
-			minScale.Scale = startScale
-
 			self.Sidebar.Visible = true
 			self.BodyArea.Visible = true
-			self:_setAmbientChromeVisible(false)
+			self:_setAmbientChromeVisible(true)
 			wrapper.ZIndex = 2
 			wrapper.Visible = true
 
-			Tween.Play(
-				minScale,
-				{ Scale = 1 },
-				morphDur,
-				Enum.EasingStyle.Quint,
-				Enum.EasingDirection.Out
-			)
 			local restoreTw = Tween.Play(
 				wrapper,
 				{ Position = restorePos },
@@ -1908,15 +1903,13 @@ function Window:SetVisible(visible)
 				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
 					return
 				end
-				clearMinScale()
 				wrapper.Position = restorePos
-				self:_setAmbientChromeVisible(true)
+				wrapper.Size = restoreSize
 				self._morphing = false
 			end)
 			return
 		end
 
-		clearMinScale()
 		self.Sidebar.Visible = true
 		self.BodyArea.Visible = true
 		self:_setAmbientChromeVisible(true)
@@ -2057,10 +2050,40 @@ function Window:BuildSettingsTab(options)
 	return SettingsTab.Build(self, options)
 end
 
-function Window:Destroy()
+function Window:Unload()
+	return self:Destroy(false)
+end
+
+function Window:Destroy(instant)
 	if self._destroyed then
 		return
 	end
+	local wrapper = self.MainWrapper
+	if not instant and not self._unloading and not Tween.Reduced and self._visible and wrapper and wrapper.Parent then
+		self._unloading = true
+		self:ClosePopup()
+		CommandPalette.Close()
+		Tooltip.Hide()
+		Blur.SetOpen(false)
+		if self._mobileButton and self._mobileButton.Destroy then
+			pcall(function()
+				self._mobileButton:Destroy()
+			end)
+		end
+		local startPos = wrapper.Position
+		local exitPos = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset,
+			startPos.Y.Scale,
+			startPos.Y.Offset + 10
+		)
+		Tween.Play(wrapper, { Position = exitPos }, 0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		Transition.Unmount(wrapper, 1, function()
+			self:Destroy(true)
+		end, { NoPositionTween = true, Duration = 0.22 })
+		return
+	end
+	self._unloading = false
 	self._destroyed = true
 
 	if type(self._onDestroy) == "function" then

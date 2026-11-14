@@ -57,7 +57,8 @@ local window = Bali:CreateWindow({
 | `window:BuildSettingsTab(opts?)` | Auto-generates the full **Settings** tab (themes, HUD, config, diagnostics). |
 | `window:Dialog(opts)` | Displays a centered modal confirmation or prompt dialog. |
 | `window:Notify(opts)` | Dispatches a toast notification linked to this window's bell history. |
-| `window:Destroy()` | Tears down the window, its popups, and owned cleanup tasks. |
+| `window:Unload()` | Smoothly animates (`0.22s` `Quint Out` fade + glide) and tears down the UI and owned cleanup tasks. |
+| `window:Destroy(instant?)` | Destroys the window with an exit transition by default, or immediately when `instant == true`. |
 
 ---
 

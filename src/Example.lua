@@ -804,9 +804,55 @@ local selectionSection = pickersSub:AddSection({
 
 selectionSection:AddDropdown({
 	Title = "Balancing Strategy",
-	Description = "Single-select searchable popover menu.",
+	Description = "Single-select searchable menu with custom colors, badges, images & locks.",
 	Icon = "sliders",
-	Values = { "Balanced", "Low Latency", "High Throughput", "Eco Saver" },
+	Values = {
+		{
+			Title = "Balanced",
+			Value = "Balanced",
+			Icon = "gauge",
+			Color = Color3.fromRGB(192, 132, 252),
+			Badge = "Auto",
+		},
+		{
+			Title = "Low Latency",
+			Value = "Low Latency",
+			Icon = "zap",
+			Color = Color3.fromRGB(56, 189, 248),
+			Badge = "Fast",
+			BadgeColor = Color3.fromRGB(56, 189, 248),
+		},
+		{
+			Title = "High Throughput",
+			Value = "High Throughput",
+			Icon = "cpu",
+			Color = Color3.fromRGB(52, 211, 153),
+			RightText = "10k/s",
+			BadgeColor = Color3.fromRGB(52, 211, 153),
+		},
+		{
+			Title = "Guardian Profile",
+			Value = "Guardian Profile",
+			Image = "rbxthumb://type=AvatarHeadShot&id=1&w=100&h=100",
+			Color = Color3.fromRGB(251, 191, 36),
+			Badge = "Pro",
+			BadgeColor = Color3.fromRGB(251, 191, 36),
+		},
+		{
+			Title = "Eco Saver",
+			Value = "Eco Saver",
+			Icon = "leaf",
+			Color = Color3.fromRGB(163, 230, 53),
+			RightText = "-40% CPU",
+		},
+		{
+			Title = "Maintenance Mode",
+			Value = "Maintenance Mode",
+			Icon = "lock",
+			RightText = "Locked",
+			Disabled = true,
+		},
+	},
 	Default = "Balanced",
 	Flag = "Pickers_Strategy",
 })

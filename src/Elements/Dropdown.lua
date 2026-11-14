@@ -18,6 +18,36 @@ local Tooltip = require("Systems/Tooltip")
 local Dropdown = {}
 Dropdown.__index = Dropdown
 
+local function resolveCustomColor(val)
+	if typeof(val) == "Color3" then
+		return val, nil
+	elseif type(val) == "string" and val ~= "" then
+		if string.sub(val, 1, 1) == "#" then
+			local ok, col = pcall(Color3.fromHex, val)
+			if ok and typeof(col) == "Color3" then
+				return col, nil
+			end
+		end
+		return nil, val
+	end
+	return nil, nil
+end
+
+local function normalizeImageAsset(val)
+	if val == nil or val == false or val == "" then
+		return nil
+	end
+	if type(val) == "number" then
+		return "rbxassetid://" .. tostring(val)
+	elseif type(val) == "string" then
+		if string.find(val, "^%d+$") then
+			return "rbxassetid://" .. val
+		end
+		return val
+	end
+	return nil
+end
+
 local function normalizeItem(entry)
 	if type(entry) == "table" then
 		local title = tostring(entry.Title or entry.Name or entry.Text or entry.Value or "")
@@ -29,6 +59,13 @@ local function normalizeItem(entry)
 			Title = title,
 			Desc = entry.Desc or entry.Description,
 			Icon = entry.Icon,
+			Image = entry.Image or entry.Thumbnail or entry.Avatar,
+			Color = entry.Color or entry.TextColor,
+			IconColor = entry.IconColor or entry.Color or entry.TextColor,
+			Badge = entry.Badge or entry.Tag,
+			BadgeColor = entry.BadgeColor or entry.TagColor or entry.Color,
+			RightText = entry.RightText or entry.Hint,
+			Disabled = entry.Disabled == true,
 			Value = value,
 		}
 	end
@@ -37,6 +74,13 @@ local function normalizeItem(entry)
 		Title = text,
 		Desc = nil,
 		Icon = nil,
+		Image = nil,
+		Color = nil,
+		IconColor = nil,
+		Badge = nil,
+		BadgeColor = nil,
+		RightText = nil,
+		Disabled = false,
 		Value = entry,
 	}
 end
@@ -456,7 +500,13 @@ function Dropdown.new(parent, opts, ctx)
 		else
 			if selectedSingle then
 				summaryLabel.Text = selectedSingle.Title
-				Theme.Bind(summaryLabel, { TextColor3 = "Text" })
+				local customCol, customToken = resolveCustomColor(selectedSingle.Color)
+				if customCol then
+					Theme.Unbind(summaryLabel, "TextColor3")
+					summaryLabel.TextColor3 = customCol
+				else
+					Theme.Bind(summaryLabel, { TextColor3 = customToken or "Text" })
+				end
 			else
 				summaryLabel.Text = "Select..."
 				Theme.Bind(summaryLabel, { TextColor3 = "Muted" })
@@ -471,10 +521,33 @@ function Dropdown.new(parent, opts, ctx)
 		return selectedSingle == item
 	end
 
+	local function cancelEntryTweens(entry)
+		if entry._bgTween then
+			pcall(function()
+				entry._bgTween:Cancel()
+			end)
+			entry._bgTween = nil
+		end
+		if entry._strTween then
+			pcall(function()
+				entry._strTween:Cancel()
+			end)
+			entry._strTween = nil
+		end
+		if entry._chkTween then
+			pcall(function()
+				entry._chkTween:Cancel()
+			end)
+			entry._chkTween = nil
+		end
+	end
+
 	local function syncEntryVisual(entry, animated)
-		local active = isItemSelected(entry.Item)
-		local targetBg = active and 0.82 or (entry.Hovered and 0.42 or 1)
-		local targetStroke = active and 0.52 or (entry.Hovered and 0.86 or 1)
+		local item = entry.Item
+		local active = isItemSelected(item)
+		local disabled = item.Disabled == true
+		local targetBg = active and 0.82 or ((entry.Hovered and not disabled) and 0.42 or 1)
+		local targetStroke = active and 0.52 or ((entry.Hovered and not disabled) and 0.86 or 1)
 		local targetCheck = active and 0 or 1
 
 		Theme.Bind(entry.Button, {
@@ -483,20 +556,36 @@ function Dropdown.new(parent, opts, ctx)
 		Theme.Bind(entry.Stroke, {
 			Color = active and "Accent" or "Stroke",
 		})
-		Theme.Bind(entry.TitleLabel, {
-			TextColor3 = active and "Text" or "SubText",
-			FontFace = active and "@SemiBold" or "@Medium",
-		})
 
+		local customCol, customToken = resolveCustomColor(item.Color)
+		if customCol then
+			Theme.Unbind(entry.TitleLabel, "TextColor3")
+			Theme.Bind(entry.TitleLabel, {
+				FontFace = active and "@SemiBold" or "@Medium",
+			})
+			entry.TitleLabel.TextColor3 = customCol
+		else
+			Theme.Bind(entry.TitleLabel, {
+				TextColor3 = customToken or (active and "Text" or "SubText"),
+				FontFace = active and "@SemiBold" or "@Medium",
+			})
+		end
+		entry.TitleLabel.TextTransparency = disabled and 0.48 or 0
+
+		if entry.IconInst and not item.IconColor then
+			Icons.SetColor(entry.IconInst, active and "Accent" or "SubText")
+		end
+
+		cancelEntryTweens(entry)
 		if animated and not Tween.Reduced and isOpen then
 			entry.Button:SetAttribute("_BaliRestBg", targetBg)
 			entry.Stroke:SetAttribute("_BaliRestStr", targetStroke)
-			Tween.Play(entry.Button, { BackgroundTransparency = targetBg }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			Tween.Play(entry.Stroke, { Transparency = targetStroke }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			entry._bgTween = Tween.Play(entry.Button, { BackgroundTransparency = targetBg }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			entry._strTween = Tween.Play(entry.Stroke, { Transparency = targetStroke }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			if entry.CheckIcon then
 				entry.CheckIcon.Visible = true
 				entry.CheckIcon:SetAttribute("_BaliRestImg", targetCheck)
-				Tween.Play(entry.CheckIcon, { ImageTransparency = targetCheck }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				entry._chkTween = Tween.Play(entry.CheckIcon, { ImageTransparency = targetCheck }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			end
 		else
 			entry.Button.BackgroundTransparency = targetBg
@@ -511,9 +600,10 @@ function Dropdown.new(parent, opts, ctx)
 		end
 	end
 
-	local function updateOptionVisuals()
+	local function updateOptionVisuals(animated)
+		local animateNow = (animated == true) and isOpen
 		for _, entry in ipairs(optionRows) do
-			syncEntryVisual(entry, isOpen)
+			syncEntryVisual(entry, animateNow)
 		end
 	end
 
@@ -594,11 +684,14 @@ function Dropdown.new(parent, opts, ctx)
 		end)
 	end
 
-	local function fireSelection(silent)
+	local function fireSelection(silent, animated)
+		if animated == nil then
+			animated = true
+		end
 		local value = getSelectedValues()
 		self.Value = value
 		updateSummary()
-		updateOptionVisuals()
+		updateOptionVisuals(animated)
 		if not silent then
 			if opts.Callback then
 				Util.Spawn(opts.Callback, multi and cloneArray(value) or value)
@@ -608,7 +701,7 @@ function Dropdown.new(parent, opts, ctx)
 	end
 
 	local function onSelectItem(item)
-		if isDisabledOrLocked(self) then
+		if isDisabledOrLocked(self) or item.Disabled then
 			return
 		end
 		if multi then
@@ -626,16 +719,16 @@ function Dropdown.new(parent, opts, ctx)
 			else
 				selectedMap[item] = true
 			end
-			fireSelection(false)
+			fireSelection(false, true)
 		else
 			if selectedSingle == item then
 				if allowNull then
 					selectedSingle = nil
-					fireSelection(false)
+					fireSelection(false, false)
 				end
 			else
 				selectedSingle = item
-				fireSelection(false)
+				fireSelection(false, false)
 			end
 			self:Close()
 		end
@@ -643,17 +736,22 @@ function Dropdown.new(parent, opts, ctx)
 
 	local function rebuildOptions()
 		for _, entry in ipairs(optionRows) do
+			cancelEntryTweens(entry)
 			entry.Button:Destroy()
 		end
 		table.clear(optionRows)
 
 		for index, item in ipairs(items) do
 			local hasDesc = (item.Desc ~= nil and item.Desc ~= "")
+			local imgAsset = normalizeImageAsset(item.Image)
+			local hasAccessory = (item.Badge ~= nil and item.Badge ~= "") or (item.RightText ~= nil and item.RightText ~= "")
 			local btn = Create.New("TextButton", {
 				Name = "Opt_" .. index,
 				Size = UDim2.new(1, 0, 0, hasDesc and 44 or 28),
 				AutomaticSize = hasDesc and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
 				LayoutOrder = index,
+				AutoButtonColor = false,
+				Active = not item.Disabled,
 				ZIndex = 113,
 				Corner = 7,
 				Padding = hasDesc and { 6, 10, 6, 10 } or { 0, 10, 0, 10 },
@@ -666,18 +764,98 @@ function Dropdown.new(parent, opts, ctx)
 				Theme = { Color = "Accent" },
 			})
 
-			local leftReserve = item.Icon and 22 or 0
-			local rightReserve = 20
+			local leftReserve = imgAsset and 26 or (item.Icon and 22 or 0)
+			local rightReserve = hasAccessory and 82 or 20
+			local iconInst = nil
+			local thumbInst = nil
 
-			if item.Icon then
-				Icons.Create(item.Icon, {
-					Size = UDim2.fromOffset(15, 15),
+			if imgAsset then
+				thumbInst = Create.New("ImageLabel", {
+					Name = "Thumb",
+					Size = UDim2.fromOffset(18, 18),
 					Position = UDim2.new(0, 0, 0.5, 0),
 					AnchorPoint = Vector2.new(0, 0.5),
-					Color = "SubText",
+					BackgroundTransparency = 1,
+					Image = imgAsset,
+					ScaleType = Enum.ScaleType.Crop,
+					Corner = 5,
 					ZIndex = 114,
 					Parent = btn,
 				})
+				Create.Stroke(thumbInst, {
+					Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+					Thickness = 1,
+				})
+			elseif item.Icon then
+				local iconCol, iconToken = resolveCustomColor(item.IconColor)
+				iconInst = Icons.Create(item.Icon, {
+					Size = UDim2.fromOffset(15, 15),
+					Position = UDim2.new(0, 0, 0.5, 0),
+					AnchorPoint = Vector2.new(0, 0.5),
+					Color = iconCol or iconToken or "SubText",
+					Transparency = item.Disabled and 0.45 or 0,
+					ZIndex = 114,
+					Parent = btn,
+				})
+			end
+
+			if item.Badge ~= nil and item.Badge ~= "" then
+				local badgeCol, badgeToken = resolveCustomColor(item.BadgeColor)
+				local badgeFrame = Create.New("Frame", {
+					Name = "OptionBadge",
+					Size = UDim2.fromOffset(0, 18),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Position = UDim2.new(1, -20, 0.5, 0),
+					AnchorPoint = Vector2.new(1, 0.5),
+					Corner = 99,
+					Padding = { 0, 7, 0, 7 },
+					BackgroundTransparency = 0.82,
+					BackgroundColor3 = badgeCol or Color3.new(1, 1, 1),
+					Theme = (not badgeCol) and { BackgroundColor3 = badgeToken or "Accent" } or nil,
+					ZIndex = 114,
+					Parent = btn,
+				})
+				Create.Stroke(badgeFrame, {
+					Color = badgeCol,
+					Theme = (not badgeCol) and { Color = badgeToken or "Accent" } or nil,
+					Transparency = 0.55,
+					Thickness = 1,
+				})
+				local badgeTxt = Create.Text({
+					Size = UDim2.fromOffset(0, 18),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Text = tostring(item.Badge),
+					Font = "SemiBold",
+					TextSize = 10,
+					Color = badgeToken or "Accent",
+					TextYAlignment = Enum.TextYAlignment.Center,
+					ZIndex = 115,
+					Parent = badgeFrame,
+				})
+				if badgeCol then
+					Theme.Unbind(badgeTxt, "TextColor3")
+					badgeTxt.TextColor3 = badgeCol
+				end
+			elseif item.RightText ~= nil and item.RightText ~= "" then
+				local hintCol, hintToken = resolveCustomColor(item.BadgeColor)
+				local hintTxt = Create.Text({
+					Name = "RightText",
+					Size = UDim2.fromOffset(0, 16),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Position = UDim2.new(1, -20, 0.5, 0),
+					AnchorPoint = Vector2.new(1, 0.5),
+					Text = tostring(item.RightText),
+					Font = "Medium",
+					TextSize = 11,
+					Color = hintToken or "Muted",
+					TextYAlignment = Enum.TextYAlignment.Center,
+					ZIndex = 114,
+					Parent = btn,
+				})
+				if hintCol then
+					Theme.Unbind(hintTxt, "TextColor3")
+					hintTxt.TextColor3 = hintCol
+				end
 			end
 
 			local titleLbl
@@ -754,22 +932,27 @@ function Dropdown.new(parent, opts, ctx)
 				TitleLabel = titleLbl,
 				DescLabel = descLbl,
 				CheckIcon = checkIcon,
+				IconInst = iconInst,
+				ThumbInst = thumbInst,
 				Hovered = false,
 			}
 
 			btn.MouseEnter:Connect(function()
-				if Transition.IsOverlayBlocking(btn) then
+				if item.Disabled or Transition.IsOverlayBlocking(btn) then
 					return
 				end
 				entry.Hovered = true
 				syncEntryVisual(entry, true)
 			end)
 			btn.MouseLeave:Connect(function()
+				if item.Disabled then
+					return
+				end
 				entry.Hovered = false
 				syncEntryVisual(entry, true)
 			end)
 			btn.Activated:Connect(function()
-				if Transition.IsOverlayBlocking(btn) then
+				if item.Disabled or Transition.IsOverlayBlocking(btn) then
 					return
 				end
 				Transition.Ripple(btn, nil, "Accent")
@@ -779,7 +962,7 @@ function Dropdown.new(parent, opts, ctx)
 			table.insert(optionRows, entry)
 		end
 
-		updateOptionVisuals()
+		updateOptionVisuals(false)
 		applyFilter()
 	end
 
@@ -825,6 +1008,10 @@ function Dropdown.new(parent, opts, ctx)
 		isOpen = false
 		openGen += 1
 		local myGen = openGen
+		for _, entry in ipairs(optionRows) do
+			entry.Hovered = false
+			syncEntryVisual(entry, false)
+		end
 		if scroll then
 			Transition.RestoreCascade(scroll)
 		end
@@ -849,11 +1036,15 @@ function Dropdown.new(parent, opts, ctx)
 		isOpen = true
 		openGen += 1
 
+		for _, entry in ipairs(optionRows) do
+			entry.Hovered = false
+		end
 		if searchBox then
 			searchBox.Text = ""
 			searchQuery = ""
 			applyFilter()
 		end
+		updateOptionVisuals(false)
 		resizePopup()
 		popup.Visible = true
 

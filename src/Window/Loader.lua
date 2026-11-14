@@ -90,60 +90,21 @@ local function createBackdropAndCard(parentGui, maid, maxWidth, withOverlay)
 	})
 	Create.GlassStroke(card, 0.05)
 
-	local bgClip = Create.New("CanvasGroup", {
-		Name = "BackgroundClip",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		ClipsDescendants = true,
-		Corner = 14,
-		ZIndex = 1,
-		Parent = card,
-	})
-
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
 		Create.New("ImageLabel", {
 			Name = "GlowTop",
 			Image = glowAsset,
-			Size = UDim2.fromOffset(280, 280),
-			Position = UDim2.fromOffset(-100, -110),
+			Size = UDim2.fromOffset(240, 150),
+			Position = UDim2.fromOffset(-80, -80),
+			Corner = 14,
 			BackgroundTransparency = 1,
 			Theme = {
 				ImageColor3 = "Accent",
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = bgClip,
-		})
-		Create.New("ImageLabel", {
-			Name = "GlowBottom",
-			Image = glowAsset,
-			AnchorPoint = Vector2.new(1, 1),
-			Size = UDim2.fromOffset(260, 260),
-			Position = UDim2.new(1, 110, 1, 110),
-			BackgroundTransparency = 1,
-			Theme = {
-				ImageColor3 = "Accent2",
-				ImageTransparency = "GlowTransparency",
-			},
-			ZIndex = 1,
-			Parent = bgClip,
-		})
-	end
-
-	local noiseAsset = Assets.Get("Noise")
-	if noiseAsset and Assets.Available then
-		Create.New("ImageLabel", {
-			Name = "Noise",
-			Image = noiseAsset,
-			ScaleType = Enum.ScaleType.Tile,
-			TileSize = UDim2.fromOffset(128, 128),
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			Corner = 14,
-			Theme = { ImageTransparency = "NoiseTransparency" },
-			ZIndex = 1,
-			Parent = bgClip,
+			Parent = card,
 		})
 	end
 
@@ -200,25 +161,26 @@ function Loader.LoadingScreen(parentGui, options)
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 
+	local customIcon = options.Icon and options.Icon ~= "bali-logo" and options.Icon ~= "bali"
 	local badge = Create.New("Frame", {
 		Size = UDim2.fromOffset(40, 40),
 		Corner = 11,
-		Theme = { BackgroundColor3 = "Accent" },
-		BackgroundTransparency = 0.88,
+		Theme = { BackgroundColor3 = customIcon and "Accent" or "TileHover" },
+		BackgroundTransparency = customIcon and 0.88 or 0.8,
 		LayoutOrder = 1,
 		Parent = header,
 	})
 	Create.Stroke(badge, {
-		Theme = { Color = "Accent" },
-		Transparency = 0.65,
+		Theme = { Color = customIcon and "Accent" or "Stroke" },
+		Transparency = customIcon and 0.65 or 0.52,
 		Thickness = 1,
 	})
 
 	local badgeIcon = Icons.Create(options.Icon or "bali-logo", {
-		Size = UDim2.fromOffset(22, 22),
+		Size = UDim2.fromOffset(customIcon and 22 or 26, customIcon and 22 or 26),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "Accent",
+		Color = customIcon and "Accent" or Color3.fromRGB(255, 255, 255),
 		Parent = badge,
 	})
 	local stopPulse = nil
@@ -893,24 +855,25 @@ function Loader.KeySystem(parentGui, options)
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 
+	local useBrandLogo = options.Icon == "bali-logo" or options.Icon == "bali"
 	local iconBadge = Create.New("Frame", {
 		Size = UDim2.fromOffset(40, 40),
 		Corner = 11,
-		Theme = { BackgroundColor3 = "Accent" },
-		BackgroundTransparency = 0.88,
+		Theme = { BackgroundColor3 = useBrandLogo and "TileHover" or "Accent" },
+		BackgroundTransparency = useBrandLogo and 0.8 or 0.88,
 		LayoutOrder = 1,
 		Parent = header,
 	})
 	Create.Stroke(iconBadge, {
-		Theme = { Color = "Accent" },
-		Transparency = 0.65,
+		Theme = { Color = useBrandLogo and "Stroke" or "Accent" },
+		Transparency = useBrandLogo and 0.52 or 0.65,
 		Thickness = 1,
 	})
 	Icons.Create(options.Icon or "key", {
-		Size = UDim2.fromOffset(20, 20),
+		Size = UDim2.fromOffset(useBrandLogo and 26 or 20, useBrandLogo and 26 or 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "Accent",
+		Color = useBrandLogo and Color3.fromRGB(255, 255, 255) or "Accent",
 		Parent = iconBadge,
 	})
 

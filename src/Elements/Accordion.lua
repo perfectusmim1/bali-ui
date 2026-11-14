@@ -53,7 +53,7 @@ function Accordion.new(parent, opts, ctx)
 		self.Frame.AutomaticSize = Enum.AutomaticSize.Y
 	end
 
-	cardFrame.ClipsDescendants = false
+	cardFrame.ClipsDescendants = true
 	Create.List(cardFrame, { Gap = 0 })
 
 	local initialExpanded = false
@@ -79,6 +79,7 @@ function Accordion.new(parent, opts, ctx)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 1,
 		Text = "",
+		Corner = 10,
 		Padding = { 10, 12, 10, 12 },
 		Theme = {
 			BackgroundColor3 = "Tile",
@@ -247,6 +248,7 @@ function Accordion.new(parent, opts, ctx)
 				task.defer(runExpandTween)
 			end
 		else
+			divider.Visible = false
 			bodyClip.ClipsDescendants = true
 			local startH = bodyClip.AbsoluteSize.Y
 			if startH <= 0 then
@@ -259,7 +261,6 @@ function Accordion.new(parent, opts, ctx)
 			Tween.Then(tw, function()
 				if animGen == myGen and not expanded then
 					bodyClip.Visible = false
-					divider.Visible = false
 				end
 			end)
 		end

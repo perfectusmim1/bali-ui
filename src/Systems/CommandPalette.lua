@@ -604,10 +604,10 @@ local function ensureBuilt()
 	})
 	Create.GlassStroke(modal, 0.06)
 
-	Create.New("TextButton", {
+	local inputSink = Create.New("TextButton", {
 		Name = "InputSink",
 		Parent = modal,
-		Size = UDim2.fromScale(1, 1),
+		Size = UDim2.new(1, 0, 0, 0),
 		BackgroundTransparency = 1,
 		Text = "",
 		AutoButtonColor = false,
@@ -615,23 +615,14 @@ local function ensureBuilt()
 		ZIndex = 305,
 	})
 
-	local bgClip = Create.New("CanvasGroup", {
-		Name = "BackgroundClip",
-		Parent = modal,
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		ClipsDescendants = true,
-		Corner = 14,
-		ZIndex = 305,
-	})
-
 	local glowId = Assets.Get("Glow")
 	if glowId then
 		Create.New("ImageLabel", {
 			Name = "Glow",
-			Parent = bgClip,
-			Size = UDim2.fromScale(0.75, 0.7),
-			Position = UDim2.fromScale(-0.18, -0.25),
+			Parent = modal,
+			Size = UDim2.fromOffset(320, 180),
+			Position = UDim2.fromOffset(-80, -70),
+			Corner = 14,
 			Image = glowId,
 			ScaleType = Enum.ScaleType.Stretch,
 			Theme = {
@@ -639,24 +630,6 @@ local function ensureBuilt()
 				ImageTransparency = function(t)
 					return math.min(t.GlowTransparency + 0.05, 0.94)
 				end,
-			},
-			ZIndex = 305,
-		})
-	end
-
-	local noiseId = Assets.Get("Noise")
-	if noiseId then
-		Create.New("ImageLabel", {
-			Name = "Noise",
-			Parent = bgClip,
-			Size = UDim2.fromScale(1, 1),
-			Corner = 14,
-			Image = noiseId,
-			ScaleType = Enum.ScaleType.Tile,
-			TileSize = UDim2.fromOffset(128, 128),
-			Theme = {
-				ImageColor3 = "Stroke",
-				ImageTransparency = "NoiseTransparency",
 			},
 			ZIndex = 305,
 		})
@@ -670,6 +643,9 @@ local function ensureBuilt()
 		BackgroundTransparency = 1,
 		ZIndex = 308,
 	})
+	rootMaid:Give(body:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		inputSink.Size = UDim2.new(1, 0, 0, math.max(48, body.AbsoluteSize.Y))
+	end))
 	Create.List(body, { Direction = Enum.FillDirection.Vertical, Gap = 0 })
 
 	local searchBar = Create.New("Frame", {

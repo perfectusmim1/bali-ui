@@ -262,24 +262,15 @@ function Notification.Notify(opts)
 	})
 	Create.GlassStroke(card, 0.06)
 
-	local bgClip = Create.New("CanvasGroup", {
-		Name = "BackgroundClip",
-		Parent = card,
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		ClipsDescendants = true,
-		Corner = 12,
-		ZIndex = 402,
-	})
-
 	local glowId = Assets.Get("Glow")
 	local glowImg = nil
 	if glowId then
 		glowImg = Create.New("ImageLabel", {
 			Name = "Glow",
-			Parent = bgClip,
-			Size = UDim2.fromScale(0.75, 1.5),
-			Position = UDim2.fromScale(-0.22, -0.32),
+			Parent = card,
+			Size = UDim2.fromOffset(200, 72),
+			Position = UDim2.fromOffset(-50, -24),
+			Corner = 12,
 			Image = glowId,
 			ScaleType = Enum.ScaleType.Stretch,
 			Theme = {
@@ -287,24 +278,6 @@ function Notification.Notify(opts)
 				ImageTransparency = function(t)
 					return math.min(t.GlowTransparency + 0.04, 0.94)
 				end,
-			},
-			ZIndex = 402,
-		})
-	end
-
-	local noiseId = Assets.Get("Noise")
-	if noiseId then
-		Create.New("ImageLabel", {
-			Name = "Noise",
-			Parent = bgClip,
-			Size = UDim2.fromScale(1, 1),
-			Corner = 12,
-			Image = noiseId,
-			ScaleType = Enum.ScaleType.Tile,
-			TileSize = UDim2.fromOffset(128, 128),
-			Theme = {
-				ImageColor3 = "Stroke",
-				ImageTransparency = "NoiseTransparency",
 			},
 			ZIndex = 402,
 		})

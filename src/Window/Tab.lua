@@ -407,12 +407,29 @@ function Tab.new(window, options)
 		Position = UDim2.fromOffset(0, 2),
 		Size = UDim2.new(0, 0, 1, -4),
 		Corner = 8,
-		Theme = { BackgroundColor3 = "Card" },
+		Theme = { BackgroundColor3 = "Accent" },
+		BackgroundTransparency = 0.78,
 		Visible = false,
 		ZIndex = 1,
 		Parent = subTabScroll,
 	})
-	Create.GlassStroke(subTabIndicator, 0.05)
+	local pillGradient = Create.New("UIGradient", {
+		Color = Theme.AccentSequence(),
+		Rotation = 20,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.05),
+			NumberSequenceKeypoint.new(1, 0.35),
+		}),
+		Parent = subTabIndicator,
+	})
+	maid:Give(Theme.Changed:Connect(function(theme)
+		pillGradient.Color = Theme.AccentSequence(theme)
+	end))
+	Create.Stroke(subTabIndicator, {
+		Theme = { Color = "Accent" },
+		Transparency = 0.35,
+		Thickness = 1,
+	})
 
 	local subTabButtons = Create.New("Frame", {
 		Name = "Buttons",
@@ -544,14 +561,30 @@ function Tab:SetCompact(compact, instant)
 	if compact then
 		self._titleLabel.Visible = false
 		self._badgeFrame.Visible = false
+		if self._iconInst then
+			self._iconInst.AnchorPoint = Vector2.new(0.5, 0.5)
+			self._iconInst.Position = UDim2.fromScale(0.5, 0.5)
+		end
 	else
 		self._titleLabel.Visible = true
 		self._titleLabel.TextTransparency = 1
 		self._badgeFrame.Visible = self._badgeLabel.Text ~= ""
+		if self._iconInst then
+			self._iconInst.AnchorPoint = Vector2.new(0, 0.5)
+			self._iconInst.Position = UDim2.new(0, 13, 0.5, 0)
+		end
 		if instant then
 			self._titleLabel.TextTransparency = 0
 		else
 			Tween.Play(self._titleLabel, { TextTransparency = 0 }, Tween.Fast)
+		end
+	end
+	if self._indicator then
+		self._indicator.Position = UDim2.new(0, compact and 2 or 0, 0.5, 0)
+		if self.Selected then
+			self._indicator.Size = compact and UDim2.fromOffset(2, 14) or UDim2.fromOffset(3, 18)
+		else
+			self._indicator.Size = compact and UDim2.fromOffset(2, 0) or UDim2.fromOffset(3, 0)
 		end
 	end
 end
@@ -560,7 +593,9 @@ function Tab:_setActiveVisual(active, instant)
 	self.Selected = active == true
 	local fillT = active and 0.8 or 1
 	local strokeT = active and 0.68 or 1
-	local indSize = active and UDim2.fromOffset(3, 18) or UDim2.fromOffset(3, 0)
+	local indW = self._compact and 2 or 3
+	local indH = active and (self._compact and 14 or 18) or 0
+	local indSize = UDim2.fromOffset(indW, indH)
 
 	if active then
 		Theme.Bind(self._titleLabel, { TextColor3 = "Text", FontFace = "@SemiBold" })
@@ -688,7 +723,7 @@ function Tab:SelectSubTab(subTab)
 		candidate.Scroll.Visible = isCurrent
 		Theme.Bind(candidate._titleLabel, {
 			TextColor3 = isCurrent and "Text" or "SubText",
-			FontFace = isCurrent and "@SemiBold" or "@Medium",
+			FontFace = isCurrent and "@Bold" or "@Medium",
 		})
 		if candidate._iconInst then
 			Icons.SetColor(candidate._iconInst, isCurrent and "Accent" or "SubText")

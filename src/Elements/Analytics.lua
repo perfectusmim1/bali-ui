@@ -187,24 +187,16 @@ function StatCard.new(parent, opts, ctx)
 	-- Subtle top-left radial Glow tint (clipped cleanly to card corner)
 	local glowImg = Assets.Get("Glow")
 	if opts.Glow ~= false and glowImg then
-		local glowClip = Create.New("CanvasGroup", {
-			Name = "GlowClip",
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			ClipsDescendants = true,
-			Corner = opts.Corner or 10,
-			ZIndex = 1,
-			Parent = cardFrame,
-		})
 		local glow = Create.New("ImageLabel", {
 			Name = "Glow",
-			Size = UDim2.fromOffset(180, 120),
-			Position = UDim2.fromOffset(-48, -42),
+			Size = UDim2.fromOffset(160, 84),
+			Position = UDim2.fromOffset(-44, -38),
+			Corner = opts.Corner or 10,
 			Image = glowImg,
 			ScaleType = Enum.ScaleType.Stretch,
 			ZIndex = 1,
 			Theme = { ImageTransparency = "GlowTransparency" },
-			Parent = glowClip,
+			Parent = cardFrame,
 		})
 		bindColorProp(glow, "ImageColor3", colorSpec)
 	end

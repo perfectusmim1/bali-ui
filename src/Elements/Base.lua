@@ -517,14 +517,14 @@ function Base.Row(parent, options, rightWidth)
 		local measureW = reservedRight > 0 and reservedRight or naturalRightW
 		local actualW = right.Visible and math.max(reservedRight, measureW) or 0
 		local availLeft = bodyW - 24 - actualW - 10 - (iconWidth > 0 and (iconWidth + 10) or 0)
-		local stackRight = (options.StackRight == true) or (actualW >= 100 and bodyW > 0 and availLeft < 132)
+		local stackRight = (options.StackRight == true) or (options.StackRight ~= false and actualW >= 100 and bodyW > 0 and availLeft < 132)
 		local compactStack = stackRight and (reservedRight > 0 and reservedRight < 130 or (reservedRight <= 0 and actualW > 0 and actualW < 130))
 
 		if rightConstraint then
 			if stackRight or bodyW <= 180 or titleText == "" then
 				rightConstraint.MaxSize = Vector2.new(9999, 9999)
 			else
-				local maxR = math.max(96, bodyW - math.max(132, math.floor(bodyW * 0.44)) - 10)
+				local maxR = (options.StackRight == false) and math.max(120, bodyW - 110) or math.max(96, bodyW - math.max(132, math.floor(bodyW * 0.44)) - 10)
 				rightConstraint.MaxSize = Vector2.new(maxR, 9999)
 			end
 		end

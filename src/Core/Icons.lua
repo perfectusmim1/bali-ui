@@ -27,8 +27,8 @@ local glyphs = {
 	["circle-help"] = "?",
 	ellipsis = "•••",
 	circle = "●",
-	["bali-logo"] = "B",
-	bali = "B",
+	["bali-logo"] = "PH",
+	bali = "PH",
 }
 local glyphRotation = { ["chevron-down"] = 90, ["chevron-up"] = -90 }
 
@@ -179,6 +179,9 @@ function Icons.Create(icon, props)
 	end
 	if props.LayoutOrder then
 		instance.LayoutOrder = props.LayoutOrder
+	end
+	if props.Visible ~= nil then
+		instance.Visible = props.Visible == true
 	end
 
 	local color = props.Color or "Text"

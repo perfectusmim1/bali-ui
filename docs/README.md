@@ -2,7 +2,9 @@
 
 **Obsidian glassmorphic UI library for Roblox and Luau** — built for unified `Quint` hardware motion, crisp `BuilderSans` typography, a bundled 164-icon Lucide sprite atlas, live re-theming, real-time analytics widgets, and standalone single-file bundles with zero runtime `loadstring` chains.
 
-![Bali Suite MacBook Showcase](assets/promo-hero.png)
+> **Published GitBook:** [bali-2.gitbook.io/bali-docs](https://bali-2.gitbook.io/bali-docs/)
+
+![Bali Suite Showcase](assets/promo-hero.png)
 
 ---
 

@@ -159,29 +159,39 @@ section:AddSegmented({
 
 ![Searchable Dropdown Popover](assets/screenshots/dropdown-controls.png)
 
-Viewport-aware popover dropdown mounted in `BaliPopupLayer` with compact `28px` single-line option rows, active modal input blocking so sliders underneath cannot react while browsing options, live search filtering, single or multi selection, and dynamic option updates.
+Viewport-aware popover dropdown mounted in `BaliPopupLayer` with compact `28px` single-line option rows, active modal input blocking so sliders underneath cannot react while browsing options, live search filtering, single or multi selection, per-option icons/thumbnails/badges/colors, and dynamic option updates.
 
 ```lua
-local clusters = section:AddDropdown({
-	Title = "Edge Clusters",
-	Description = "Multi-select dropdown with live search filter.",
+local strategy = section:AddDropdown({
+	Title = "Balancing Strategy",
+	Description = "Single-select searchable menu with custom colors, badges, images & locks.",
 	Values = {
-		"US-East (Virginia)",
-		"US-West (Oregon)",
-		"EU-Central (Frankfurt)",
-		"EU-West (London)",
-		"AP-Northeast (Tokyo)",
-		"AP-Southeast (Singapore)",
+		{ Label = "Balanced", Icon = "gauge", Badge = "Auto" },
+		{ Label = "Low Latency", Icon = "zap", Color = Color3.fromRGB(96, 165, 250), Badge = "Fast", BadgeColor = Color3.fromRGB(59, 130, 246) },
+		{ Label = "High Throughput", Icon = "cpu", Color = Color3.fromRGB(52, 211, 153), RightText = "10k/s" },
+		{ Label = "Guardian Profile", Image = "rbxthumb://type=AvatarHeadShot&id=1&w=100&h=100", Color = Color3.fromRGB(251, 191, 36), Badge = "Pro", BadgeColor = Color3.fromRGB(245, 158, 11) },
+		{ Label = "Eco Saver", Icon = "leaf", IconColor = Color3.fromRGB(163, 230, 53), Color = Color3.fromRGB(190, 242, 100), RightText = "40% CPU" },
+		{ Label = "Maintenance Mode", Icon = "lock", RightText = "Locked", Disabled = true },
 	},
-	Default = { "US-East (Virginia)", "EU-Central (Frankfurt)" },
-	Multi = true,
+	Default = "Low Latency",
 	Searchable = true,
-	AllowNull = false,
-	MaxVisible = 6,
-	Flag = "EdgeClusters",
-	Callback = function(selectedList) end,
+	Flag = "Strategy",
+	Callback = function(selected) end,
 })
 ```
+
+### Rich Option Fields (`Values` table entries)
+
+Plain string values and rich option tables can be mixed freely:
+
+- `Label` / `Title` / `Name` / `Text` — Display label shown in the menu and summary trigger.
+- `Value` — Stored return value (defaults to the display label).
+- `Icon` / `IconColor` — Lucide icon name and optional custom `Color3` tint.
+- `Image` / `Thumbnail` / `Avatar` — Rounded `18x18` thumbnail asset displayed on the left of the option row.
+- `Color` / `TextColor` — Custom `Color3` for the option label (and selected summary on single-select triggers).
+- `Badge` / `Tag` & `BadgeColor` / `TagColor` — Compact pill badge rendered on the right side.
+- `RightText` / `Hint` — Secondary right-aligned hint text.
+- `Disabled` — Grays out and locks an option against selection.
 
 - **Methods**: `:Open()`, `:Close()`, `:Set(valueOrTable, silent?)`, `:Get()`, `:SetValues(list)`.
 

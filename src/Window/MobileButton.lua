@@ -102,25 +102,32 @@ function MobileButton.new(parentLayer, window, options)
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 
+	local customIcon = options.Icon and options.Icon ~= "bali-logo" and options.Icon ~= "bali"
 	local badge = Create.New("Frame", {
 		Size = UDim2.fromOffset(24, 24),
 		Corner = 7,
-		Theme = { BackgroundColor3 = "Accent" },
-		BackgroundTransparency = 0.88,
+		Theme = {
+			BackgroundColor3 = customIcon and "Accent" or function(t)
+				return (t and t.Dark == false) and Color3.fromRGB(24, 24, 32) or t.TileHover
+			end,
+			BackgroundTransparency = customIcon and 0.88 or function(t)
+				return (t and t.Dark == false) and 0.12 or 0.82
+			end,
+		},
 		LayoutOrder = 1,
 		Parent = content,
 	})
 	Create.Stroke(badge, {
-		Theme = { Color = "Accent" },
-		Transparency = 0.68,
+		Theme = { Color = customIcon and "Accent" or "Stroke" },
+		Transparency = customIcon and 0.68 or 0.55,
 		Thickness = 1,
 	})
 
 	Icons.Create(options.Icon or "bali-logo", {
-		Size = UDim2.fromOffset(15, 15),
+		Size = UDim2.fromOffset(customIcon and 15 or 17, customIcon and 15 or 17),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "Accent",
+		Color = customIcon and "Accent" or Color3.fromRGB(255, 255, 255),
 		Parent = badge,
 	})
 

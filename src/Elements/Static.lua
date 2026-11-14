@@ -25,6 +25,9 @@ function Label.new(parent, opts, ctx)
 	if rowOpts.IconBadge == nil then
 		rowOpts.IconBadge = false
 	end
+	if rowOpts.StackRight == nil then
+		rowOpts.StackRight = false
+	end
 
 	local row = Base.Row(parent, rowOpts, 0)
 	element:BindUI(row)
@@ -1307,27 +1310,19 @@ function ProfileCard.new(parent, opts, ctx)
 	card.Frame.ClipsDescendants = true
 
 	if Assets.Get("Glow") then
-		local glowClip = Create.New("CanvasGroup", {
-			Name = "GlowClip",
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			ClipsDescendants = true,
-			Corner = 10,
-			ZIndex = 1,
-			Parent = card.Frame,
-		})
 		Create.New("ImageLabel", {
 			Name = "Glow",
-			Size = UDim2.fromOffset(180, 120),
-			Position = UDim2.fromOffset(-36, -36),
+			Size = UDim2.fromOffset(160, 72),
+			Position = UDim2.fromOffset(-36, -32),
 			BackgroundTransparency = 1,
 			Image = Assets.Get("Glow"),
+			Corner = 10,
 			Theme = {
 				ImageColor3 = "Accent",
 				ImageTransparency = "GlowTransparency",
 			},
 			ZIndex = 1,
-			Parent = glowClip,
+			Parent = card.Frame,
 		})
 	end
 

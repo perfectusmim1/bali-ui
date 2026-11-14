@@ -2,36 +2,40 @@
 
 **Bali** is an obsidian glassmorphic UI library for Roblox and Luau featuring unified `Quint Out` deceleration motion, crisp `BuilderSans` typography, radial glass strokes, a bundled 164-icon `1024x704` Lucide sprite atlas, live theme switching, real-time analytics widgets, desktop & mobile ergonomics, and zero-`loadstring` single-file distribution bundles.
 
+> **Documentation:** [bali-2.gitbook.io/bali-docs](https://bali-2.gitbook.io/bali-docs/)
+
 ![Bali Suite Showcase](docs/assets/promo-hero.png)
 
 ---
 
 ## Highlights
 
-- **Obsidian Glass Architecture**: Layered depth (`Main`, `HUD`, `Popup`, `Dialog`, `Notify`), directional hairline `UIStroke` highlights, ambient radial blooms, and zero `UIScale` layout jitter on hover or expansion.
+- **Obsidian Glass Architecture**: Layered depth (`Main`, `HUD`, `Popup`, `Dialog`, `Notify`), directional hairline `UIStroke` highlights, ambient radial blooms, and constant-size fade/glide minimize & restore transitions without `UIScale` jitter.
 - **7 Curated Themes & Live Overrides**: `Midnight`, `Ocean`, `Graphite`, `Aurora`, `Sunset`, `Emerald`, and `Light`, plus runtime `SetAccent`, `AddTheme`, and `SetFont` (`Builder`, `Gotham`, `Montserrat`, `Ubuntu`, `Nunito`).
-- **164 Bundled Lucide Icons**: Self-contained `1024x704` Lucide atlas (`src/Generated/AssetData.lua`) hydrated cleanly via `getcustomasset` / `getsynasset` with monochrome glyph fallbacks in Roblox Studio.
-- **Complete Interactive Suite**: `Button` (with `Confirm` & variants), `ButtonGroup`, `Toggle` (with inline keybinds), `Checkbox`, `Slider`, `RangeSlider`, `Stepper`, `Input` (numeric, integer, password mask, clearable), `Segmented`, `Dropdown` (single, multi, searchable, input-isolated compact popover), `Keybind` (`Toggle`, `Hold`, `Always`, mouse binds), `ColorPicker` (HSV square, alpha slider, hex/RGB, presets, rainbow), and nested `Accordion`.
+- **164 Bundled Lucide Icons**: Self-contained `1024x704` Lucide sprite atlas (`src/Generated/AssetData.lua`) hydrated cleanly via `getcustomasset` / `getsynasset` with monochrome glyph fallbacks in Roblox Studio.
+- **Complete Interactive Suite**: `Button` (with `Confirm` & variants), `ButtonGroup`, `Toggle` (with inline keybinds), `Checkbox`, `Slider`, `RangeSlider`, `Stepper`, `Input` (numeric, integer, password mask, clearable), `Segmented`, `Dropdown` (single, multi, searchable, input-isolated compact popover with per-option `Icon`, `IconColor`, `Image`/`Thumbnail`, `Color`, `Badge`, `RightText`, and `Disabled` states), `Keybind` (`Toggle`, `Hold`, `Always`, mouse binds), `ColorPicker` (HSV square, alpha slider, hex/RGB, presets, rainbow), and nested `Accordion`.
 - **Analytics & Data Widgets**: `StatCard` (animated counters, deltas, sparklines), `Chart` (`Line` / `Bar` with live `:Push()`), `ProgressBar`, `Table` (live filter, selectable checkboxes, badges, inline row actions), `CardGrid`, plus rich typography (`Label`, `Paragraph`, `Divider`, `Header`, `CodeBlock` with language-aware `RichText` highlighting, `Image` / `Banner`, `ProfileCard`).
-- **System HUD & Lifecycle Safety**: Stackable `Notification` toasts (with configurable default duration via `SetNotificationDuration`) + unread history bell popover, draggable `Watermark`, live `KeybindList`, window-centered `CommandPalette` (`Ctrl+K`), `Lighting` `Blur`, viewport-clamped `Tooltip`, `Dialog` modals, `LoadingScreen`, `KeySystem`, JSON `Config` & `AutoSave` persistence, automatic `_BaliInstance` orphan cleanup on re-execute, and global error boundary (`Util.ErrorHandler`).
+- **System HUD & Lifecycle Safety**: Stackable `Notification` toasts (configurable duration via `SetNotificationDuration`) + unread history bell popover, draggable `Watermark`, live `KeybindList`, window-centered `CommandPalette` (`Ctrl+K`), `Lighting` `Blur`, viewport-clamped `Tooltip`, `Dialog` modals, `LoadingScreen`, `KeySystem`, JSON `Config` & `AutoSave` persistence, animated `window:Unload()`, automatic `_BaliInstance` orphan cleanup on re-execute, and global error boundary (`Util.ErrorHandler`).
 
 ---
 
 ## Showcase
 
-| Telemetry & Cluster Matrix | Multi-Theme Engine |
+| Telemetry & Rich Controls | Multi-Theme Engine (`Midnight`, `Ocean`, `Light`) |
 | :---: | :---: |
-| ![Bali Analytics Showcase](docs/assets/promo-analytics.png) | ![Bali Dual Theme Showcase](docs/assets/promo-themes.png) |
+| ![Bali Analytics Showcase](docs/assets/promo-analytics.png) | ![Bali Multi-Theme Showcase](docs/assets/promo-themes.png) |
 
 <details>
 <summary>More Live In-Engine Screenshots</summary>
 
 | Feature | Preview |
 | :--- | :---: |
-| **Color Picker & Presets** | ![Color Picker](docs/assets/screenshots/color-picker.png) |
-| **Notification History Popover** | ![Notifications Popover](docs/assets/screenshots/notifications.png) |
-| **Interactive Controls** | ![Interactive Controls](docs/assets/screenshots/interactive-controls.png) |
-| **Key Verification Modal** | ![Key System](docs/assets/screenshots/key-system.png) |
+| **Overview Dashboard (`Midnight`)** | ![Overview Dashboard](docs/assets/screenshots/overview-midnight.png) |
+| **Interactive Controls** | ![Interactive Controls](docs/assets/screenshots/controls-interactive.png) |
+| **Rich Searchable Dropdowns & Pickers** | ![Controls & Pickers](docs/assets/screenshots/controls-pickers.png) |
+| **Layout, CodeBlock & Accordion** | ![Layout & Rich](docs/assets/screenshots/controls-layout.png) |
+| **Notifications & Modals** | ![Notifications & Modals](docs/assets/screenshots/notifications-modals.png) |
+| **Light & Multi-Theme Appearance** | ![Settings & Themes](docs/assets/screenshots/settings-themes.png) |
 | **Command Palette (`Ctrl+K`)** | ![Command Palette](docs/assets/screenshots/command-palette.png) |
 
 </details>
@@ -106,7 +110,7 @@ local window = Bali:CreateWindow({ Title = "Studio Demo" })
 
 ## Documentation
 
-Full GitBook-ready documentation lives inside [`docs/`](docs/SUMMARY.md):
+Read the hosted docs at **[bali-2.gitbook.io/bali-docs](https://bali-2.gitbook.io/bali-docs/)** or browse the Markdown source inside [`docs/`](docs/SUMMARY.md):
 
 - [Getting Started](docs/getting-started.md) — Executor quickstart, Studio setup & duplicate window cleanup
 - [Architecture & Motion](docs/architecture.md) — Modular hierarchy, `ZIndex` layers, tweens & Lucide atlas

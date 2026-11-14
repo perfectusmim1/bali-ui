@@ -456,7 +456,7 @@ function Bali:Destroy()
 	for _, win in ipairs(activeWindows) do
 		if type(win) == "table" and type(win.Destroy) == "function" then
 			pcall(function()
-				win:Destroy()
+				win:Destroy(true)
 			end)
 		end
 	end
