@@ -64,8 +64,12 @@ function Keybind.new(parent, opts, ctx)
 
 	local self = Base.New("Keybind", parent, opts, ctx)
 	local rowParent = (typeof(self.Frame) == "Instance") and self.Frame or parent
-	local rightWidth = 152
-	local row = Base.Row(rowParent, opts, rightWidth)
+	local rightWidth = 114
+	local rowOpts = table.clone(opts)
+	if rowOpts.IconBadge == nil then
+		rowOpts.IconBadge = false
+	end
+	local row = Base.Row(rowParent, rowOpts, rightWidth)
 
 	if typeof(self.Frame) ~= "Instance" then
 		self.Frame = row.Frame

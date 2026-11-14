@@ -86,8 +86,12 @@ function ColorPicker.new(parent, opts, ctx)
 
 	local self = Base.New("ColorPicker", parent, opts, ctx)
 	local rowParent = (typeof(self.Frame) == "Instance") and self.Frame or parent
-	local rightWidth = 112
-	local row = Base.Row(rowParent, opts, rightWidth)
+	local rightWidth = 104
+	local rowOpts = table.clone(opts)
+	if rowOpts.IconBadge == nil then
+		rowOpts.IconBadge = false
+	end
+	local row = Base.Row(rowParent, rowOpts, rightWidth)
 
 	if typeof(self.Frame) ~= "Instance" then
 		self.Frame = row.Frame
@@ -184,6 +188,7 @@ function ColorPicker.new(parent, opts, ctx)
 		Name = popupId,
 		Size = UDim2.fromOffset(236, 100),
 		AutomaticSize = Enum.AutomaticSize.Y,
+		Active = true,
 		Visible = false,
 		ZIndex = 110,
 		Corner = 12,
@@ -195,6 +200,17 @@ function ColorPicker.new(parent, opts, ctx)
 		},
 	})
 	Create.GlassStroke(popover, 0.06)
+
+	Create.New("TextButton", {
+		Name = "InputSink",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		Active = true,
+		ZIndex = 110,
+		Parent = popover,
+	})
 
 	Create.New("ImageLabel", {
 		Name = "Shadow",
@@ -532,6 +548,7 @@ function ColorPicker.new(parent, opts, ctx)
 		pillSwatch.BackgroundColor3 = currentColor
 		pillSwatch.BackgroundTransparency = hasAlpha and currentAlpha or 0
 		headerSwatch.BackgroundColor3 = currentColor
+		headerSwatch.BackgroundTransparency = hasAlpha and currentAlpha or 0
 
 		svHueGrad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromHSV(hue, 1, 1))
 		svCursorRing.Position = UDim2.fromScale(sat, 1 - val)
@@ -677,6 +694,10 @@ function ColorPicker.new(parent, opts, ctx)
 
 	local dragMoveConn = Services.UserInputService.InputChanged:Connect(function(input)
 		if activeDrag and Util.IsMove(input) then
+			if Transition.IsOverlayBlocking(popover) then
+				activeDrag = nil
+				return
+			end
 			applyDragAt(Util.MousePosition())
 		end
 	end)
@@ -688,7 +709,7 @@ function ColorPicker.new(parent, opts, ctx)
 
 	local function bindSliderDrag(target, kind, disableRainbow)
 		target.InputBegan:Connect(function(input)
-			if isDisabledOrLocked(self) then
+			if isDisabledOrLocked(self) or Transition.IsOverlayBlocking(target) then
 				return
 			end
 			if Util.IsPointer(input) then
@@ -817,7 +838,7 @@ function ColorPicker.new(parent, opts, ctx)
 	end
 
 	swatchPill.Activated:Connect(function()
-		if isDisabledOrLocked(self) then
+		if isDisabledOrLocked(self) or Transition.IsOverlayBlocking(swatchPill) then
 			return
 		end
 		Transition.Ripple(swatchPill, nil, "Accent")

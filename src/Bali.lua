@@ -294,6 +294,21 @@ function Bali:CreateWindow(opts)
 	pcall(Assets.Load)
 	Input.Init()
 
+	if type(options.KeySystem) == "table" and options.KeySystem.Enabled ~= false then
+		local ksOpts = {}
+		for k, v in pairs(options.KeySystem) do
+			ksOpts[k] = v
+		end
+		ksOpts.Title = ksOpts.Title or options.Title or "Bali"
+		if ksOpts.Yield == nil then
+			ksOpts.Yield = true
+		end
+		local verified = self:KeySystem(ksOpts)
+		if ksOpts.Yield and not verified then
+			return nil
+		end
+	end
+
 	local customGui = options.ScreenGui
 	local screenGui = (typeof(customGui) == "Instance" and customGui) or self:_ensureScreenGui()
 	options.ScreenGui = nil
@@ -401,6 +416,22 @@ end
 
 function Bali:SetFont(family)
 	return Theme.SetFont(family)
+end
+
+function Bali:SetAutoSave(enabled)
+	return Config.SetAutoSave(enabled)
+end
+
+function Bali:GetAutoSave()
+	return Config.GetAutoSave()
+end
+
+function Bali:SetNotificationDuration(seconds)
+	return Notification.SetDefaultDuration(seconds)
+end
+
+function Bali:GetNotificationDuration()
+	return Notification.GetDefaultDuration()
 end
 
 function Bali:Destroy()

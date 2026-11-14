@@ -92,7 +92,7 @@ local function createFlowController(tab, parent, subTab)
 		ScrollBarThickness = 3,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		Theme = { ScrollBarImageColor3 = "Muted" },
-		Padding = { 14, 16, 18, 16 },
+		Padding = (window and window.IsMobileMode and window:IsMobileMode()) and { 10, 10, 14, 10 } or { 14, 16, 18, 16 },
 		Parent = parent,
 	})
 	Create.List(scroll, { Gap = 12 })
@@ -102,6 +102,7 @@ local function createFlowController(tab, parent, subTab)
 		SubTab = subTab,
 		CurrentPair = nil,
 		Order = 0,
+		_pairs = {},
 	}
 
 	function flow.NextOrder()
@@ -163,7 +164,8 @@ local function createFlowController(tab, parent, subTab)
 		}
 
 		function pair.ApplyLayout(windowWidth)
-			local stacked = (windowWidth or 820) < 620
+			local isMobile = window and window.IsMobileMode and window:IsMobileMode()
+			local stacked = isMobile or (windowWidth or 820) < 620
 			if stacked then
 				rowLayout.FillDirection = Enum.FillDirection.Vertical
 				leftCol.Size = UDim2.new(1, 0, 0, 0)
@@ -186,8 +188,23 @@ local function createFlowController(tab, parent, subTab)
 		end
 		pair.ApplyLayout(window and window:GetWidth() or 820)
 
+		table.insert(flow._pairs, pair)
 		flow.CurrentPair = pair
 		return pair
+	end
+
+	function flow.RefreshLayout(windowWidth)
+		local isMobile = window and window.IsMobileMode and window:IsMobileMode()
+		local pad = scroll:FindFirstChildOfClass("UIPadding")
+		if pad then
+			pad.PaddingTop = UDim.new(0, isMobile and 10 or 14)
+			pad.PaddingRight = UDim.new(0, isMobile and 10 or 16)
+			pad.PaddingBottom = UDim.new(0, isMobile and 14 or 18)
+			pad.PaddingLeft = UDim.new(0, isMobile and 10 or 16)
+		end
+		for _, pair in ipairs(flow._pairs) do
+			pair.ApplyLayout(windowWidth)
+		end
 	end
 
 	function flow.AddSection(opts)
@@ -448,6 +465,7 @@ function Tab.new(window, options)
 	}, Tab)
 
 	self._defaultFlow = createFlowController(self, subPageHolder, nil)
+	self._flows = { self._defaultFlow }
 
 	-- Attach Container directly onto Tab as a convenience fallback for direct calls
 	self._beforeAdd = function()
@@ -461,7 +479,7 @@ function Tab.new(window, options)
 	self:SetCompact(self._compact, true)
 
 	maid:Give(button.MouseEnter:Connect(function()
-		if not self.Selected then
+		if not self.Selected and not Transition.IsOverlayBlocking(button) then
 			Tween.Play(button, { BackgroundTransparency = 0.55 }, Tween.Instant)
 			if self._iconInst then
 				Icons.SetColor(self._iconInst, "Text")
@@ -481,6 +499,9 @@ function Tab.new(window, options)
 	end))
 
 	maid:Give(button.Activated:Connect(function(input)
+		if Transition.IsOverlayBlocking(button) then
+			return
+		end
 		Transition.Ripple(button, input, "Accent")
 		self:Select()
 	end))
@@ -565,14 +586,22 @@ function Tab:_setActiveVisual(active, instant)
 		Tween.Spring(self._indicator, { Size = indSize }, Tween.Normal)
 	end
 
-	self.Page.Visible = active
-	if active then
+	if not active then
+		if self._defaultFlow and self._defaultFlow.Scroll then
+			Transition.RestoreCascade(self._defaultFlow.Scroll)
+		end
+		for _, candidate in ipairs(self.SubTabs) do
+			if candidate.Scroll then
+				Transition.RestoreCascade(candidate.Scroll)
+			end
+		end
+	else
 		self:_syncSubTabIndicator(instant)
 	end
+	self.Page.Visible = active
 	if active and not instant then
 		local activeScroll = self.ActiveSubTab and self.ActiveSubTab.Scroll or self._defaultFlow.Scroll
-		Transition.SlideFade(activeScroll, 8)
-		Transition.Cascade(activeScroll, 0.022, 12)
+		Transition.Cascade(activeScroll, 0.018, 12, 10)
 	end
 end
 
@@ -653,6 +682,9 @@ function Tab:SelectSubTab(subTab)
 
 	for _, candidate in ipairs(self.SubTabs) do
 		local isCurrent = (candidate == subTab)
+		if not isCurrent and candidate.Scroll then
+			Transition.RestoreCascade(candidate.Scroll)
+		end
 		candidate.Scroll.Visible = isCurrent
 		Theme.Bind(candidate._titleLabel, {
 			TextColor3 = isCurrent and "Text" or "SubText",
@@ -664,8 +696,7 @@ function Tab:SelectSubTab(subTab)
 	end
 
 	self.ActiveSubTab = subTab
-	Transition.SlideFade(subTab.Scroll, 0, dir * 16)
-	Transition.Cascade(subTab.Scroll, 0.02, 10)
+	Transition.Cascade(subTab.Scroll, 0.018, 12, dir * 12)
 	self:_syncSubTabIndicator(false)
 
 	if self.Window and self.Window.ActiveTab == self then
@@ -735,6 +766,7 @@ function Tab:AddSubTab(options)
 	}
 
 	local flow = createFlowController(self, self._subPageHolder, subTab)
+	table.insert(self._flows, flow)
 	flow.Scroll.Visible = false
 	subTab.Scroll = flow.Scroll
 	subTab.Page = flow.Scroll
@@ -763,22 +795,25 @@ function Tab:AddSubTab(options)
 	Theme.Bind(subBtn, { BackgroundColor3 = "Tile" })
 	local subHovered = false
 	self.Maid:Give(subBtn.MouseEnter:Connect(function()
-		if self.ActiveSubTab == subTab or Util.IsTouchDevice() then
+		if self.ActiveSubTab == subTab or Util.IsTouchDevice() or Transition.IsOverlayBlocking(subBtn) then
 			return
 		end
 		subHovered = true
-		Tween.Play(subBtn, { BackgroundTransparency = 0.52 }, Tween.Fast, Enum.EasingStyle.Exponential)
-		Tween.Play(subLabel, { TextColor3 = Theme.Current.Text }, Tween.Fast, Enum.EasingStyle.Exponential)
+		Tween.Play(subBtn, { BackgroundTransparency = 0.52 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		Tween.Play(subLabel, { TextColor3 = Theme.Current.Text }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end))
 	self.Maid:Give(subBtn.MouseLeave:Connect(function()
 		subHovered = false
-		Tween.Play(subBtn, { BackgroundTransparency = 1 }, Tween.Fast, Enum.EasingStyle.Exponential)
+		Tween.Play(subBtn, { BackgroundTransparency = 1 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 		if self.ActiveSubTab ~= subTab then
-			Tween.Play(subLabel, { TextColor3 = Theme.Current.SubText }, Tween.Fast, Enum.EasingStyle.Exponential)
+			Tween.Play(subLabel, { TextColor3 = Theme.Current.SubText }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 		end
 	end))
 
 	self.Maid:Give(subBtn.Activated:Connect(function()
+		if Transition.IsOverlayBlocking(subBtn) then
+			return
+		end
 		if subHovered then
 			subBtn.BackgroundTransparency = 1
 		end
@@ -791,6 +826,20 @@ function Tab:AddSubTab(options)
 	end
 
 	return subTab
+end
+
+function Tab:RefreshLayout(windowWidth)
+	local w = windowWidth or (self.Window and self.Window:GetWidth()) or 820
+	if self._flows then
+		for _, flow in ipairs(self._flows) do
+			if flow.RefreshLayout then
+				flow.RefreshLayout(w)
+			end
+		end
+	end
+	if self._syncSubTabIndicator then
+		self:_syncSubTabIndicator(true)
+	end
 end
 
 function Tab:Destroy()

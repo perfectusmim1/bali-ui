@@ -71,9 +71,9 @@ function Dropdown.new(parent, opts, ctx)
 		Values = {},
 		Default = nil,
 		Multi = false,
-		Searchable = false,
+		Searchable = true,
 		AllowNull = false,
-		MaxVisible = 6,
+		MaxVisible = 7,
 		Callback = nil,
 		Flag = nil,
 		Tooltip = nil,
@@ -82,8 +82,15 @@ function Dropdown.new(parent, opts, ctx)
 
 	local self = Base.New("Dropdown", parent, opts, ctx)
 	local rowParent = (typeof(self.Frame) == "Instance") and self.Frame or parent
-	local rightWidth = 136
-	local row = Base.Row(rowParent, opts, rightWidth)
+	local rightWidth = 168
+	local rowOpts = table.clone(opts)
+	if rowOpts.IconBadge == nil then
+		rowOpts.IconBadge = false
+	end
+	if rowOpts.StackRight == nil then
+		rowOpts.StackRight = true
+	end
+	local row = Base.Row(rowParent, rowOpts, rightWidth)
 
 	if typeof(self.Frame) ~= "Instance" then
 		self.Frame = row.Frame
@@ -111,8 +118,8 @@ function Dropdown.new(parent, opts, ctx)
 	local items = normalizeList(opts.Values)
 	local multi = opts.Multi == true
 	local allowNull = opts.AllowNull == true
-	local searchable = opts.Searchable == true
-	local maxVisible = math.max(1, tonumber(opts.MaxVisible) or 6)
+	local searchable = opts.Searchable ~= false
+	local maxVisible = math.max(1, tonumber(opts.MaxVisible) or 7)
 
 	local selectedSingle = nil
 	local selectedMap = {} -- [item] = true (keyed by item reference for exact identity)
@@ -125,10 +132,10 @@ function Dropdown.new(parent, opts, ctx)
 	-- Right-side trigger pill
 	local trigger = Create.New("TextButton", {
 		Name = "Trigger",
-		Size = UDim2.new(1, 0, 0, 30),
+		Size = UDim2.new(1, 0, 0, 32),
 		Text = "",
 		Corner = 8,
-		Padding = { 0, 8, 0, 10 },
+		Padding = { 0, 10, 0, 12 },
 		Theme = {
 			BackgroundColor3 = "Field",
 		},
@@ -168,6 +175,7 @@ function Dropdown.new(parent, opts, ctx)
 	local popup = Create.New("Frame", {
 		Name = popupId,
 		Size = UDim2.fromOffset(220, 120),
+		Active = true,
 		Visible = false,
 		ZIndex = 110,
 		Corner = 10,
@@ -179,6 +187,17 @@ function Dropdown.new(parent, opts, ctx)
 		},
 	})
 	Create.GlassStroke(popup, 0.06)
+
+	Create.New("TextButton", {
+		Name = "InputSink",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		Active = true,
+		ZIndex = 110,
+		Parent = popup,
+	})
 
 	Create.New("ImageLabel", {
 		Name = "Shadow",
@@ -194,6 +213,84 @@ function Dropdown.new(parent, opts, ctx)
 		},
 		Parent = popup,
 	})
+
+	local glassClip = Create.New("Frame", {
+		Name = "GlassClip",
+		Size = UDim2.fromScale(1, 1),
+		Corner = 10,
+		ClipsDescendants = true,
+		BackgroundTransparency = 1,
+		ZIndex = 110,
+		Parent = popup,
+	})
+
+	local glassSheen = Create.New("Frame", {
+		Name = "GlassSheen",
+		Size = UDim2.fromScale(1, 1),
+		Corner = 10,
+		BackgroundTransparency = 0.72,
+		Theme = { BackgroundColor3 = "Elevated" },
+		ZIndex = 110,
+		Parent = glassClip,
+	})
+	local sheenGrad = Instance.new("UIGradient")
+	sheenGrad.Rotation = 125
+	sheenGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.62),
+		NumberSequenceKeypoint.new(0.45, 0.90),
+		NumberSequenceKeypoint.new(1, 0.78),
+	})
+	sheenGrad.Parent = glassSheen
+
+	local glowAsset = Assets.Get("Glow")
+	if glowAsset and Assets.Available then
+		Create.New("ImageLabel", {
+			Name = "Glow",
+			Size = UDim2.fromScale(0.85, 0.85),
+			Position = UDim2.fromScale(-0.25, -0.25),
+			Image = glowAsset,
+			ScaleType = Enum.ScaleType.Stretch,
+			ZIndex = 110,
+			Theme = {
+				ImageColor3 = "Accent",
+				ImageTransparency = function(t)
+					return math.min((t.GlowTransparency or 0.84) + 0.04, 0.93)
+				end,
+			},
+			Parent = glassClip,
+		})
+	end
+
+	local glassAsset = Assets.Get("Glass")
+	if glassAsset and Assets.Available then
+		Create.New("ImageLabel", {
+			Name = "Glass",
+			Size = UDim2.fromScale(1, 1),
+			Image = glassAsset,
+			ScaleType = Enum.ScaleType.Stretch,
+			ImageTransparency = 0.80,
+			Theme = { ImageColor3 = "Text" },
+			ZIndex = 110,
+			Parent = glassClip,
+		})
+	end
+
+	local noiseAsset = Assets.Get("Noise")
+	if noiseAsset and Assets.Available then
+		Create.New("ImageLabel", {
+			Name = "Noise",
+			Size = UDim2.fromScale(1, 1),
+			Image = noiseAsset,
+			ScaleType = Enum.ScaleType.Tile,
+			TileSize = UDim2.fromOffset(128, 128),
+			ZIndex = 110,
+			Theme = {
+				ImageColor3 = "Stroke",
+				ImageTransparency = "NoiseTransparency",
+			},
+			Parent = glassClip,
+		})
+	end
 
 	local popupInner = Create.New("Frame", {
 		Name = "Inner",
@@ -291,7 +388,7 @@ function Dropdown.new(parent, opts, ctx)
 		Parent = popupInner,
 	})
 	Create.Padding(scroll, { 3, 7, 3, 3 })
-	local scrollLayout = Create.List(scroll, { Gap = 4 })
+	local scrollLayout = Create.List(scroll, { Gap = 3 })
 
 	local emptyLabel = Create.Text({
 		Name = "Empty",
@@ -372,24 +469,49 @@ function Dropdown.new(parent, opts, ctx)
 		return selectedSingle == item
 	end
 
+	local function syncEntryVisual(entry, animated)
+		local active = isItemSelected(entry.Item)
+		local targetBg = active and 0.82 or (entry.Hovered and 0.42 or 1)
+		local targetStroke = active and 0.52 or (entry.Hovered and 0.86 or 1)
+		local targetCheck = active and 0 or 1
+
+		Theme.Bind(entry.Button, {
+			BackgroundColor3 = active and "Accent" or "TileHover",
+		})
+		Theme.Bind(entry.Stroke, {
+			Color = active and "Accent" or "Stroke",
+		})
+		Theme.Bind(entry.TitleLabel, {
+			TextColor3 = active and "Text" or "SubText",
+			FontFace = active and "@SemiBold" or "@Medium",
+		})
+
+		if animated and not Tween.Reduced and isOpen then
+			entry.Button:SetAttribute("_BaliRestBg", targetBg)
+			entry.Stroke:SetAttribute("_BaliRestStr", targetStroke)
+			Tween.Play(entry.Button, { BackgroundTransparency = targetBg }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			Tween.Play(entry.Stroke, { Transparency = targetStroke }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			if entry.CheckIcon then
+				entry.CheckIcon.Visible = true
+				entry.CheckIcon:SetAttribute("_BaliRestImg", targetCheck)
+				Tween.Play(entry.CheckIcon, { ImageTransparency = targetCheck }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			end
+		else
+			entry.Button.BackgroundTransparency = targetBg
+			entry.Button:SetAttribute("_BaliRestBg", targetBg)
+			entry.Stroke.Transparency = targetStroke
+			entry.Stroke:SetAttribute("_BaliRestStr", targetStroke)
+			if entry.CheckIcon then
+				entry.CheckIcon.Visible = true
+				entry.CheckIcon.ImageTransparency = targetCheck
+				entry.CheckIcon:SetAttribute("_BaliRestImg", targetCheck)
+			end
+		end
+	end
+
 	local function updateOptionVisuals()
 		for _, entry in ipairs(optionRows) do
-			local active = isItemSelected(entry.Item)
-			Theme.Bind(entry.Button, {
-				BackgroundColor3 = active and "Accent" or "TileHover",
-				BackgroundTransparency = active and function() return 0.84 end or function() return entry.Hovered and 0.4 or 1 end,
-			})
-			Theme.Bind(entry.Stroke, {
-				Color = active and "Accent" or "Stroke",
-				Transparency = active and function() return 0.58 end or function() return 1 end,
-			})
-			Theme.Bind(entry.TitleLabel, {
-				TextColor3 = active and "Text" or "SubText",
-				FontFace = active and "@SemiBold" or "@Medium",
-			})
-			if entry.CheckIcon then
-				entry.CheckIcon.Visible = active
-			end
+			syncEntryVisual(entry, isOpen)
 		end
 	end
 
@@ -408,8 +530,8 @@ function Dropdown.new(parent, opts, ctx)
 
 		local padV = 6
 		local contentH = scrollLayout.AbsoluteContentSize.Y
-		local estPerRow = hasDesc and 44 or 32
-		local maxListH = maxVisible * estPerRow + math.max(0, maxVisible - 1) * 4 + padV
+		local estPerRow = hasDesc and 44 or 28
+		local maxListH = maxVisible * estPerRow + math.max(0, maxVisible - 1) * 3 + padV
 		local listH
 		if visibleCount == 0 then
 			listH = 36
@@ -417,12 +539,12 @@ function Dropdown.new(parent, opts, ctx)
 			listH = math.min(contentH + padV, maxListH)
 		else
 			local shown = math.min(visibleCount, maxVisible)
-			listH = shown * estPerRow + math.max(0, shown - 1) * 4 + padV
+			listH = shown * estPerRow + math.max(0, shown - 1) * 3 + padV
 		end
 
 		local layerH = (ctx.PopupLayer and ctx.PopupLayer.AbsoluteSize.Y > 0) and ctx.PopupLayer.AbsoluteSize.Y or 680
-		local anchorW = (trigger.AbsoluteSize.X > 0) and trigger.AbsoluteSize.X or 136
-		local width = Util.Clamp(anchorW + 64, 198, 276)
+		local anchorW = (trigger.AbsoluteSize.X > 0) and trigger.AbsoluteSize.X or 168
+		local width = Util.Clamp(math.max(anchorW + 76, 248), 248, 320)
 		local totalH = math.min(16 + searchH + listH, math.max(120, layerH - 16))
 		listH = math.max(36, totalH - 16 - searchH)
 
@@ -521,14 +643,15 @@ function Dropdown.new(parent, opts, ctx)
 		table.clear(optionRows)
 
 		for index, item in ipairs(items) do
+			local hasDesc = (item.Desc ~= nil and item.Desc ~= "")
 			local btn = Create.New("TextButton", {
 				Name = "Opt_" .. index,
-				Size = UDim2.new(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
+				Size = UDim2.new(1, 0, 0, hasDesc and 44 or 28),
+				AutomaticSize = hasDesc and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
 				LayoutOrder = index,
 				ZIndex = 113,
 				Corner = 7,
-				Padding = { 6, 8, 6, 8 },
+				Padding = hasDesc and { 6, 10, 6, 10 } or { 0, 10, 0, 10 },
 				BackgroundTransparency = 1,
 				Theme = { BackgroundColor3 = "TileHover" },
 				Parent = scroll,
@@ -552,31 +675,32 @@ function Dropdown.new(parent, opts, ctx)
 				})
 			end
 
-			local textCol = Create.New("Frame", {
-				Size = UDim2.new(1, -(leftReserve + rightReserve), 0, 0),
-				Position = UDim2.fromOffset(leftReserve, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				ZIndex = 114,
-				Parent = btn,
-			})
-			Create.List(textCol, { Gap = 2 })
-
-			local titleLbl = Create.Text({
-				Size = UDim2.new(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				Text = item.Title,
-				TextSize = 12,
-				TextWrapped = true,
-				Font = "Medium",
-				Color = "SubText",
-				LayoutOrder = 1,
-				ZIndex = 114,
-				Parent = textCol,
-			})
-
+			local titleLbl
 			local descLbl
-			if item.Desc and item.Desc ~= "" then
+			if hasDesc then
+				local textCol = Create.New("Frame", {
+					Size = UDim2.new(1, -(leftReserve + rightReserve), 0, 0),
+					Position = UDim2.fromOffset(leftReserve, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					ZIndex = 114,
+					Parent = btn,
+				})
+				Create.List(textCol, { Gap = 2 })
+
+				titleLbl = Create.Text({
+					Size = UDim2.new(1, 0, 0, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					Text = item.Title,
+					TextSize = 12,
+					TextWrapped = true,
+					Font = "Medium",
+					Color = "SubText",
+					LayoutOrder = 1,
+					ZIndex = 114,
+					Parent = textCol,
+				})
+
 				descLbl = Create.Text({
 					Size = UDim2.new(1, 0, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
@@ -587,6 +711,21 @@ function Dropdown.new(parent, opts, ctx)
 					LayoutOrder = 2,
 					ZIndex = 114,
 					Parent = textCol,
+				})
+			else
+				titleLbl = Create.Text({
+					Size = UDim2.new(1, -(leftReserve + rightReserve), 1, 0),
+					Position = UDim2.fromOffset(leftReserve, 0),
+					AutomaticSize = Enum.AutomaticSize.None,
+					Text = item.Title,
+					TextSize = 12,
+					TextWrapped = false,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					TextYAlignment = Enum.TextYAlignment.Center,
+					Font = "Medium",
+					Color = "SubText",
+					ZIndex = 114,
+					Parent = btn,
 				})
 			end
 
@@ -599,7 +738,8 @@ function Dropdown.new(parent, opts, ctx)
 				Parent = btn,
 			})
 			if checkIcon then
-				checkIcon.Visible = false
+				checkIcon.Visible = true
+				checkIcon.ImageTransparency = 1
 			end
 
 			local entry = {
@@ -613,18 +753,20 @@ function Dropdown.new(parent, opts, ctx)
 			}
 
 			btn.MouseEnter:Connect(function()
-				entry.Hovered = true
-				if not isItemSelected(item) then
-					Theme.Bind(btn, { BackgroundColor3 = "TileHover", BackgroundTransparency = function() return 0.45 end })
+				if Transition.IsOverlayBlocking(btn) then
+					return
 				end
+				entry.Hovered = true
+				syncEntryVisual(entry, true)
 			end)
 			btn.MouseLeave:Connect(function()
 				entry.Hovered = false
-				if not isItemSelected(item) then
-					Theme.Bind(btn, { BackgroundColor3 = "TileHover", BackgroundTransparency = function() return 1 end })
-				end
+				syncEntryVisual(entry, true)
 			end)
 			btn.Activated:Connect(function()
+				if Transition.IsOverlayBlocking(btn) then
+					return
+				end
 				Transition.Ripple(btn, nil, "Accent")
 				onSelectItem(item)
 			end)
@@ -678,6 +820,9 @@ function Dropdown.new(parent, opts, ctx)
 		isOpen = false
 		openGen += 1
 		local myGen = openGen
+		if scroll then
+			Transition.RestoreCascade(scroll)
+		end
 		if chevron then
 			Tween.Play(chevron, { Rotation = chevronBaseRot }, Tween.Fast)
 		end
@@ -811,7 +956,7 @@ function Dropdown.new(parent, opts, ctx)
 	self.Refresh = self.SetValues
 
 	trigger.Activated:Connect(function()
-		if isDisabledOrLocked(self) then
+		if isDisabledOrLocked(self) or Transition.IsOverlayBlocking(trigger) then
 			return
 		end
 		Transition.Ripple(trigger, nil, "Accent")

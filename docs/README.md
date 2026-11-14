@@ -1,6 +1,6 @@
 # Bali UI
 
-**Obsidian glassmorphic UI library for Roblox and Luau** — built for buttery `Exponential` hardware motion, crisp `BuilderSans` typography, a bundled 164-icon Lucide sprite atlas, live re-theming, real-time analytics widgets, and standalone single-file bundles with zero runtime `loadstring` chains.
+**Obsidian glassmorphic UI library for Roblox and Luau** — built for unified `Quint` hardware motion, crisp `BuilderSans` typography, a bundled 164-icon Lucide sprite atlas, live re-theming, real-time analytics widgets, and standalone single-file bundles with zero runtime `loadstring` chains.
 
 ![Bali Suite MacBook Showcase](assets/promo-hero.png)
 
@@ -8,9 +8,9 @@
 
 ## Why Bali?
 
-- **Zero-Stretch Motion Engine**: Every transition, hover state, tab switch, accordion expand, and popover uses smooth `Exponential Out` deceleration without `UIScale` distortion or `UIListLayout` neighbor jitter.
-- **ZIndex-Isolated Layering**: Dedicated `Main`, `HUD`, `Popup`, `Dialog`, and `Notify` layers ensure dropdowns, HSV color pickers, modals, and toasts never clip or z-fight with scrolling containers.
-- **164 Bundled Lucide Icons**: Self-contained `832x572` sprite sheet hydrated cleanly into executor asset APIs, with sharp monochrome glyph fallbacks inside sandboxed environments like Roblox Studio.
+- **Zero-Stretch Motion Engine**: Every transition, hover state, tab switch, accordion expand, minimize morph, and popover uses smooth `Quint Out` deceleration without `UIScale` bitmap distortion or `UIListLayout` neighbor jitter at rest.
+- **ZIndex-Isolated Layering**: Dedicated `Main`, `HUD`, `Popup`, `Dialog`, and `Notify` layers with modal input isolation ensure dropdowns, HSV color pickers, modals, and toasts never clip or bleed hover/drag events to controls underneath.
+- **164 Bundled Lucide Icons**: Self-contained `1024x704` sprite sheet hydrated cleanly into executor asset APIs, with sharp monochrome glyph fallbacks inside sandboxed environments like Roblox Studio.
 - **7 Built-in Themes & Live Customization**: Switch live between `Midnight`, `Ocean`, `Graphite`, `Aurora`, `Sunset`, `Emerald`, and `Light`, override accents dynamically, or register custom themes.
 - **Full Control & Telemetry Suite**: Buttons (with `Confirm` guards), Toggles with inline keybinds, Checkboxes, Sliders, RangeSliders, Steppers, Masked/Numeric Inputs, Segmented controls, Searchable Single/Multi Dropdowns, HSV + Alpha + Rainbow ColorPicker, StatCards with Sparklines, live Line/Bar Charts, ProgressBars, searchable Tables, and CardGrids.
 

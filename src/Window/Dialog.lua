@@ -119,7 +119,9 @@ function Dialog.Show(dialogLayer, options)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Theme = {
 			BackgroundColor3 = "Card",
-			BackgroundTransparency = "CardTransparency",
+			BackgroundTransparency = function(t)
+				return math.min(t.CardTransparency or 0.12, 0.03)
+			end,
 		},
 		Corner = 14,
 		ClipsDescendants = true,
@@ -305,9 +307,9 @@ function Dialog.Show(dialogLayer, options)
 				Name = "MaskOverlay",
 				Position = inputBox.Position,
 				Size = inputBox.Size,
-				Text = string.rep("•", #inputBox.Text),
-				Font = "Regular",
-				TextSize = 13,
+				Text = string.rep("●", #inputBox.Text),
+				Font = "SemiBold",
+				TextSize = 11,
 				Color = "Text",
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				Visible = showMasked,
@@ -315,7 +317,7 @@ function Dialog.Show(dialogLayer, options)
 				Parent = field,
 			})
 			local function syncMask()
-				maskOverlay.Text = string.rep("•", #inputBox.Text)
+				maskOverlay.Text = string.rep("●", #inputBox.Text)
 				maskOverlay.Visible = showMasked and inputBox.Text ~= ""
 				inputBox.TextTransparency = (showMasked and inputBox.Text ~= "") and 1 or 0
 			end
@@ -400,6 +402,8 @@ function Dialog.Show(dialogLayer, options)
 			return
 		end
 		closed = true
+		backdrop.Active = false
+		backdrop:SetAttribute("_BaliClosing", true)
 		Tween.Play(backdrop, { BackgroundTransparency = 1 }, Tween.Fast)
 		Transition.Unmount(container, 0.94, function()
 			maid:Clean()
@@ -441,6 +445,8 @@ function Dialog.Show(dialogLayer, options)
 
 		local btnStroke = Create.Stroke(btn, { Thickness = 1 })
 		local btnContent = Create.New("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.new(0, 0, 1, 0),
 			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundTransparency = 1,
@@ -464,8 +470,20 @@ function Dialog.Show(dialogLayer, options)
 			Parent = btnContent,
 		})
 
-		if def.Icon then
-			Icons.Create(def.Icon, {
+		local resolvedIcon = def.Icon
+		if resolvedIcon == nil then
+			local lower = string.lower(btnTitle)
+			if lower == "cancel" or lower == "close" or lower == "dismiss" or lower == "no" then
+				resolvedIcon = "x"
+			elseif variant == "Danger" then
+				resolvedIcon = "trash"
+			elseif variant == "Primary" then
+				resolvedIcon = "check"
+			end
+		end
+
+		if resolvedIcon and resolvedIcon ~= false then
+			Icons.Create(resolvedIcon, {
 				Size = UDim2.fromOffset(14, 14),
 				Color = (variant == "Primary") and "AccentText" or (variant == "Danger" and "Error" or "Text"),
 				LayoutOrder = 1,
@@ -519,17 +537,18 @@ function Dialog.Show(dialogLayer, options)
 		maid:Give(backdrop.Activated:Connect(function()
 			controller:Close()
 		end))
-		maid:Give(Services.UserInputService.InputBegan:Connect(function(input, processed)
-			if not processed and input.KeyCode == Enum.KeyCode.Escape then
+		maid:Give(Services.UserInputService.InputBegan:Connect(function(input)
+			if input.KeyCode == Enum.KeyCode.Escape then
 				controller:Close()
 			end
 		end))
 	end
 
-	Tween.Play(backdrop, { BackgroundTransparency = Theme.Current.OverlayTransparency }, Tween.Fast)
+	local targetOverlayTrans = math.max(0.32, (Theme.Current.OverlayTransparency or 0.56) - 0.14)
+	Tween.Play(backdrop, { BackgroundTransparency = targetOverlayTrans }, Tween.Fast)
 	maid:Give(Theme.Changed:Connect(function(theme)
 		if not closed then
-			backdrop.BackgroundTransparency = theme.OverlayTransparency
+			backdrop.BackgroundTransparency = math.max(0.32, (theme.OverlayTransparency or 0.56) - 0.14)
 		end
 	end))
 	Transition.Mount(container, 0.94)

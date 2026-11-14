@@ -65,8 +65,6 @@ section:AddCheckbox({
 
 ## `AddSlider`, `AddRangeSlider` & `AddStepper`
 
-![Sliders & Steppers](assets/screenshots/dropdown-controls.png)
-
 ```lua
 section:AddSlider({
 	Title = "Max Frame Budget",
@@ -159,7 +157,9 @@ section:AddSegmented({
 
 ## `AddDropdown`
 
-Viewport-aware popover dropdown mounted in `BaliPopupLayer` with full border clarity, live search filtering, single or multi selection, and dynamic option updates.
+![Searchable Dropdown Popover](assets/screenshots/dropdown-controls.png)
+
+Viewport-aware popover dropdown mounted in `BaliPopupLayer` with compact `28px` single-line option rows, active modal input blocking so sliders underneath cannot react while browsing options, live search filtering, single or multi selection, and dynamic option updates.
 
 ```lua
 local clusters = section:AddDropdown({

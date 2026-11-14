@@ -343,10 +343,15 @@ function Util.HttpGet(url, acceptJson)
 
 	if type(req) == "function" then
 		local ok, res = pcall(req, { Url = url, Method = "GET", Headers = headers })
-		if ok and type(res) == "table" and type(res.Body) == "string" and #res.Body > 0 then
+		if ok and type(res) == "table" then
 			local code = tonumber(res.StatusCode or res.status_code)
-			if (res.Success == nil or res.Success == true) and (not code or (code >= 200 and code < 300)) then
-				return res.Body, code or 200
+			if code and code >= 400 and code < 500 then
+				return nil, code
+			end
+			if type(res.Body) == "string" and #res.Body > 0 then
+				if (res.Success == nil or res.Success == true) and (not code or (code >= 200 and code < 300)) then
+					return res.Body, code or 200
+				end
 			end
 		end
 	end

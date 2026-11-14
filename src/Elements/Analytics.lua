@@ -383,11 +383,11 @@ function StatCard.new(parent, opts, ctx)
 		end
 	end
 
-	sparkContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	self.Maid:Give(sparkContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 		if #currentPoints >= 2 then
 			renderLineSegments(sparkContainer, currentPoints, colorSpec, 2, 3)
 		end
-	end)
+	end))
 
 	function self:SetValue(v, delta)
 		if cancelRoll then
@@ -547,8 +547,7 @@ function Chart.new(parent, opts, ctx)
 	end
 
 	local headerRight = Create.New("Frame", {
-		Size = UDim2.fromOffset(100, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.fromOffset(100, 32),
 		Position = UDim2.new(1, 0, 0, 0),
 		AnchorPoint = Vector2.new(1, 0),
 		BackgroundTransparency = 1,
@@ -570,13 +569,14 @@ function Chart.new(parent, opts, ctx)
 
 	local hoverTagLabel = Create.Text({
 		Size = UDim2.new(1, 0, 0, 13),
-		Text = "",
+		Text = "Latest",
 		TextSize = 10,
 		Font = "Medium",
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Color = "SubText",
-		Visible = false,
+		TextTransparency = 0.25,
+		Visible = true,
 		LayoutOrder = 2,
 		Parent = headerRight,
 	})
@@ -699,14 +699,22 @@ function Chart.new(parent, opts, ctx)
 		Parent = plotCanvas,
 	})
 
-	local xAxisRow = Create.New("Frame", {
-		Name = "XAxis",
-		Size = UDim2.new(1, -46, 0, 14),
-		Position = UDim2.fromOffset(44, 0),
+	local xAxisWrap = Create.New("Frame", {
+		Name = "XAxisWrap",
+		Size = UDim2.new(1, 0, 0, 14),
 		BackgroundTransparency = 1,
 		Visible = #labels > 0,
 		LayoutOrder = 3,
 		Parent = content,
+	})
+
+	local xAxisRow = Create.New("Frame", {
+		Name = "XAxis",
+		Size = UDim2.new(1, -46, 1, 0),
+		Position = UDim2.fromOffset(44, 0),
+		BackgroundTransparency = 1,
+		Visible = #labels > 0,
+		Parent = xAxisWrap,
 	})
 
 	if self.BindUI then
@@ -744,7 +752,15 @@ function Chart.new(parent, opts, ctx)
 		else
 			readoutLabel.Text = "—"
 		end
-		hoverTagLabel.Visible = false
+		hoverTagLabel.Visible = true
+		hoverTagLabel.TextTransparency = 0.25
+		if #labels > 0 then
+			hoverTagLabel.Text = tostring(labels[#labels])
+		elseif staticHeadline ~= nil then
+			hoverTagLabel.Text = "Current"
+		else
+			hoverTagLabel.Text = "Latest"
+		end
 	end
 
 	local function rebuildXLabels()
@@ -754,15 +770,25 @@ function Chart.new(parent, opts, ctx)
 			end
 		end
 		if #labels == 0 then
+			xAxisWrap.Visible = false
 			xAxisRow.Visible = false
 			return
 		end
+		xAxisWrap.Visible = true
 		xAxisRow.Visible = true
-		local maxShown = 6
-		local step = math.max(1, math.ceil(#labels / maxShown))
+		local canvasW = plotCanvas.AbsoluteSize.X
+		local maxByWidth = canvasW > 40 and math.max(2, math.floor(canvasW / 54) + 1) or 6
+		local maxShown = math.min(6, maxByWidth)
+		local step = math.max(1, math.ceil(#labels / math.max(1, maxShown - 1)))
+		local minEndGap = math.max(step, math.ceil(#labels * 0.18))
+		local lastPlacedScale = -1
+		local labelWidth = 48
+		local minNormDist = canvasW > 0 and ((labelWidth + 6) / canvasW) or 0.2
 		for i = 1, #labels do
-			if i == 1 or i == #labels or ((i - 1) % step == 0 and (#labels - i) >= step * 0.5) then
-				local scaleX = #labels == 1 and 0.5 or (i - 1) / (#labels - 1)
+			local scaleX = #labels == 1 and 0.5 or (i - 1) / (#labels - 1)
+			local isEnd = (i == 1 or i == #labels)
+			local isCadence = ((i - 1) % step == 0 and (i - 1) >= minEndGap and (#labels - i) >= minEndGap)
+			if isEnd or (isCadence and (scaleX - lastPlacedScale) >= minNormDist and (1 - scaleX) >= minNormDist) then
 				local align = Enum.TextXAlignment.Center
 				local anchorX = 0.5
 				if i == 1 and #labels > 1 then
@@ -773,7 +799,7 @@ function Chart.new(parent, opts, ctx)
 					anchorX = 1
 				end
 				Create.Text({
-					Size = UDim2.fromOffset(48, 14),
+					Size = UDim2.fromOffset(labelWidth, 14),
 					Position = UDim2.fromScale(scaleX, 0),
 					AnchorPoint = Vector2.new(anchorX, 0),
 					Text = tostring(labels[i]),
@@ -783,6 +809,7 @@ function Chart.new(parent, opts, ctx)
 					Color = "Muted",
 					Parent = xAxisRow,
 				})
+				lastPlacedScale = scaleX
 			end
 		end
 	end
@@ -960,6 +987,7 @@ function Chart.new(parent, opts, ctx)
 
 		local val = tonumber(points[idx]) or points[idx]
 		readoutLabel.Text = formatNumericValue(val, opts.Prefix, opts.Suffix, opts.Decimals)
+		hoverTagLabel.TextTransparency = 0
 		local lbl = labels[idx]
 		if lbl and lbl ~= "" then
 			hoverTagLabel.Text = tostring(lbl)
@@ -977,22 +1005,36 @@ function Chart.new(parent, opts, ctx)
 		refreshDefaultReadout()
 	end
 
-	hitOverlay.MouseMoved:Connect(function()
+	self.Maid:Give(hitOverlay.MouseMoved:Connect(function()
+		if Transition.IsOverlayBlocking(hitOverlay) then
+			clearHover()
+			return
+		end
 		updateHoverAt(Util.MousePosition())
-	end)
-	hitOverlay.MouseLeave:Connect(clearHover)
-	hitOverlay.InputBegan:Connect(function(input)
+	end))
+	self.Maid:Give(hitOverlay.MouseLeave:Connect(clearHover))
+	self.Maid:Give(hitOverlay.InputBegan:Connect(function(input)
+		if Transition.IsOverlayBlocking(hitOverlay) then
+			return
+		end
 		if Util.IsPointer(input) then
 			updateHoverAt(Util.MousePosition())
 		end
-	end)
-	hitOverlay.InputChanged:Connect(function(input)
+	end))
+	self.Maid:Give(hitOverlay.InputChanged:Connect(function(input)
+		if Transition.IsOverlayBlocking(hitOverlay) then
+			clearHover()
+			return
+		end
 		if Util.IsMove(input) then
 			updateHoverAt(Util.MousePosition())
 		end
-	end)
+	end))
 
-	plotCanvas:GetPropertyChangedSignal("AbsoluteSize"):Connect(redrawChart)
+	self.Maid:Give(plotCanvas:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		rebuildXLabels()
+		redrawChart()
+	end))
 
 	function self:SetPoints(pts, newLabels)
 		points = type(pts) == "table" and Util.Copy(pts) or {}
@@ -1946,9 +1988,9 @@ function CardGrid.new(parent, opts, ctx)
 		local cols
 		if count == 1 then
 			cols = 1
-		elseif width <= 0 or width >= 430 then
+		elseif width <= 0 or width >= 520 then
 			cols = math.min(count, 4)
-		elseif width >= 230 then
+		elseif width >= 220 then
 			cols = math.min(count, 2)
 		else
 			cols = 1
@@ -1976,7 +2018,7 @@ function CardGrid.new(parent, opts, ctx)
 			end
 			for _, m in ipairs(entry.MetricRows) do
 				Theme.Bind(m.Label, { TextColor3 = "AccentText" })
-				m.Label.TextTransparency = 0.22
+				m.Label.TextTransparency = 0.08
 				Theme.Bind(m.Value, { TextColor3 = "AccentText" })
 			end
 		else
@@ -2170,6 +2212,7 @@ function CardGrid.new(parent, opts, ctx)
 			self.Changed:Fire(id, cardData)
 		end
 	end
+	self.Set = self.SetActive
 
 	function self:UpdateCard(id, data)
 		if type(data) ~= "table" then

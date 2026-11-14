@@ -16,12 +16,21 @@ local Config = {}
 
 local DEFAULT_FOLDER = "Bali/Configs"
 local AUTOLOAD_FILE = "_autoload.txt"
+local AUTOSAVE_FILE = "_autosave.json"
+local AUTOSAVE_STATE_FILE = "_autosave_enabled.txt"
 
 local folder = DEFAULT_FOLDER
 local registryRef = nil
 local extrasRef = nil
 local memoryStore = {}
 local memoryAutoLoad = nil
+local memoryAutoSave = nil
+local lastAutoSaveFlags = nil
+local lastAutoSaveUnnamed = nil
+local hasLoadedAutoSave = false
+local autoSaveEnabled = true
+local isLoading = false
+local autoSaveToken = 0
 
 -- ─── Pure-Lua JSON Encoder & Decoder ─────────────────────────────────────────
 
@@ -436,6 +445,14 @@ local function autoLoadPath()
 	return folder .. "/" .. AUTOLOAD_FILE
 end
 
+local function autoSavePath()
+	return folder .. "/" .. AUTOSAVE_FILE
+end
+
+local function autoSaveStatePath()
+	return folder .. "/" .. AUTOSAVE_STATE_FILE
+end
+
 local function collectPreferences()
 	if not extrasRef then
 		return nil
@@ -521,27 +538,42 @@ local function applyPreferences(prefs)
 	end
 end
 
-local function collectFlags()
-	local flags = {}
-	if type(registryRef) ~= "table" then
-		return flags
+local function serializeMap(sourceMap)
+	local out = {}
+	if type(sourceMap) ~= "table" then
+		return out
 	end
 
-	for flag, element in pairs(registryRef) do
+	for key, element in pairs(sourceMap) do
 		if type(element) == "table" and not element.IgnoreConfig then
 			local opts = element.Options
 			if not (type(opts) == "table" and opts.IgnoreConfig) then
-				if element.Type == "ColorPicker" and type(element.Get) == "function" then
+				if element.Type == "Toggle" and type(element.Get) == "function" then
+					local ok, val = pcall(element.Get, element)
+					if ok then
+						local hasInlineKey = type(element.GetKeybind) == "function" and element._hasKeybind == true
+						if hasInlineKey then
+							local kbOk, k = pcall(element.GetKeybind, element)
+							out[key] = {
+								__type = "ToggleState",
+								Value = val == true,
+								Key = (kbOk and k ~= nil) and tostring(k) or "None",
+							}
+						elseif val ~= nil then
+							out[key] = serializeValue(val)
+						end
+					end
+				elseif element.Type == "ColorPicker" and type(element.Get) == "function" then
 					local ok, color, alpha = pcall(element.Get, element)
 					if ok and typeof(color) == "Color3" then
-						flags[flag] = serializeValue(color, alpha or 0)
+						out[key] = serializeValue(color, alpha or 0)
 					end
 				elseif element.Type == "Keybind" and type(element.Get) == "function" then
-					local ok, key, mode = pcall(element.Get, element)
+					local ok, k, mode = pcall(element.Get, element)
 					if ok then
-						flags[flag] = {
+						out[key] = {
 							__type = "Keybind",
-							Key = key ~= nil and tostring(key) or "None",
+							Key = k ~= nil and tostring(k) or "None",
 							Mode = mode or "Toggle",
 						}
 					end
@@ -549,38 +581,51 @@ local function collectFlags()
 					local ok, val, extra = pcall(element.Get, element)
 					if ok then
 						if typeof(val) == "Color3" then
-							flags[flag] = serializeValue(val, extra or 0)
+							out[key] = serializeValue(val, extra or 0)
 						elseif typeof(val) == "EnumItem" or (extra ~= nil and (extra == "Toggle" or extra == "Hold" or extra == "Always")) then
-							flags[flag] = {
+							out[key] = {
 								__type = "Keybind",
 								Key = val ~= nil and tostring(val) or "None",
 								Mode = extra or "Toggle",
 							}
 						elseif val ~= nil then
-							flags[flag] = serializeValue(val)
+							out[key] = serializeValue(val)
 						end
 					end
 				elseif element.Value ~= nil then
-					flags[flag] = serializeValue(element.Value)
+					out[key] = serializeValue(element.Value)
 				end
 			end
 		end
 	end
 
-	return flags
+	return out
 end
 
-local function applyFlags(flags)
-	if type(registryRef) ~= "table" or type(flags) ~= "table" then
+local function applyMap(targetMap, rawMap)
+	if type(targetMap) ~= "table" or type(rawMap) ~= "table" then
 		return
 	end
 
-	for flag, raw in pairs(flags) do
-		local element = registryRef[flag]
+	for flag, raw in pairs(rawMap) do
+		local element = targetMap[flag]
 		if type(element) == "table" and not element.IgnoreConfig then
 			local opts = element.Options
 			if not (type(opts) == "table" and opts.IgnoreConfig) and type(element.Set) == "function" then
-				if type(raw) == "table" and raw.__type == "Keybind" then
+				if type(raw) == "table" and raw.__type == "ToggleState" then
+					local value = raw.Value == true
+					pcall(element.Set, element, value)
+					if type(element.SetKeybind) == "function" then
+						local key = nil
+						if raw.Key ~= nil and raw.Key ~= "None" and raw.Key ~= "" then
+							key = deserializeValue(raw.Key)
+							if typeof(key) ~= "EnumItem" then
+								key = Util.ResolveKey(raw.Key)
+							end
+						end
+						pcall(element.SetKeybind, element, key)
+					end
+				elseif type(raw) == "table" and raw.__type == "Keybind" then
 					local key = nil
 					if raw.Key ~= nil and raw.Key ~= "None" and raw.Key ~= "" then
 						key = deserializeValue(raw.Key)
@@ -603,21 +648,44 @@ local function applyFlags(flags)
 	end
 end
 
+local function collectFlags()
+	return serializeMap(registryRef)
+end
+
+local function applyFlags(flags)
+	applyMap(registryRef, flags)
+end
+
 -- ─── Public API ──────────────────────────────────────────────────────────────
+
+function Config.IsLoading()
+	return isLoading
+end
 
 function Config.Init(folderName, registry, extras)
 	folder = (type(folderName) == "string" and Util.Trim(folderName) ~= "") and Util.Trim(folderName) or DEFAULT_FOLDER
 	registryRef = registry
 	extrasRef = extras
 	ensureFolder()
+	if Util.FS.Supported() and Util.FS.IsFile(autoSaveStatePath()) then
+		local rawState = string.lower(Util.Trim(Util.FS.Read(autoSaveStatePath()) or ""))
+		if rawState == "false" or rawState == "0" then
+			autoSaveEnabled = false
+		else
+			autoSaveEnabled = true
+		end
+	end
 	return Config
 end
 
-function Config.Export()
+function Config.Export(includeUnnamed)
 	local payload = {
 		Version = 1,
 		Flags = collectFlags(),
 	}
+	if includeUnnamed and type(extrasRef) == "table" and type(extrasRef.UnnamedRegistry) == "table" then
+		payload.Unnamed = serializeMap(extrasRef.UnnamedRegistry)
+	end
 	local prefs = collectPreferences()
 	if prefs then
 		payload.Preferences = prefs
@@ -631,16 +699,27 @@ function Config.Import(jsonStr)
 		return false, "Invalid JSON config payload"
 	end
 
-	if type(decoded.Flags) == "table" then
-		applyFlags(decoded.Flags)
-		if type(decoded.Preferences) == "table" then
-			applyPreferences(decoded.Preferences)
+	local prevLoading = isLoading
+	isLoading = true
+	local ok, err = pcall(function()
+		if type(decoded.Flags) == "table" then
+			applyFlags(decoded.Flags)
+			if type(decoded.Unnamed) == "table" and type(extrasRef) == "table" and type(extrasRef.UnnamedRegistry) == "table" then
+				applyMap(extrasRef.UnnamedRegistry, decoded.Unnamed)
+			end
+			if type(decoded.Preferences) == "table" then
+				applyPreferences(decoded.Preferences)
+			end
+		else
+			-- Support flat { Flag = Value } payloads
+			applyFlags(decoded)
 		end
-	else
-		-- Support flat { Flag = Value } payloads
-		applyFlags(decoded)
-	end
+	end)
+	isLoading = prevLoading
 
+	if not ok then
+		return false, tostring(err)
+	end
 	return true
 end
 
@@ -650,7 +729,7 @@ function Config.Save(name)
 		return false, "Invalid config name"
 	end
 
-	local json = Config.Export()
+	local json = Config.Export(true)
 	memoryStore[safeName] = json
 
 	if Util.FS.Supported() then
@@ -773,6 +852,90 @@ function Config.LoadAuto()
 		return false, "No autoload config set"
 	end
 	return Config.Load(autoName)
+end
+
+function Config.GetAutoSave()
+	return autoSaveEnabled
+end
+
+function Config.SaveAutoSaveNow()
+	if isLoading or not autoSaveEnabled or not registryRef then
+		return false
+	end
+	local json = Config.Export(true)
+	memoryAutoSave = json
+	if Util.FS.Supported() then
+		ensureFolder()
+		return Util.FS.Write(autoSavePath(), json)
+	end
+	return true
+end
+
+function Config.SetAutoSave(enabled)
+	autoSaveEnabled = enabled == true
+	if Util.FS.Supported() then
+		ensureFolder()
+		Util.FS.Write(autoSaveStatePath(), autoSaveEnabled and "true" or "false")
+	end
+	if autoSaveEnabled and not isLoading and registryRef then
+		Config.SaveAutoSaveNow()
+	end
+	return true
+end
+
+function Config.TriggerAutoSave()
+	if not autoSaveEnabled or isLoading or not registryRef then
+		return
+	end
+	autoSaveToken += 1
+	local myToken = autoSaveToken
+	task.delay(0.35, function()
+		if autoSaveToken == myToken and autoSaveEnabled and not isLoading then
+			Config.SaveAutoSaveNow()
+		end
+	end)
+end
+
+function Config.LoadAutoSave()
+	if not autoSaveEnabled then
+		return false, "Auto-save is disabled"
+	end
+	local raw = nil
+	if Util.FS.Supported() and Util.FS.IsFile(autoSavePath()) then
+		raw = Util.FS.Read(autoSavePath())
+	end
+	if not raw then
+		raw = memoryAutoSave
+	end
+	if not raw or raw == "" then
+		return false, "No auto-save snapshot found"
+	end
+	local decoded = Config.JsonDecode(raw)
+	if type(decoded) == "table" then
+		lastAutoSaveFlags = type(decoded.Flags) == "table" and decoded.Flags or decoded
+		lastAutoSaveUnnamed = type(decoded.Unnamed) == "table" and decoded.Unnamed or nil
+		hasLoadedAutoSave = true
+	end
+	return Config.Import(raw)
+end
+
+function Config.HasLoadedAutoSave()
+	return hasLoadedAutoSave == true and autoSaveEnabled == true
+end
+
+function Config.TryApplyCachedAutoSave(key, element, isFlag)
+	if not autoSaveEnabled or not hasLoadedAutoSave or type(element) ~= "table" then
+		return false
+	end
+	local source = isFlag and lastAutoSaveFlags or lastAutoSaveUnnamed
+	if type(source) ~= "table" or source[key] == nil then
+		return false
+	end
+	local prevLoading = isLoading
+	isLoading = true
+	pcall(applyMap, { [key] = element }, { [key] = source[key] })
+	isLoading = prevLoading
+	return true
 end
 
 return Config

@@ -639,6 +639,7 @@ switchesSection:AddToggle({
 switchesSection:AddCheckbox({
 	Title = "Strict Telemetry Validation",
 	Description = "Validate checksums before writing local config snapshots.",
+	Icon = "shield-check",
 	Default = true,
 	Flag = "Controls_StrictValidation",
 })
@@ -744,6 +745,7 @@ rangeSection:AddSlider({
 rangeSection:AddRangeSlider({
 	Title = "Target Latency Window",
 	Description = "Dual-thumb lower and upper latency bounds.",
+	Icon = "sliders",
 	Min = 5,
 	Max = 200,
 	Step = 5,
@@ -756,6 +758,7 @@ rangeSection:AddRangeSlider({
 rangeSection:AddStepper({
 	Title = "Worker Threads",
 	Description = "Discrete increment / decrement stepper control.",
+	Icon = "cpu",
 	Min = 1,
 	Max = 16,
 	Step = 1,
@@ -767,6 +770,7 @@ rangeSection:AddStepper({
 local lockedDemoSlider = rangeSection:AddSlider({
 	Title = "Protected Gain Limit",
 	Description = "Demonstrates element :Lock(reason) and :Unlock().",
+	Icon = "shield",
 	Min = 0,
 	Max = 100,
 	Step = 1,
@@ -800,7 +804,8 @@ local selectionSection = pickersSub:AddSection({
 
 selectionSection:AddDropdown({
 	Title = "Balancing Strategy",
-	Description = "Single-select popover menu.",
+	Description = "Single-select searchable popover menu.",
+	Icon = "sliders",
 	Values = { "Balanced", "Low Latency", "High Throughput", "Eco Saver" },
 	Default = "Balanced",
 	Flag = "Pickers_Strategy",
@@ -809,6 +814,7 @@ selectionSection:AddDropdown({
 selectionSection:AddDropdown({
 	Title = "Edge Clusters",
 	Description = "Multi-select dropdown with live search filter.",
+	Icon = "globe",
 	Values = {
 		"US-East (Virginia)",
 		"US-West (Oregon)",
@@ -826,6 +832,7 @@ selectionSection:AddDropdown({
 selectionSection:AddSegmented({
 	Title = "Sampling Window",
 	Description = "Spring-animated segmented pill control.",
+	Icon = "timer",
 	Values = { "Adaptive", "Fixed", "Burst" },
 	Default = "Adaptive",
 	Flag = "Pickers_SamplingWindow",
@@ -834,6 +841,7 @@ selectionSection:AddSegmented({
 selectionSection:AddKeybind({
 	Title = "Capture Trigger",
 	Description = "Supports Toggle, Hold, Always modes + Mouse inputs.",
+	Icon = "keyboard",
 	Default = Enum.KeyCode.G,
 	Mode = "Toggle",
 	AllowMouse = true,
@@ -868,6 +876,7 @@ inputSection:AddInput({
 inputSection:AddInput({
 	Title = "Gateway Port",
 	Description = "Numeric & integer constrained input field.",
+	Icon = "server",
 	BoxIcon = "hash",
 	Placeholder = "8443",
 	Default = "8443",
@@ -880,6 +889,7 @@ inputSection:AddInput({
 inputSection:AddInput({
 	Title = "Access Token",
 	Description = "Password-masked input with reveal eye toggle.",
+	Icon = "lock",
 	BoxIcon = "key",
 	Placeholder = "Paste secret token...",
 	Default = "bali_live_9821a",
@@ -890,6 +900,7 @@ inputSection:AddInput({
 inputSection:AddColorPicker({
 	Title = "Highlight Swatch",
 	Description = "HSV square, hue/alpha sliders, hex editor, presets, and rainbow.",
+	Icon = "palette",
 	Default = Color3.fromRGB(214, 64, 236),
 	Transparency = 0.15,
 	Presets = {
@@ -951,12 +962,14 @@ local diagAccordion = editorialSection:AddAccordion({
 diagAccordion:AddToggle({
 	Title = "Frame Time Capture",
 	Description = "Record frame deltas for profiler diagnostics.",
+	Icon = "clock",
 	Default = false,
 	Flag = "Layout_FrameCapture",
 })
 
 diagAccordion:AddSlider({
 	Title = "Ring Buffer Capacity",
+	Icon = "layers",
 	Min = 64,
 	Max = 512,
 	Step = 64,
@@ -1000,15 +1013,18 @@ local tab = win:AddTab({ Title = "Overview", Icon = "dashboard" })
 local sec = tab:AddSection({ Title = "Controls" })
 sec:AddToggle({ Title = "Enabled", Default = true })]],
 	LineNumbers = true,
-	MaxHeight = 190,
+	MaxHeight = 220,
 })
 
-mediaSection:AddImage({
-	Title = "Bundled Icon Atlas",
-	Caption = "832x572 Lucide SDF/PNG sprite sheet loaded at runtime",
-	Image = Bali.Assets.Get("Atlas") or "rbxassetid://0",
-	Height = 148,
-	ScaleType = Enum.ScaleType.Fit,
+mediaSection:AddBanner({
+	Title = "Bali Obsidian Architecture",
+	Caption = "1024px high-DPI Lucide icon atlas, procedural frosted glass, and spring-damped transitions",
+	Badge = "v4.0 HD",
+	Icon = "sparkles",
+	Overlay = true,
+	Image = Bali.Assets.Get("Banner") or Bali.Assets.Get("Atlas") or "rbxassetid://0",
+	Height = 152,
+	ScaleType = Enum.ScaleType.Crop,
 })
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -1228,11 +1244,12 @@ modalsSection:AddButton({
 		Bali:KeySystem({
 			Title = "Bali Access Gate",
 			Subtitle = "Demo key: BALI-DEMO",
-			Version = "v2.0",
+			Version = "v1.0.0",
 			Icon = "key",
 			Key = "BALI-DEMO",
 			KeyUrl = "https://github.com/perfectusmim1/bali-ui",
 			DiscordName = "Bali Community",
+			DiscordInvite = "e9CScDQSv",
 			SupportedGames = { [game.PlaceId] = "Active Workspace" },
 			Closable = true,
 			OnSuccess = function(acceptedKey)

@@ -169,6 +169,18 @@ function Notification.ClearHistory()
 	Notification.Changed:Fire()
 end
 
+function Notification.SetDefaultDuration(seconds)
+	local num = tonumber(seconds)
+	if num ~= nil then
+		DEFAULT_DURATION = Util.Clamp(num, 1, 30)
+	end
+	return DEFAULT_DURATION
+end
+
+function Notification.GetDefaultDuration()
+	return DEFAULT_DURATION
+end
+
 function Notification.Notify(opts)
 	opts = Util.Options(opts, {
 		Title = "Notification",
@@ -227,6 +239,7 @@ function Notification.Notify(opts)
 		Parent = container,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
+		ClipsDescendants = true,
 		BackgroundTransparency = 1,
 		LayoutOrder = noteId,
 		ZIndex = 401,
@@ -521,7 +534,16 @@ function Notification.Notify(opts)
 		if immediate or Tween.Reduced then
 			finalize()
 		else
-			Transition.Unmount(card, 0.94, finalize)
+			local isLeft = currentPosition == "BottomLeft" or currentPosition == "TopLeft"
+			local slideOutX = isLeft and -48 or 48
+			if wrapper and wrapper.Parent then
+				local h = math.max(wrapper.AbsoluteSize.Y, card.AbsoluteSize.Y)
+				wrapper.AutomaticSize = Enum.AutomaticSize.None
+				wrapper.Size = UDim2.new(1, 0, 0, h)
+				Tween.Play(wrapper, { Size = UDim2.new(1, 0, 0, 0) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			end
+			Tween.Play(card, { Position = UDim2.fromOffset(slideOutX, 0) }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			Transition.Unmount(card, 1, finalize, { NoPositionTween = true })
 		end
 	end
 
@@ -659,7 +681,9 @@ function Notification.Notify(opts)
 	end))
 
 	table.insert(activeToasts, toast)
-	Transition.Mount(card, 0.94)
+	local isLeft = currentPosition == "BottomLeft" or currentPosition == "TopLeft"
+	local slideInX = isLeft and -48 or 48
+	Transition.SlideFade(card, 0, slideInX)
 	startTimer(totalDuration)
 
 	return toast

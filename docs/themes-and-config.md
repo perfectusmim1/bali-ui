@@ -65,7 +65,7 @@ Configs persist to the configured folder (`ConfigFolder`, default `"BaliConfigs"
 
 ## Prebuilt Settings Tab (`window:BuildSettingsTab`)
 
-Generate a full two-column Settings tab in a single call with live Theme switcher, Accent color picker, Font selector, Window opacity/Blur sliders, Toggle Key picker, HUD overlay switches (`Watermark`, `KeybindList`, `NotificationPosition`, `MobileButton`), Animation Speed / Reduce Motion controls, JSON Config Profile manager, and Runtime Diagnostics (`Unload UI`):
+Generate a full two-column Settings tab in a single call with live Theme switcher, Accent color picker, Font selector, Window opacity/Blur sliders, Toggle Key picker, HUD overlay switches (`Watermark`, `KeybindList`, `NotificationPosition`, `NotificationDuration`, `MobileButton`, `MobileCompactMode`), Animation Speed / Reduce Motion controls, JSON Config Profile & `AutoSave` manager, and Runtime Diagnostics (`Unload UI`):
 
 ```lua
 window:BuildSettingsTab({

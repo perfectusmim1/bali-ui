@@ -394,7 +394,7 @@ function Base.Row(parent, options, rightWidth)
 		Parent = frame,
 	})
 
-	Create.List(body, {
+	local bodyList = Create.List(body, {
 		Direction = Enum.FillDirection.Horizontal,
 		VAlign = Enum.VerticalAlignment.Center,
 		HAlign = Enum.HorizontalAlignment.Left,
@@ -512,12 +512,44 @@ function Base.Row(parent, options, rightWidth)
 		end
 		right.Visible = (reservedRight > 0) or hasVisibleChild
 		local bodyW = math.floor(body.AbsoluteSize.X)
-		if rightConstraint and bodyW > 180 and titleText ~= "" then
-			local maxR = math.max(96, bodyW - math.max(132, math.floor(bodyW * 0.44)) - 10)
-			rightConstraint.MaxSize = Vector2.new(maxR, 9999)
+		local rightLayout = reservedRight <= 0 and right:FindFirstChildOfClass("UIListLayout") or nil
+		local naturalRightW = rightLayout and math.ceil(rightLayout.AbsoluteContentSize.X) or math.ceil(right.AbsoluteSize.X)
+		local measureW = reservedRight > 0 and reservedRight or naturalRightW
+		local actualW = right.Visible and math.max(reservedRight, measureW) or 0
+		local availLeft = bodyW - 24 - actualW - 10 - (iconWidth > 0 and (iconWidth + 10) or 0)
+		local stackRight = (options.StackRight == true) or (actualW >= 100 and bodyW > 0 and availLeft < 132)
+		local compactStack = stackRight and (reservedRight > 0 and reservedRight < 130 or (reservedRight <= 0 and actualW > 0 and actualW < 130))
+
+		if rightConstraint then
+			if stackRight or bodyW <= 180 or titleText == "" then
+				rightConstraint.MaxSize = Vector2.new(9999, 9999)
+			else
+				local maxR = math.max(96, bodyW - math.max(132, math.floor(bodyW * 0.44)) - 10)
+				rightConstraint.MaxSize = Vector2.new(maxR, 9999)
+			end
 		end
-		local actualW = right.Visible and math.max(reservedRight, math.ceil(right.AbsoluteSize.X)) or 0
-		left.Size = UDim2.new(1, actualW > 0 and -(actualW + 10) or 0, 0, 0)
+
+		if stackRight and right.Visible then
+			bodyList.FillDirection = Enum.FillDirection.Vertical
+			bodyList.VerticalAlignment = Enum.VerticalAlignment.Top
+			bodyList.HorizontalAlignment = compactStack and Enum.HorizontalAlignment.Right or Enum.HorizontalAlignment.Left
+			bodyList.Padding = UDim.new(0, 8)
+			left.Size = UDim2.new(1, 0, 0, 0)
+			if compactStack then
+				right.Size = UDim2.new(0, math.max(reservedRight, actualW), 0, 0)
+			else
+				right.Size = UDim2.new(1, 0, 0, 0)
+			end
+			right.AutomaticSize = Enum.AutomaticSize.Y
+		else
+			bodyList.FillDirection = Enum.FillDirection.Horizontal
+			bodyList.VerticalAlignment = Enum.VerticalAlignment.Center
+			bodyList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+			bodyList.Padding = UDim.new(0, 10)
+			right.Size = UDim2.new(0, reservedRight, 0, 0)
+			right.AutomaticSize = reservedRight > 0 and Enum.AutomaticSize.Y or Enum.AutomaticSize.XY
+			left.Size = UDim2.new(1, actualW > 0 and -(actualW + 10) or 0, 0, 0)
+		end
 	end
 
 	right.ChildAdded:Connect(function(child)

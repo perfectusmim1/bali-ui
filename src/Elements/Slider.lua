@@ -392,7 +392,7 @@ function Slider.new(parent, opts, ctx)
 	end
 
 	element.Maid:Give(trackHit.MouseEnter:Connect(function()
-		if element.Disabled or element.Locked or Util.IsTouchDevice() then
+		if element.Disabled or element.Locked or Util.IsTouchDevice() or Transition.IsOverlayBlocking(trackHit) then
 			return
 		end
 		hovered = true
@@ -407,7 +407,7 @@ function Slider.new(parent, opts, ctx)
 	end))
 
 	element.Maid:Give(trackHit.InputBegan:Connect(function(input)
-		if element.Disabled or element.Locked then
+		if element.Disabled or element.Locked or Transition.IsOverlayBlocking(trackHit) then
 			return
 		end
 		if Util.IsPointer(input) then
@@ -420,6 +420,12 @@ function Slider.new(parent, opts, ctx)
 
 	element.Maid:Give(Services.UserInputService.InputChanged:Connect(function(input)
 		if not dragging then
+			return
+		end
+		if Transition.IsOverlayBlocking(trackHit) then
+			dragging = false
+			activeInput = nil
+			setThumbActive(false)
 			return
 		end
 		local isTouch = activeInput and activeInput.UserInputType == Enum.UserInputType.Touch
@@ -744,7 +750,7 @@ function RangeSlider.new(parent, opts, ctx)
 	end
 
 	element.Maid:Give(trackHit.InputBegan:Connect(function(input)
-		if element.Disabled or element.Locked then
+		if element.Disabled or element.Locked or Transition.IsOverlayBlocking(trackHit) then
 			return
 		end
 		if Util.IsPointer(input) then
@@ -774,6 +780,13 @@ function RangeSlider.new(parent, opts, ctx)
 
 	element.Maid:Give(Services.UserInputService.InputChanged:Connect(function(input)
 		if not activeHandle then
+			return
+		end
+		if Transition.IsOverlayBlocking(trackHit) then
+			setLowActive(false)
+			setHighActive(false)
+			activeHandle = nil
+			activeInput = nil
 			return
 		end
 		local isTouch = activeInput and activeInput.UserInputType == Enum.UserInputType.Touch
@@ -1001,7 +1014,7 @@ function Stepper.new(parent, opts, ctx)
 	local function bindRepeatButton(btn, delta)
 		local holdToken = 0
 		element.Maid:Give(btn.InputBegan:Connect(function(input)
-			if element.Disabled or element.Locked or not Util.IsPointer(input) then
+			if element.Disabled or element.Locked or Transition.IsOverlayBlocking(btn) or not Util.IsPointer(input) then
 				return
 			end
 			Transition.Ripple(btn, input, "Accent")
@@ -1011,7 +1024,7 @@ function Stepper.new(parent, opts, ctx)
 			local myToken = holdToken
 			task.spawn(function()
 				task.wait(0.38)
-				while not element._destroyed and holdToken == myToken and not element.Disabled and not element.Locked do
+				while not element._destroyed and holdToken == myToken and not element.Disabled and not element.Locked and not Transition.IsOverlayBlocking(btn) do
 					element:Step(delta)
 					task.wait(0.08)
 				end

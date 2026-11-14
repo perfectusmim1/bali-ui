@@ -4,6 +4,7 @@
 	(Section, Accordion, Tab, SubTab), providing unified ctx wiring.
 ]]
 
+local Config = require("Systems/Config")
 local Static = require("Elements/Static")
 local Button = require("Elements/Button")
 local Toggle = require("Elements/Toggle")
@@ -39,7 +40,7 @@ local FACTORIES = {
 	{ Methods = { "AddDivider", "Divider" }, Ctor = resolveCtor(Static.Divider, "Divider") },
 	{ Methods = { "AddHeader", "Header" }, Ctor = resolveCtor(Static.Header, "Header") },
 	{ Methods = { "AddCodeBlock", "CodeBlock" }, Ctor = resolveCtor(Static.CodeBlock, "CodeBlock") },
-	{ Methods = { "AddImage", "Image" }, Ctor = resolveCtor(Static.Image, "Image") },
+	{ Methods = { "AddImage", "Image", "AddBanner", "Banner" }, Ctor = resolveCtor(Static.Image, "Image") },
 	{ Methods = { "AddProfileCard", "ProfileCard" }, Ctor = resolveCtor(Static.ProfileCard, "ProfileCard") },
 
 	{ Methods = { "AddButton", "Button" }, Ctor = resolveCtor(Button.Button, "Button") },
@@ -92,6 +93,72 @@ function Container.Attach(target, parentFrame, tab, section, window, subTab)
 			or (window and window.Maid),
 	}
 
+	local function registerUnnamedIfReady(elem, entry)
+		if not window or type(elem) ~= "table" or type(elem.Set) ~= "function" or type(window._unnamedRegistry) ~= "table" then
+			return
+		end
+		if type(entry) ~= "table" or entry._unnamedRegistered then
+			return
+		end
+		local flag = entry.Flag or elem.Flag
+		if flag ~= nil and flag ~= "" then
+			return
+		end
+		local ignoreConfig = (elem.IgnoreConfig == true or (type(elem.Options) == "table" and elem.Options.IgnoreConfig == true))
+			or (tab and tab._isSettingsTab == true)
+		if ignoreConfig then
+			return
+		end
+
+		local baseKey = string.format(
+			"%s/%s/%s/%s:%s",
+			tostring(tab and tab.Title or "Main"),
+			tostring(subTab and subTab.Title or ""),
+			tostring(section and section.Title or ""),
+			tostring(elem.Type or "Control"),
+			tostring(elem.Title or "Item")
+		)
+		local autoKey = baseKey
+		local idx = 2
+		while window._unnamedRegistry[autoKey] do
+			autoKey = baseKey .. "#" .. tostring(idx)
+			idx += 1
+		end
+		window._unnamedRegistry[autoKey] = elem
+		entry._unnamedRegistered = true
+		entry._unnamedKey = autoKey
+		if Config.HasLoadedAutoSave() then
+			Config.TryApplyCachedAutoSave(autoKey, elem, false)
+		end
+
+		if type(elem.Maid) == "table" and type(elem.Maid.Give) == "function" then
+			elem.Maid:Give(function()
+				if type(window._unnamedRegistry) == "table" and window._unnamedRegistry[autoKey] == elem then
+					window._unnamedRegistry[autoKey] = nil
+				end
+			end)
+		end
+	end
+
+	local function applyFlaggedIfReady(elem, entry)
+		if not window or type(elem) ~= "table" or type(elem.Set) ~= "function" or type(entry) ~= "table" or entry._flaggedAutoApplied then
+			return
+		end
+		local flag = entry.Flag or elem.Flag
+		if flag == nil or flag == "" then
+			return
+		end
+		local ignoreConfig = (elem.IgnoreConfig == true or (type(elem.Options) == "table" and elem.Options.IgnoreConfig == true))
+			or (tab and tab._isSettingsTab == true)
+		if ignoreConfig then
+			return
+		end
+		entry._flaggedAutoApplied = true
+		if Config.HasLoadedAutoSave() then
+			Config.TryApplyCachedAutoSave(flag, elem, true)
+		end
+	end
+
 	function ctx.RegisterElement(record)
 		if type(record) ~= "table" then
 			return nil
@@ -122,12 +189,32 @@ function Container.Attach(target, parentFrame, tab, section, window, subTab)
 				table.insert(window._elements, entry)
 			end
 			local flag = entry.Flag
+			local ignoreConfig = (type(elem) == "table" and (elem.IgnoreConfig == true or (type(elem.Options) == "table" and elem.Options.IgnoreConfig == true)))
+				or (tab and tab._isSettingsTab == true)
+
 			if flag ~= nil and flag ~= "" then
 				if type(window._registry) == "table" then
 					window._registry[flag] = elem
 				end
 				if type(window.Flags) == "table" and window.Flags ~= window._registry then
 					window.Flags[flag] = elem
+				end
+				applyFlaggedIfReady(elem, entry)
+			else
+				-- Defer check too via finalizeElement after ctor attaches :Set()
+				registerUnnamedIfReady(elem, entry)
+			end
+
+			if not ignoreConfig and type(elem) == "table" and elem.Changed and type(elem.Changed.Connect) == "function" then
+				local conn = elem.Changed:Connect(function()
+					if not Config.IsLoading() then
+						Config.TriggerAutoSave()
+					end
+				end)
+				if type(elem.Maid) == "table" and type(elem.Maid.Give) == "function" then
+					elem.Maid:Give(conn)
+				elseif window.Maid and window.Maid.Give then
+					window.Maid:Give(conn)
 				end
 			end
 
@@ -188,9 +275,15 @@ function Container.Attach(target, parentFrame, tab, section, window, subTab)
 			end
 			local resolved = normalizeOptions(options, extra)
 			local element = ctor(parentFrame, resolved, ctx)
-			if type(element) == "table" and typeof(element.Frame) == "Instance" and element.Frame.LayoutOrder == 0 then
-				nextOrder += 1
-				element.Frame.LayoutOrder = nextOrder
+			if type(element) == "table" then
+				if type(element._record) == "table" then
+					registerUnnamedIfReady(element, element._record)
+					applyFlaggedIfReady(element, element._record)
+				end
+				if typeof(element.Frame) == "Instance" and element.Frame.LayoutOrder == 0 then
+					nextOrder += 1
+					element.Frame.LayoutOrder = nextOrder
+				end
 			end
 			return element
 		end

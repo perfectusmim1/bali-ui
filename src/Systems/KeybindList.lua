@@ -146,6 +146,13 @@ local function buildRow(id, entry)
 		VAlign = Enum.VerticalAlignment.Center,
 		Gap = 4,
 	})
+	local function syncTitleWidth()
+		local rw = rightGroup.AbsoluteSize.X
+		local reserve = math.max(76, rw + 20)
+		title.Size = UDim2.new(1, -reserve, 0, 0)
+	end
+	rightGroup:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncTitleWidth)
+	task.defer(syncTitleWidth)
 
 	local modeChipRow = Create.New("Frame", {
 		Name = "ModeBadge",

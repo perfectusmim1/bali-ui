@@ -211,8 +211,9 @@ function Loader.LoadingScreen(parentGui, options)
 		Color = "AccentText",
 		Parent = badge,
 	})
+	local stopPulse = nil
 	if badgeIcon then
-		local stopPulse = Transition.Pulse(badgeIcon, Icons.TransparencyProperty(badgeIcon), 0, 0.45, 0.9)
+		stopPulse = Transition.Pulse(badgeIcon, Icons.TransparencyProperty(badgeIcon), 0, 0.45, 0.9)
 		maid:Give(stopPulse)
 	end
 
@@ -336,6 +337,10 @@ function Loader.LoadingScreen(parentGui, options)
 			return
 		end
 		closed = true
+		if stopPulse then
+			pcall(stopPulse)
+			stopPulse = nil
+		end
 		if backdrop then
 			Tween.Play(backdrop, { BackgroundTransparency = 1 }, Tween.Fast)
 		end
@@ -436,17 +441,25 @@ local function writeSavedKey(options, key)
 end
 
 local function fetchJson(url)
-	local body = Util.HttpGet(url, true)
+	local body, status = Util.HttpGet(url, true)
 	if not body then
-		return nil
+		return nil, status
 	end
 	local ok, data = pcall(function()
 		return Services.HttpService:JSONDecode(body)
 	end)
 	if ok and type(data) == "table" then
-		return data
+		return data, status
 	end
-	return nil
+	local presence = tonumber(body:match('"approximate_presence_count"%s*:%s*(%d+)'))
+	local total = tonumber(body:match('"approximate_member_count"%s*:%s*(%d+)'))
+	if presence or total then
+		return {
+			approximate_presence_count = presence,
+			approximate_member_count = total,
+		}, status
+	end
+	return nil, status
 end
 
 local function createPillBadge(parent, bgColorKey, strokeColorKey, dotColorKey, text, textSize, layoutOrder)
@@ -499,7 +512,7 @@ function Loader.KeySystem(parentGui, options)
 	options = Util.Options(options, {
 		Title = "Key Verification",
 		Subtitle = "Key System",
-		Version = "v2.0",
+		Version = "v1.0.0",
 		Note = nil,
 		Icon = "key",
 		Key = nil,
@@ -924,7 +937,7 @@ function Loader.KeySystem(parentGui, options)
 	})
 	Create.Stroke(verPill, { Theme = { Color = "Accent" }, Transparency = 0.55 })
 	Create.Text({
-		Text = tostring(options.Version or "v2.0"),
+		Text = tostring(options.Version or "v1.0.0"),
 		Font = "Bold",
 		TextSize = 11,
 		Color = "Accent",
@@ -1084,7 +1097,7 @@ function Loader.KeySystem(parentGui, options)
 				if closed or not container.Parent then
 					return
 				end
-				Tween.Play(container, { Position = UDim2.new(0.5, offset, 0.5, 0) }, 0.04, Enum.EasingStyle.Quad)
+				Tween.Play(container, { Position = UDim2.new(0.5, offset, 0.5, 0) }, 0.04, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 				task.wait(0.04)
 			end
 		end)
@@ -1224,7 +1237,7 @@ function Loader.KeySystem(parentGui, options)
 		Text = "",
 		AutoButtonColor = false,
 		Corner = 99,
-		Theme = { BackgroundColor3 = rememberKey and "Accent" or "Tile" },
+		Theme = { BackgroundColor3 = rememberKey and "Accent" or "ToggleOff" },
 		Parent = remRow,
 	})
 	local remKnob = Create.New("Frame", {
@@ -1247,7 +1260,7 @@ function Loader.KeySystem(parentGui, options)
 	maid:Give(remTrack.Activated:Connect(function()
 		rememberKey = not rememberKey
 		runtimeOpts.SaveKey = rememberKey
-		Theme.Bind(remTrack, { BackgroundColor3 = rememberKey and "Accent" or "Tile" })
+		Theme.Bind(remTrack, { BackgroundColor3 = rememberKey and "Accent" or "ToggleOff" })
 		Tween.Spring(remKnob, { Position = UDim2.new(0, rememberKey and 18 or 2, 0.5, 0) }, Tween.Fast + 0.05)
 	end))
 
@@ -1284,7 +1297,7 @@ function Loader.KeySystem(parentGui, options)
 	local execName = Util.ExecutorName()
 	Create.Text({
 		Position = UDim2.fromOffset(0, 7),
-		Size = UDim2.new(0.6, 0, 0, 18),
+		Size = UDim2.new(0.62, 0, 0, 18),
 		Text = "Executor: " .. execName,
 		Font = "Medium",
 		TextSize = 11,
@@ -1293,9 +1306,9 @@ function Loader.KeySystem(parentGui, options)
 		Parent = footer,
 	})
 	Create.Text({
-		Position = UDim2.fromScale(0.6, 0),
-		Size = UDim2.new(0.4, 0, 1, 0),
-		Text = tostring(options.Version or "v2.0"),
+		Position = UDim2.new(0.62, 0, 0, 7),
+		Size = UDim2.new(0.38, 0, 0, 18),
+		Text = tostring(options.Version or "v1.0.0"),
 		Font = "Medium",
 		TextSize = 11,
 		Color = "Muted",
@@ -1479,13 +1492,24 @@ function Loader.KeySystem(parentGui, options)
 		ClipsDescendants = true,
 		Parent = discordCard,
 	})
-	local dcDefaultIco = Icons.Create("users", {
-		Size = UDim2.fromOffset(18, 18),
+	local dcDefaultIco = Create.New("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "AccentText",
+		Size = UDim2.fromOffset(20, 14),
+		Corner = 6,
+		BackgroundColor3 = Color3.new(1, 1, 1),
 		Parent = dcBadge,
 	})
+	for _, ex in ipairs({ 6, 14 }) do
+		Create.New("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(ex, 7),
+			Size = UDim2.fromOffset(4, 5),
+			Corner = 99,
+			BackgroundColor3 = Color3.fromRGB(88, 101, 242),
+			Parent = dcDefaultIco,
+		})
+	end
 	local dcImg = Create.New("ImageLabel", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
@@ -1506,10 +1530,10 @@ function Loader.KeySystem(parentGui, options)
 	})
 	Create.Text({
 		Position = UDim2.fromOffset(58, 31),
-		Size = UDim2.new(1, -68, 0, 15),
+		Size = UDim2.new(1, -68, 0, 16),
 		Text = inviteCode ~= "" and ("discord.gg/" .. inviteCode) or "Community Server",
-		Font = "Regular",
-		TextSize = 11,
+		Font = "Medium",
+		TextSize = 12,
 		Color = "SubText",
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Parent = discordCard,
@@ -1614,9 +1638,17 @@ function Loader.KeySystem(parentGui, options)
 		Util.Spawn(function()
 			local data = nil
 			if inviteCode ~= "" then
-				data = fetchJson("https://discord.com/api/v10/invites/" .. inviteCode .. "?with_counts=true&with_expiration=true")
-				if not (data and (data.approximate_member_count ~= nil or data.approximate_presence_count ~= nil)) then
-					data = fetchJson("https://discord.com/api/v9/invites/" .. inviteCode .. "?with_counts=true&with_expiration=true")
+				local urls = {
+					"https://discord.com/api/v10/invites/" .. inviteCode .. "?with_counts=true&with_expiration=true",
+					"https://discord.com/api/v9/invites/" .. inviteCode .. "?with_counts=true&with_expiration=true",
+					"https://discordapp.com/api/v9/invites/" .. inviteCode .. "?with_counts=true&with_expiration=true",
+				}
+				for _, url in ipairs(urls) do
+					local d, status = fetchJson(url)
+					data = d
+					if (data and (data.approximate_member_count ~= nil or data.approximate_presence_count ~= nil)) or status == 404 then
+						break
+					end
 				end
 			end
 			if closed or not dcOnlineLabel.Parent then
@@ -1638,6 +1670,34 @@ function Loader.KeySystem(parentGui, options)
 				if not closed and w and (w.presence_count ~= nil or type(w.members) == "table") then
 					local online = tonumber(w.presence_count) or (type(w.members) == "table" and #w.members or 0)
 					dcOnlineLabel.Text = Util.FormatNumber(online)
+					dcOfflineLabel.Text = "—"
+				else
+					local fbOnline = tonumber(options.DiscordOnline)
+					local fbTotal = tonumber(options.DiscordMembers)
+					local fbOffline = tonumber(options.DiscordOffline)
+					dcOnlineLabel.Text = fbOnline and Util.FormatNumber(fbOnline) or "—"
+					if fbOffline then
+						dcOfflineLabel.Text = Util.FormatNumber(fbOffline)
+					elseif fbTotal and fbOnline then
+						dcOfflineLabel.Text = Util.FormatNumber(math.max(fbTotal - fbOnline, 0))
+					elseif fbTotal then
+						dcOfflineLabel.Text = Util.FormatNumber(fbTotal)
+					else
+						dcOfflineLabel.Text = "—"
+					end
+				end
+			else
+				local fbOnline = tonumber(options.DiscordOnline)
+				local fbTotal = tonumber(options.DiscordMembers)
+				local fbOffline = tonumber(options.DiscordOffline)
+				dcOnlineLabel.Text = fbOnline and Util.FormatNumber(fbOnline) or "—"
+				if fbOffline then
+					dcOfflineLabel.Text = Util.FormatNumber(fbOffline)
+				elseif fbTotal and fbOnline then
+					dcOfflineLabel.Text = Util.FormatNumber(math.max(fbTotal - fbOnline, 0))
+				elseif fbTotal then
+					dcOfflineLabel.Text = Util.FormatNumber(fbTotal)
+				else
 					dcOfflineLabel.Text = "—"
 				end
 			end
@@ -1703,7 +1763,7 @@ function Loader.KeySystem(parentGui, options)
 	Create.Text({
 		Position = UDim2.fromOffset(12, 52),
 		Size = UDim2.new(1, -24, 0, 14),
-		Text = "●  What's new in " .. tostring(options.Version or "v2.0"),
+		Text = "What's new in " .. tostring(options.Version or "v1.0.0"),
 		Font = "Medium",
 		TextSize = 11,
 		Color = "Accent",
@@ -1820,7 +1880,7 @@ function Loader.KeySystem(parentGui, options)
 	addDrawerRow("Place ID", tostring(game.PlaceId or 0))
 
 	local changelogList = type(options.Changelog) == "table" and options.Changelog or {
-		{ Version = tostring(options.Version or "v2.0"), Date = "Latest", Changes = { "Hardware-accelerated animations & Key System" } },
+		{ Version = tostring(options.Version or "v1.0.0"), Date = "Latest", Changes = { "Hardware-accelerated animations & Key System" } },
 	}
 	Create.Text({
 		Text = "CHANGELOG",
@@ -1881,7 +1941,7 @@ function Loader.KeySystem(parentGui, options)
 		end
 		infoOpen = false
 		Tween.Play(infoOverlay, { BackgroundTransparency = 1 }, Tween.Fast)
-		Tween.Play(drawer, { Position = UDim2.new(1, 340, 0, 10) }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		Tween.Play(drawer, { Position = UDim2.new(1, 340, 0, 10) }, 0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 		task.delay(0.2, function()
 			if not infoOpen and infoOverlay.Parent then
 				infoOverlay.Visible = false
@@ -1999,7 +2059,7 @@ function Loader.KeySystem(parentGui, options)
 				Theme.Bind(fieldStroke, { Color = "Success" })
 
 				successView.Visible = true
-				Tween.Play(sFill, { Size = UDim2.fromScale(1, 1) }, 0.34, Enum.EasingStyle.Exponential)
+				Tween.Play(sFill, { Size = UDim2.fromScale(1, 1) }, 0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 				task.wait(0.38)
 				controller:Close()
 				if type(options.OnSuccess) == "function" then

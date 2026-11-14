@@ -145,6 +145,6 @@ local grid = section:AddCardGrid({
 | `AddParagraph` | Descriptive card with optional leading accent bar (`AccentBar`), tags & icon | `:SetTitle(s)`, `:SetDesc(s)`, `:SetContent(s)`, `:SetTags(list)` |
 | `AddDivider` | Clean centered hairline divider with optional centered label | `—` |
 | `AddHeader` | Uppercase category micro-heading with optional trailing badge | `—` |
-| `AddCodeBlock` | Syntax-tinted monospaced snippet viewer with copy-to-clipboard button | `:SetCode(src)`, `:Get()` |
-| `AddImage` | Aspect-preserving image card with caption footer (`ScaleType`, `Corner`, `Height`) | `:SetImage(src)`, `:SetCaption(s)` |
+| `AddCodeBlock` | Language-aware `RichText` syntax-highlighted monospaced snippet viewer (`Luau`/`Lua`/`JSON`/`Python`/`JS`) with per-line gutter alignment and copy button | `:SetCode(src)`, `:Get()` |
+| `AddImage` / `AddBanner` | Aspect-preserving `CanvasGroup` rounded image & banner card (`Overlay`, `Badge`, `ScaleType`, `Corner`, `Height`) | `:SetImage(src)`, `:SetCaption(s)` |
 | `AddProfileCard` | Displays `LocalPlayer` (or custom `UserId`) avatar headshot, status pill & workspace meta | `:SetTitle(s)`, `:SetDesc(s)`, `:SetStatus(text, colorKey?)` |

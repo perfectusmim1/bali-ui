@@ -44,7 +44,7 @@ local unlocked = false
 Bali:KeySystem({
 	Title = "Bali Access Gate",
 	Subtitle = "Key System",
-	Version = "v2.0",
+	Version = "v1.0.0",
 	Icon = "key",
 	Keys = { "BALI-DEMO" }, -- or custom Verify = function(candidate) return true, "Reason" end
 	KeyUrl = "https://example.com/get-key", -- copied on clicking "Get Key"
@@ -55,7 +55,7 @@ Bali:KeySystem({
 	DiscordInvite = "your-invite-code", -- optional invite URL or code for live member counts
 	DiscordGuildId = "", -- optional widget.json fallback ID
 	Changelog = {
-		{ Version = "v2.0", Date = "Today", Changes = { "Initial release" } },
+		{ Version = "v1.0.0", Date = "Today", Changes = { "Initial release" } },
 	},
 	MaxAttempts = 5,
 	Cooldown = 8,

@@ -121,6 +121,6 @@ local leftSec = interactiveSub:AddSection({
 
 ## Command Palette (`Ctrl+K`)
 
-Press `Ctrl+K` (or click the top search pill / header magnifying glass) to search every registered tab, sub-tab, section, element, flag, or action. Executing a result jumps directly to the matching tab/sub-tab, opens collapsed parent sections or accordions, scrolls the element into view, and flashes its surface border.
+Press `Ctrl+K` (or click the top search pill / header magnifying glass) to search every registered tab, sub-tab, section, element, flag, or action. The modal opens dynamically centered over the active window frame (clamped within the viewport) and isolates pointer input behind it. Executing a result jumps directly to the matching tab/sub-tab, opens collapsed parent sections or accordions, scrolls the element into view, and flashes its surface border.
 
 ![Command Palette Search](assets/screenshots/command-palette.png)

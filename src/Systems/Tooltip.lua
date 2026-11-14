@@ -9,12 +9,13 @@ local Maid = require("Core/Maid")
 local Theme = require("Core/Theme")
 local Create = require("Core/Create")
 local Assets = require("Core/Assets")
+local Tween = require("Core/Tween")
 local Transition = require("Core/Transition")
 local Util = require("Core/Util")
 
 local Tooltip = {}
 
-local DEFAULT_DELAY = 0.3
+local DEFAULT_DELAY = 0.12
 local MAX_WIDTH = 260
 local MIN_WIDTH = 44
 local EDGE_PAD = 8
@@ -45,12 +46,7 @@ local function getViewportBounds()
 end
 
 local function getCursorPosition()
-	if layer then
-		local rootGui = layer:FindFirstAncestorWhichIsA("ScreenGui")
-		if rootGui and rootGui.IgnoreGuiInset then
-			return Services.UserInputService:GetMouseLocation()
-		end
-	end
+	-- GuiObject.AbsolutePosition is reported in GuiInset-subtracted coordinates even under IgnoreGuiInset = true
 	return Util.MousePosition()
 end
 
@@ -97,14 +93,14 @@ end
 local function placeNearCursor(w, h)
 	local origin, vp = getViewportBounds()
 	local cursor = getCursorPosition()
-	local offset = 14
+	local offset = 10
 	local minX = origin.X + EDGE_PAD
 	local minY = origin.Y + EDGE_PAD
 	local maxX = math.max(minX, origin.X + vp.X - w - EDGE_PAD)
 	local maxY = math.max(minY, origin.Y + vp.Y - h - EDGE_PAD)
 
 	local x = cursor.X + offset
-	local y = cursor.Y + offset + 4
+	local y = cursor.Y + 12
 
 	if x + w + EDGE_PAD > origin.X + vp.X then
 		x = cursor.X - w - offset
@@ -289,8 +285,12 @@ function Tooltip.Show(text, anchorGui)
 
 	updatePosition(anchorGui)
 	if not wasVisible then
-		Transition.Mount(card, 0.94)
-		syncShadow()
+		if shadow then
+			shadow.Visible = true
+			shadow.ImageTransparency = 1
+			Tween.Play(shadow, { ImageTransparency = Theme.Current.ShadowTransparency }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+		end
+		Transition.Mount(card, 0.96, { NoPositionTween = true })
 	else
 		card.Visible = true
 		syncShadow()
@@ -309,13 +309,18 @@ function Tooltip.Hide()
 	end
 	visible = false
 	if shadow then
-		shadow.Visible = false
+		Tween.Play(shadow, { ImageTransparency = 1 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
-	Transition.Unmount(card, 0.94, function()
-		if not visible and card and card.Parent then
-			card.Visible = false
+	Transition.Unmount(card, 0.96, function()
+		if not visible then
+			if card and card.Parent then
+				card.Visible = false
+			end
+			if shadow and shadow.Parent then
+				shadow.Visible = false
+			end
 		end
-	end)
+	end, { NoPositionTween = true })
 end
 
 function Tooltip.Bind(guiObj, textOrFn, opts)
@@ -343,7 +348,7 @@ function Tooltip.Bind(guiObj, textOrFn, opts)
 	end
 
 	local function showForObject()
-		if cleaned or not hovering or not guiObj.Parent then
+		if cleaned or not hovering or not guiObj.Parent or Transition.IsOverlayBlocking(guiObj) then
 			return
 		end
 		local content = resolveText()
@@ -356,7 +361,7 @@ function Tooltip.Bind(guiObj, textOrFn, opts)
 	end
 
 	bindMaid:Give(guiObj.MouseEnter:Connect(function()
-		if cleaned or Util.IsTouchDevice() then
+		if cleaned or Util.IsTouchDevice() or Transition.IsOverlayBlocking(guiObj) then
 			return
 		end
 		hovering = true

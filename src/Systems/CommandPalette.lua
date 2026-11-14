@@ -157,7 +157,7 @@ local function scrollElementIntoView(tab, element)
 			end
 			local relY = frame.AbsolutePosition.Y - page.AbsolutePosition.Y + page.CanvasPosition.Y
 			local targetY = math.max(0, relY - page.AbsoluteSize.Y * 0.35)
-			Tween.Play(page, { CanvasPosition = Vector2.new(page.CanvasPosition.X, targetY) }, Tween.Fast, Enum.EasingStyle.Quad)
+			Tween.Play(page, { CanvasPosition = Vector2.new(page.CanvasPosition.X, targetY) }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 		end)
 	end)
 end
@@ -530,10 +530,23 @@ local function updateModalWidth()
 		return
 	end
 	local vp = getViewportSize()
-	local width = math.max(260, math.min(540, vp.X - 32))
-	local topRatio = vp.Y < 500 and 0.08 or 0.16
-	modal.Size = UDim2.fromOffset(width, 0)
-	modal.Position = UDim2.new(0.5, 0, topRatio, 0)
+	local wrapper = windowRef and windowRef.MainWrapper
+	if wrapper and wrapper.Parent and (not windowRef.IsVisible or windowRef:IsVisible()) and wrapper.AbsoluteSize.X > 0 and wrapper.AbsoluteSize.Y > 0 then
+		local wPos = wrapper.AbsolutePosition
+		local wSize = wrapper.AbsoluteSize
+		local width = math.max(260, math.min(540, math.floor(wSize.X * 0.88), vp.X - 32))
+		local modalH = modal.AbsoluteSize.Y > 0 and modal.AbsoluteSize.Y or 260
+		local cx = Util.Clamp(wPos.X + wSize.X * 0.5, width * 0.5 + 12, math.max(width * 0.5 + 12, vp.X - width * 0.5 - 12))
+		local topY = wPos.Y + Util.Clamp(math.floor(wSize.Y * 0.16), 24, 96)
+		topY = Util.Clamp(topY, 12, math.max(12, vp.Y - modalH - 12))
+		modal.Size = UDim2.fromOffset(width, 0)
+		modal.Position = UDim2.fromOffset(math.floor(cx), math.floor(topY))
+	else
+		local width = math.max(260, math.min(540, vp.X - 32))
+		local topRatio = vp.Y < 500 and 0.08 or 0.16
+		modal.Size = UDim2.fromOffset(width, 0)
+		modal.Position = UDim2.new(0.5, 0, topRatio, 0)
+	end
 	syncShadow()
 end
 
@@ -549,8 +562,10 @@ local function ensureBuilt()
 		Name = "BaliCommandPaletteBackdrop",
 		Parent = layer,
 		Visible = false,
+		Active = true,
 		Size = UDim2.fromScale(1, 1),
 		Text = "",
+		AutoButtonColor = false,
 		BackgroundTransparency = 1,
 		Theme = { BackgroundColor3 = "Overlay" },
 		ZIndex = 300,
@@ -588,6 +603,17 @@ local function ensureBuilt()
 		ZIndex = 305,
 	})
 	Create.GlassStroke(modal, 0.06)
+
+	Create.New("TextButton", {
+		Name = "InputSink",
+		Parent = modal,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+		Active = true,
+		ZIndex = 305,
+	})
 
 	local glowId = Assets.Get("Glow")
 	if glowId then
@@ -825,14 +851,21 @@ function CommandPalette.Open()
 	openMaid:Clean()
 	updateModalWidth()
 
+	backdrop.Active = true
+	backdrop:SetAttribute("_BaliClosing", nil)
 	backdrop.Visible = true
 	backdrop.BackgroundTransparency = 1
-	Tween.Play(backdrop, { BackgroundTransparency = Theme.Current.OverlayTransparency }, Tween.Fast, Enum.EasingStyle.Quad)
+	Tween.Play(backdrop, { BackgroundTransparency = Theme.Current.OverlayTransparency }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 	searchBox.Text = ""
 	rebuildResults("")
+	updateModalWidth()
 	Transition.Mount(modal, 0.95)
 	syncShadow()
+	if shadow then
+		shadow.ImageTransparency = 1
+		Tween.Play(shadow, { ImageTransparency = Theme.Current.ShadowTransparency }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	end
 
 	openMaid:Give(Services.UserInputService.InputBegan:Connect(function(input)
 		if not isOpen then
@@ -885,19 +918,31 @@ function CommandPalette.Close()
 		end)
 	end
 	if shadow then
-		shadow.Visible = false
+		Tween.Play(shadow, { ImageTransparency = 1 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 	if backdrop then
-		Tween.Play(backdrop, { BackgroundTransparency = 1 }, Tween.Fast, Enum.EasingStyle.Quad)
+		backdrop.Active = false
+		backdrop:SetAttribute("_BaliClosing", true)
+		Tween.Play(backdrop, { BackgroundTransparency = 1 }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 	if modal then
 		Transition.Unmount(modal, 0.95, function()
-			if not isOpen and backdrop and backdrop.Parent then
-				backdrop.Visible = false
-				modal.Visible = false
+			if not isOpen then
+				if shadow and shadow.Parent then
+					shadow.Visible = false
+				end
+				if backdrop and backdrop.Parent then
+					backdrop.Visible = false
+				end
+				if modal and modal.Parent then
+					modal.Visible = false
+				end
 			end
 		end)
 	elseif backdrop then
+		if shadow and shadow.Parent then
+			shadow.Visible = false
+		end
 		backdrop.Visible = false
 	end
 end

@@ -211,6 +211,7 @@ function Window.new(screenGui, options)
 
 	-- Compute initial viewport-clamped window dimensions
 	local vp = getViewportSize(screenGui)
+	local isMobile = (options.MobileMode ~= nil) and (options.MobileMode == true) or (Util.IsTouchDevice() or vp.X < 640)
 	local desiredSize = parseSizeVector(options.Size, Vector2.new(820, 540))
 	local reqMin = parseSizeVector(options.MinSize, Vector2.new(460, 360))
 	local reqMax = parseSizeVector(options.MaxSize, Vector2.new(1280, 900))
@@ -219,8 +220,9 @@ function Window.new(screenGui, options)
 	local minH = math.min(reqMin.Y, math.max(260, vp.Y - 16))
 	local effectiveMin = Vector2.new(minW, minH)
 
-	local initW = Util.Clamp(desiredSize.X, minW, math.max(minW, vp.X - 24))
-	local initH = Util.Clamp(desiredSize.Y, minH, math.max(minH, vp.Y - 24))
+	local targetW = isMobile and math.min(desiredSize.X, math.max(360, math.min(540, vp.X - 24))) or desiredSize.X
+	local initW = Util.Clamp(targetW, math.min(minW, vp.X - 24), math.max(minW, vp.X - 24))
+	local initH = Util.Clamp(desiredSize.Y, math.min(minH, vp.Y - 24), math.max(minH, vp.Y - 24))
 	local startX = math.max(8, math.floor((vp.X - initW) * 0.5))
 	local startY = math.max(8, math.floor((vp.Y - initH) * 0.5))
 
@@ -266,9 +268,10 @@ function Window.new(screenGui, options)
 	Create.GlassStroke(main, 0.04)
 
 	-- Ambient obsidian glass radial blooms & grain
+	local glowTopLeft, glowBottomRight, noiseLayer = nil, nil, nil
 	local glowAsset = Assets.Get("Glow")
 	if glowAsset and Assets.Available then
-		Create.New("ImageLabel", {
+		glowTopLeft = Create.New("ImageLabel", {
 			Name = "GlowTopLeft",
 			Image = glowAsset,
 			Size = UDim2.fromOffset(420, 420),
@@ -281,7 +284,7 @@ function Window.new(screenGui, options)
 			ZIndex = 1,
 			Parent = main,
 		})
-		Create.New("ImageLabel", {
+		glowBottomRight = Create.New("ImageLabel", {
 			Name = "GlowBottomRight",
 			Image = glowAsset,
 			AnchorPoint = Vector2.new(1, 1),
@@ -299,7 +302,7 @@ function Window.new(screenGui, options)
 
 	local noiseAsset = Assets.Get("Noise")
 	if noiseAsset and Assets.Available then
-		Create.New("ImageLabel", {
+		noiseLayer = Create.New("ImageLabel", {
 			Name = "Noise",
 			Image = noiseAsset,
 			ScaleType = Enum.ScaleType.Tile,
@@ -314,7 +317,7 @@ function Window.new(screenGui, options)
 
 	-- ─── Left Sidebar ────────────────────────────────────────────────────────
 	local expandedWidth = tonumber(options.SidebarWidth) or SIDEBAR_EXPANDED
-	local isCollapsed = options.SidebarCollapsed == true or (initW < 580 and options.SidebarCollapsed ~= false)
+	local isCollapsed = options.SidebarCollapsed == true or (isMobile and options.SidebarCollapsed ~= false) or (initW < 580 and options.SidebarCollapsed ~= false)
 	local startSidebarW = isCollapsed and SIDEBAR_COLLAPSED or expandedWidth
 
 	local sidebar = Create.New("Frame", {
@@ -849,6 +852,7 @@ function Window.new(screenGui, options)
 		ActiveTab = nil,
 		Flags = registry,
 		_registry = registry,
+		_unnamedRegistry = {},
 		_elements = {},
 		_categories = {},
 		_categoryCount = 0,
@@ -857,6 +861,13 @@ function Window.new(screenGui, options)
 		_tabScroll = tabScroll,
 		_sidebarExpandedWidth = expandedWidth,
 		_sidebarCollapsed = isCollapsed,
+		_mobileMode = isMobile,
+		_desktopPreferredSize = desiredSize,
+		_effectiveMin = effectiveMin,
+		_glowTopLeft = glowTopLeft,
+		_glowBottomRight = glowBottomRight,
+		_noiseLayer = noiseLayer,
+		_resizeGrip = resizeGrip,
 		_visible = true,
 		_visSeq = 0,
 		_morphing = false,
@@ -881,6 +892,7 @@ function Window.new(screenGui, options)
 		_collapseBtn = collapseBtn,
 		_expandBtn = expandBtn,
 		_welcomeCard = welcomeCard,
+		_searchPill = searchPill,
 		_searchPlaceholder = searchPlaceholder,
 		_shortcutChip = shortcutChip,
 		_breadcrumbLabel = breadcrumbLabel,
@@ -997,13 +1009,16 @@ function Window.new(screenGui, options)
 	-- Config initialization with live UI preferences extras
 	-- Core Theme/Tween/Blur/Watermark/KeybindList preferences are handled directly by Systems/Config.
 	self._configExtras = {
+		UnnamedRegistry = self._unnamedRegistry,
 		Save = function()
 			return {
 				NotificationPosition = self._notificationPosition,
+				NotificationDuration = Notification.GetDefaultDuration(),
 				ToggleKey = Util.KeyName(self._toggleKey),
 				KeybindListMode = self._keybindListMode or "ActiveOnly",
 				MobileButtonEnabled = self._mobileButton and self._mobileButton:IsEnabled() or false,
 				SidebarCollapsed = self._sidebarCollapsed == true,
+				MobileMode = self._mobileMode == true,
 			}
 		end,
 		Load = function(custom)
@@ -1013,6 +1028,9 @@ function Window.new(screenGui, options)
 			if type(custom.NotificationPosition) == "string" then
 				self._notificationPosition = custom.NotificationPosition
 				Notification.SetPosition(custom.NotificationPosition)
+			end
+			if type(custom.NotificationDuration) == "number" then
+				Notification.SetDefaultDuration(custom.NotificationDuration)
 			end
 			if custom.ToggleKey then
 				local resolved = Util.ResolveKey(custom.ToggleKey)
@@ -1027,8 +1045,11 @@ function Window.new(screenGui, options)
 			if type(custom.MobileButtonEnabled) == "boolean" then
 				self:SetMobileButtonEnabled(custom.MobileButtonEnabled)
 			end
+			if type(custom.MobileMode) == "boolean" and custom.MobileMode ~= self._mobileMode then
+				self:SetMobileMode(custom.MobileMode, true)
+			end
 			if type(custom.SidebarCollapsed) == "boolean" and custom.SidebarCollapsed ~= self._sidebarCollapsed then
-				self:ToggleSidebar()
+				self:ToggleSidebar(custom.SidebarCollapsed)
 			end
 		end,
 		OnLoad = function(prefs)
@@ -1091,6 +1112,9 @@ function Window.new(screenGui, options)
 			Icons.Set(themeIcon, "sun")
 		else
 			Icons.Set(themeIcon, "moon")
+		end
+		if not Config.IsLoading() then
+			Config.TriggerAutoSave()
 		end
 	end))
 
@@ -1167,8 +1191,17 @@ function Window.new(screenGui, options)
 	end))
 
 	Transition.Mount(mainWrapper, 0.94)
+	local autoLoadedNamed = false
 	if options.AutoLoadConfig then
-		pcall(Config.LoadAuto)
+		local okLoad, resLoad = pcall(Config.LoadAuto)
+		autoLoadedNamed = okLoad and resLoad == true
+	end
+	if not autoLoadedNamed and options.AutoSave ~= false then
+		task.defer(function()
+			if not self._destroyed and Config.GetAutoSave() then
+				pcall(Config.LoadAutoSave)
+			end
+		end)
 	end
 
 	return self
@@ -1224,6 +1257,8 @@ function Window:OpenPopup(id, frame, anchorGui, onClose)
 
 	local popupBackdrop = self.PopupLayer:FindFirstChild("PopupBackdrop")
 	if popupBackdrop then
+		popupBackdrop.Active = true
+		popupBackdrop.ZIndex = 1
 		popupBackdrop.Visible = true
 	end
 
@@ -1292,6 +1327,7 @@ function Window:_openNotificationHistory(anchorBtn)
 		Name = "NotificationPopover",
 		Size = UDim2.fromOffset(300, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
+		Active = true,
 		ClipsDescendants = true,
 		Corner = 12,
 		Theme = {
@@ -1621,6 +1657,9 @@ function Window:ToggleSidebar(collapsed)
 	self._brandText.Visible = not collapsed
 	self._collapseBtn.Visible = not collapsed
 	self._expandBtn.Visible = collapsed
+	if self._searchPill then
+		self._searchPill.Visible = not collapsed
+	end
 	self._searchPlaceholder.Visible = not collapsed
 	self._shortcutChip.Visible = not collapsed
 	if self._welcomeCard then
@@ -1642,6 +1681,24 @@ function Window:ToggleSidebar(collapsed)
 		Position = UDim2.new(0, targetW, 0, 0),
 		Size = UDim2.new(1, -targetW, 1, 0),
 	}, Tween.Normal)
+	if not Config.IsLoading() then
+		Config.TriggerAutoSave()
+	end
+end
+
+function Window:_setAmbientChromeVisible(show)
+	if self._glowTopLeft then
+		self._glowTopLeft.Visible = show
+	end
+	if self._glowBottomRight then
+		self._glowBottomRight.Visible = show
+	end
+	if self._noiseLayer then
+		self._noiseLayer.Visible = show
+	end
+	if self._resizeGrip then
+		self._resizeGrip.Visible = show
+	end
 end
 
 function Window:SetVisible(visible)
@@ -1656,8 +1713,50 @@ function Window:SetVisible(visible)
 	Blur.SetOpen(visible)
 
 	local wrapper = self.MainWrapper
-	local mainCorner = self._mainCorner
 	local pill = self._mobileButton
+
+	local function getMinScale()
+		local sc = wrapper:FindFirstChild("_BaliMinScale")
+		if not sc then
+			sc = Instance.new("UIScale")
+			sc.Name = "_BaliMinScale"
+			sc.Scale = 1
+			sc.Parent = wrapper
+		end
+		return sc
+	end
+
+	local function clearMinScale()
+		local sc = wrapper and wrapper:FindFirstChild("_BaliMinScale")
+		if sc then
+			sc:Destroy()
+		end
+	end
+
+	local function computeMorphOrigin(restorePos, restoreSize)
+		local rw = restoreSize.X.Offset > 0 and restoreSize.X.Offset or wrapper.AbsoluteSize.X
+		local rh = restoreSize.Y.Offset > 0 and restoreSize.Y.Offset or wrapper.AbsoluteSize.Y
+		local rx = restorePos.X.Offset
+		local ry = restorePos.Y.Offset
+		local targetScale = 0.88
+		if pill and pill.Enabled then
+			local px, py, pw, ph = pill:GetRect()
+			local cx = rx + rw * 0.5
+			local cy = ry + rh * 0.5
+			local pcx = px + pw * 0.5
+			local pcy = py + ph * 0.5
+			local targetCx = cx + (pcx - cx) * 0.18
+			local targetCy = cy + (pcy - cy) * 0.18
+			return UDim2.fromOffset(
+				math.floor(targetCx - (rw * targetScale) * 0.5),
+				math.floor(targetCy - (rh * targetScale) * 0.5)
+			), targetScale
+		end
+		return UDim2.fromOffset(
+			math.floor(rx + (rw * (1 - targetScale)) * 0.5),
+			math.floor(ry - 14)
+		), targetScale
+	end
 
 	if self._mobileButton then
 		self._mobileButton:UpdateVisibility()
@@ -1672,44 +1771,42 @@ function Window:SetVisible(visible)
 			self._restoreSize = wrapper.Size
 		end
 
-		if pill and pill.Enabled and not Tween.Reduced then
+		if not Tween.Reduced then
 			self._morphing = true
-			local px, py, pw, ph = pill:GetRect()
-			local restorePos = self._restorePos
-			local restoreSize = self._restoreSize
+			local restorePos = self._restorePos or wrapper.Position
+			local restoreSize = self._restoreSize or wrapper.Size
+			local targetPos, targetScale = computeMorphOrigin(restorePos, restoreSize)
 
-			self.Sidebar.Visible = false
-			self.BodyArea.Visible = false
-			wrapper.ZIndex = 20
-
+			self:_setAmbientChromeVisible(false)
+			local minScale = getMinScale()
 			Tween.Play(
-				wrapper,
-				{ Position = UDim2.fromOffset(px, py), Size = UDim2.fromOffset(pw, ph) },
-				0.21,
-				Enum.EasingStyle.Exponential,
+				minScale,
+				{ Scale = targetScale },
+				Tween.Fast,
+				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
-			if mainCorner then
-				Tween.Play(mainCorner, { CornerRadius = UDim.new(0, 22) }, 0.2, Enum.EasingStyle.Exponential)
-			end
-
-			task.delay(0.21, function()
+			Tween.Play(
+				wrapper,
+				{ Position = targetPos },
+				Tween.Fast,
+				Enum.EasingStyle.Quint,
+				Enum.EasingDirection.Out
+			)
+			Transition.Unmount(wrapper, 1, function()
 				if self._visSeq ~= seq or self._visible or not wrapper.Parent then
 					return
 				end
 				wrapper.Visible = false
 				wrapper.ZIndex = 2
-				if restorePos and restoreSize then
-					wrapper.Position = restorePos
-					wrapper.Size = restoreSize
-				end
-				if mainCorner then
-					mainCorner.CornerRadius = UDim.new(0, 14)
-				end
+				wrapper.Position = restorePos
+				wrapper.Size = restoreSize
+				clearMinScale()
 				self.Sidebar.Visible = true
 				self.BodyArea.Visible = true
+				self:_setAmbientChromeVisible(true)
 				self._morphing = false
-			end)
+			end, { NoPositionTween = true })
 			return
 		end
 
@@ -1719,63 +1816,55 @@ function Window:SetVisible(visible)
 			end
 		end)
 	else
-		if pill and pill.Enabled and not Tween.Reduced then
+		if not Tween.Reduced then
 			self._morphing = true
-			local px, py, pw, ph = pill:GetRect()
 			local restorePos = self._restorePos or wrapper.Position
 			local restoreSize = self._restoreSize or wrapper.Size
+			local startPos, startScale = computeMorphOrigin(restorePos, restoreSize)
 
-			wrapper.Position = UDim2.fromOffset(px, py)
-			wrapper.Size = UDim2.fromOffset(pw, ph)
-			if mainCorner then
-				mainCorner.CornerRadius = UDim.new(0, 22)
-			end
-			self.Sidebar.Visible = false
-			self.BodyArea.Visible = false
-			wrapper.ZIndex = 20
+			wrapper.Position = startPos
+			wrapper.Size = restoreSize
+			local minScale = getMinScale()
+			minScale.Scale = startScale
+
+			self.Sidebar.Visible = true
+			self.BodyArea.Visible = true
+			self:_setAmbientChromeVisible(false)
+			wrapper.ZIndex = 2
 			wrapper.Visible = true
 
 			Tween.Play(
-				wrapper,
-				{ Position = restorePos, Size = restoreSize },
-				0.22,
-				Enum.EasingStyle.Exponential,
+				minScale,
+				{ Scale = 1 },
+				Tween.Normal,
+				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
-			if mainCorner then
-				Tween.Play(mainCorner, { CornerRadius = UDim.new(0, 14) }, 0.22, Enum.EasingStyle.Exponential)
-			end
+			local restoreTw = Tween.Play(
+				wrapper,
+				{ Position = restorePos },
+				Tween.Normal,
+				Enum.EasingStyle.Quint,
+				Enum.EasingDirection.Out
+			)
+			Transition.Mount(wrapper, 1, { NoPositionTween = true })
 
-			task.delay(0.09, function()
+			Tween.Then(restoreTw, function()
 				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
 					return
 				end
-				self.Sidebar.Visible = true
-				self.BodyArea.Visible = true
-				if self.ActiveTab then
-					local activeScroll = self.ActiveTab.ActiveSubTab and self.ActiveTab.ActiveSubTab.Scroll
-						or (self.ActiveTab._defaultFlow and self.ActiveTab._defaultFlow.Scroll)
-					if activeScroll then
-						Transition.Cascade(activeScroll, 0.022, 12)
-					end
-				end
-			end)
-
-			task.delay(0.23, function()
-				if self._visSeq ~= seq or not self._visible or not wrapper.Parent then
-					return
-				end
-				wrapper.ZIndex = 2
+				clearMinScale()
+				wrapper.Position = restorePos
+				self:_setAmbientChromeVisible(true)
 				self._morphing = false
 			end)
 			return
 		end
 
+		clearMinScale()
 		self.Sidebar.Visible = true
 		self.BodyArea.Visible = true
-		if mainCorner then
-			mainCorner.CornerRadius = UDim.new(0, 14)
-		end
+		self:_setAmbientChromeVisible(true)
 		wrapper.Visible = true
 		Transition.Mount(wrapper, 0.95)
 	end
@@ -1795,10 +1884,89 @@ function Window:SetToggleKey(key)
 	if self._toggleKeybind then
 		self._toggleKeybind.SetKey(resolved)
 	end
+	if not Config.IsLoading() then
+		Config.TriggerAutoSave()
+	end
 end
 
 function Window:GetToggleKey()
 	return self._toggleKey
+end
+
+function Window:IsMobileMode()
+	return self._mobileMode == true
+end
+
+function Window:SetMobileMode(enabled, silent)
+	enabled = enabled == true
+	if self._destroyed or self._mobileMode == enabled then
+		return
+	end
+	self._mobileMode = enabled
+	if self._mobileButton then
+		self._mobileButton:UpdateVisibility()
+	end
+
+	local vp = getViewportSize(self.ScreenGui)
+	local minVec = self._effectiveMin or Vector2.new(360, 320)
+	local curSize = self.MainWrapper.AbsoluteSize
+	if curSize.X <= 0 then
+		curSize = Vector2.new(self.MainWrapper.Size.X.Offset, self.MainWrapper.Size.Y.Offset)
+	end
+
+	local targetW, targetH
+	if enabled then
+		self:ToggleSidebar(true)
+		self:SetMobileButtonEnabled(true)
+		targetW = Util.Clamp(math.min(curSize.X, math.max(360, math.min(540, vp.X - 24))), math.min(minVec.X, vp.X - 24), math.max(320, vp.X - 24))
+		targetH = Util.Clamp(curSize.Y, math.min(minVec.Y, vp.Y - 24), math.max(280, vp.Y - 24))
+	else
+		self:ToggleSidebar(false)
+		local pref = self._desktopPreferredSize or Vector2.new(820, 540)
+		targetW = Util.Clamp(pref.X, math.min(minVec.X, vp.X - 24), math.max(minVec.X, vp.X - 24))
+		targetH = Util.Clamp(pref.Y, math.min(minVec.Y, vp.Y - 24), math.max(minVec.Y, vp.Y - 24))
+	end
+
+	local newPosX = Util.Clamp(self.MainWrapper.Position.X.Offset, 8, math.max(8, vp.X - targetW - 8))
+	local newPosY = Util.Clamp(self.MainWrapper.Position.Y.Offset, 8, math.max(8, vp.Y - targetH - 8))
+	local newSizeUDim = UDim2.fromOffset(targetW, targetH)
+	local newPosUDim = UDim2.fromOffset(newPosX, newPosY)
+	self._restoreSize = newSizeUDim
+	self._restorePos = newPosUDim
+
+	if Tween.Reduced or silent then
+		self.MainWrapper.Size = newSizeUDim
+		self.MainWrapper.Position = newPosUDim
+	else
+		Tween.Play(self.MainWrapper, { Size = newSizeUDim, Position = newPosUDim }, Tween.Normal, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	end
+
+	local newVec = Vector2.new(targetW, targetH)
+	self._layoutChanged:Fire(newVec)
+	for _, tab in ipairs(self.Tabs) do
+		if type(tab.RefreshLayout) == "function" then
+			tab:RefreshLayout(targetW)
+		end
+	end
+	if self.ActiveTab and self.ActiveTab._syncSubTabIndicator then
+		task.defer(function()
+			if not self._destroyed and self.ActiveTab and self.ActiveTab._syncSubTabIndicator then
+				self.ActiveTab:_syncSubTabIndicator(true)
+			end
+		end)
+	end
+
+	if not silent and not Config.IsLoading() then
+		Config.TriggerAutoSave()
+	end
+end
+
+function Window:LoadAutoSave()
+	if self._destroyed or not Config.GetAutoSave() then
+		return false
+	end
+	local ok, res = pcall(Config.LoadAutoSave)
+	return ok and res == true
 end
 
 function Window:SetTitle(title)
@@ -1815,6 +1983,9 @@ end
 function Window:SetMobileButtonEnabled(enabled)
 	if self._mobileButton then
 		self._mobileButton:SetEnabled(enabled == true)
+	end
+	if not Config.IsLoading() then
+		Config.TriggerAutoSave()
 	end
 end
 

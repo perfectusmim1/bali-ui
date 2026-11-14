@@ -263,11 +263,13 @@ function MobileButton:GetRect()
 	local w = self.Frame.AbsoluteSize.X > 0 and self.Frame.AbsoluteSize.X or 168
 	local h = self.Frame.AbsoluteSize.Y > 0 and self.Frame.AbsoluteSize.Y or 40
 	local vp = self.Frame.Parent and self.Frame.Parent.AbsoluteSize or Vector2.new(1280, 720)
-	local x = self.Frame.Position.X.Offset
+	local slideTarget = self.Frame:GetAttribute("_BaliSlideTargetPos")
+	local refPos = typeof(slideTarget) == "UDim2" and slideTarget or self.Frame.Position
+	local x = refPos.X.Offset
 	if x <= 0 and vp.X > 0 then
 		x = math.floor((vp.X - w) * 0.5)
 	end
-	local y = self.Frame.Position.Y.Offset > 0 and self.Frame.Position.Y.Offset or 12
+	local y = refPos.Y.Offset > 0 and refPos.Y.Offset or 12
 	return x, y, w, h
 end
 
@@ -289,10 +291,15 @@ function MobileButton:SetVisible(visible)
 end
 
 function MobileButton:UpdateVisibility()
+	local wasVisible = self.Frame.Visible
 	local winVisible = self.Window and self.Window:IsVisible()
+	local mobileMode = self.Window and type(self.Window.IsMobileMode) == "function" and self.Window:IsMobileMode()
 	Theme.Bind(self._statusDot, { BackgroundColor3 = winVisible and "Success" or "Muted" })
-	local shouldShow = self.Enabled and (self.AlwaysShow or Util.IsTouchDevice() or not winVisible)
+	local shouldShow = self.Enabled and (self.AlwaysShow or mobileMode or Util.IsTouchDevice() or not winVisible)
 	self.Frame.Visible = shouldShow
+	if shouldShow and not wasVisible and self.Frame.Parent then
+		Transition.SlideFade(self.Frame, 0, -8)
+	end
 end
 
 function MobileButton:Destroy()

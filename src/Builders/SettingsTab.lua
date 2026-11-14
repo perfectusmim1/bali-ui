@@ -29,6 +29,7 @@ function SettingsTab.Build(window, options)
 		Icon = options.Icon,
 		Category = options.Category,
 	})
+	tab._isSettingsTab = true
 
 	-- ─── Appearance (Left) ───────────────────────────────────────────────────
 	local appearance = tab:AddSection({
@@ -42,6 +43,7 @@ function SettingsTab.Build(window, options)
 	local themeDropdown = appearance:AddDropdown({
 		Title = "Theme Preset",
 		Description = "Choose a built-in obsidian or light theme.",
+		Icon = "palette",
 		Values = Theme.Order,
 		Default = Theme.Name,
 		Callback = function(value)
@@ -55,6 +57,7 @@ function SettingsTab.Build(window, options)
 	local accentPicker = appearance:AddColorPicker({
 		Title = "Accent Color",
 		Description = "Override primary highlights, active pills, and gradients.",
+		Icon = "sparkles",
 		Default = Theme.Current.Accent,
 		Presets = {
 			Color3.fromRGB(214, 64, 236),
@@ -75,6 +78,7 @@ function SettingsTab.Build(window, options)
 	local fontDropdown = appearance:AddDropdown({
 		Title = "Font Family",
 		Description = "Live typography across headers, labels, and controls.",
+		Icon = "type",
 		Values = Theme.FontOrder,
 		Default = Theme.FontFamily,
 		Callback = function(value)
@@ -88,6 +92,7 @@ function SettingsTab.Build(window, options)
 	local transparencySlider = appearance:AddSlider({
 		Title = "Window Transparency",
 		Description = "Adjust obsidian glass surface opacity.",
+		Icon = "eye",
 		Min = 0,
 		Max = 0.45,
 		Step = 0.01,
@@ -103,34 +108,47 @@ function SettingsTab.Build(window, options)
 	local blurToggle = appearance:AddToggle({
 		Title = "Background Blur",
 		Description = "Softly blurs the 3D scene behind the window.",
+		Icon = "droplet",
 		Default = Blur.IsEnabled(),
 		Callback = function(state)
 			Blur.SetEnabled(state)
+			if not syncingTheme and not Config.IsLoading() then
+				Config.TriggerAutoSave()
+			end
 		end,
 	})
 
 	local blurSlider = appearance:AddSlider({
 		Title = "Blur Intensity",
+		Icon = "sliders",
 		Min = 2,
 		Max = 28,
 		Step = 1,
 		Default = Blur.GetIntensity(),
 		Callback = function(value)
 			Blur.SetIntensity(value)
+			if not syncingTheme and not Config.IsLoading() then
+				Config.TriggerAutoSave()
+			end
 		end,
 	})
 
 	local reduceMotionToggle = appearance:AddToggle({
 		Title = "Reduce Motion",
 		Description = "Use instant transitions across popups and panels.",
+		Icon = "zap",
 		Default = Tween.Reduced,
 		Callback = function(state)
 			Tween.Reduced = state == true
+			if not syncingTheme and not Config.IsLoading() then
+				Config.TriggerAutoSave()
+			end
 		end,
 	})
 
 	local speedSlider = appearance:AddSlider({
 		Title = "Animation Speed",
+		Icon = "gauge",
 		Min = 0.25,
 		Max = 2.0,
 		Step = 0.05,
@@ -138,6 +156,9 @@ function SettingsTab.Build(window, options)
 		Default = Tween.Speed,
 		Callback = function(value)
 			Tween.Speed = value
+			if not syncingTheme and not Config.IsLoading() then
+				Config.TriggerAutoSave()
+			end
 		end,
 	})
 
@@ -171,6 +192,7 @@ function SettingsTab.Build(window, options)
 	local toggleKeybind = hud:AddKeybind({
 		Title = "Toggle UI Keybind",
 		Description = "Show or hide the main workspace window.",
+		Icon = "keyboard",
 		Default = window:GetToggleKey(),
 		AllowMouse = false,
 		SyncList = false,
@@ -185,29 +207,38 @@ function SettingsTab.Build(window, options)
 	local watermarkToggle = hud:AddToggle({
 		Title = "Watermark HUD",
 		Description = "Floating telemetry pill with FPS, ping, and clock.",
+		Icon = "activity",
 		Default = Watermark.IsVisible(),
 		Callback = function(state)
 			if syncingTheme then
 				return
 			end
 			Watermark.SetVisible(state)
+			if not Config.IsLoading() then
+				Config.TriggerAutoSave()
+			end
 		end,
 	})
 
 	local keybindListToggle = hud:AddToggle({
 		Title = "Keybind List HUD",
 		Description = "Floating panel displaying active keybinds.",
+		Icon = "list",
 		Default = KeybindList.IsVisible(),
 		Callback = function(state)
 			if syncingTheme then
 				return
 			end
 			KeybindList.SetVisible(state)
+			if not Config.IsLoading() then
+				Config.TriggerAutoSave()
+			end
 		end,
 	})
 
 	local keybindModeSeg = hud:AddSegmented({
 		Title = "Keybind List Mode",
+		Icon = "list-checks",
 		Values = { "ActiveOnly", "All" },
 		Default = window._keybindListMode or "ActiveOnly",
 		Callback = function(mode)
@@ -216,11 +247,15 @@ function SettingsTab.Build(window, options)
 			end
 			window._keybindListMode = mode
 			KeybindList.SetMode(mode)
+			if not Config.IsLoading() then
+				Config.TriggerAutoSave()
+			end
 		end,
 	})
 
 	local notifDropdown = hud:AddDropdown({
 		Title = "Notification Position",
+		Icon = "bell",
 		Values = { "BottomRight", "TopRight", "BottomLeft", "TopLeft" },
 		Default = window._notificationPosition or "BottomRight",
 		Callback = function(pos)
@@ -229,18 +264,62 @@ function SettingsTab.Build(window, options)
 			end
 			window._notificationPosition = pos
 			Notification.SetPosition(pos)
+			if not Config.IsLoading() then
+				Config.TriggerAutoSave()
+			end
 		end,
 	})
 
+	local notifDurationSlider = hud:AddSlider({
+		Title = "Notification Duration",
+		Description = "Default toast visibility window before auto-dismiss.",
+		Icon = "clock",
+		Min = 1,
+		Max = 15,
+		Step = 0.5,
+		Rounding = 1,
+		Suffix = "s",
+		Default = Notification.GetDefaultDuration(),
+		Callback = function(val)
+			if syncingTheme then
+				return
+			end
+			Notification.SetDefaultDuration(val)
+			if not Config.IsLoading() then
+				Config.TriggerAutoSave()
+			end
+		end,
+	})
+
+	local defaultMobileBtn = true
+	if window._mobileButton then
+		defaultMobileBtn = window._mobileButton:IsEnabled()
+	end
 	local mobileBtnToggle = hud:AddToggle({
 		Title = "Mobile Floating Button",
 		Description = "Show draggable pill when minimized or on touch devices.",
-		Default = window._mobileButton and window._mobileButton:IsEnabled() or true,
+		Icon = "layers",
+		Default = defaultMobileBtn,
 		Callback = function(state)
 			if syncingTheme then
 				return
 			end
 			window:SetMobileButtonEnabled(state)
+		end,
+	})
+
+	local mobileModeToggle = hud:AddToggle({
+		Title = "Mobile Compact Mode",
+		Description = "Single-column stacked layout with compact sidebar and padding.",
+		Icon = "smartphone",
+		Default = window.IsMobileMode and window:IsMobileMode() or false,
+		Callback = function(state)
+			if syncingTheme then
+				return
+			end
+			if window.SetMobileMode then
+				window:SetMobileMode(state)
+			end
 		end,
 	})
 
@@ -252,6 +331,19 @@ function SettingsTab.Build(window, options)
 		Side = "Right",
 	})
 
+	local autoSaveToggle = configSection:AddToggle({
+		Title = "Auto-Save Workspace",
+		Description = "Automatically save & restore all control states without creating profiles.",
+		Icon = "save",
+		Default = Config.GetAutoSave(),
+		Callback = function(state)
+			if syncingTheme then
+				return
+			end
+			Config.SetAutoSave(state)
+		end,
+	})
+
 	local folderName = window._configFolder or "Bali"
 	configSection:AddLabel({
 		Title = "Config Folder",
@@ -261,6 +353,7 @@ function SettingsTab.Build(window, options)
 
 	local profileInput = configSection:AddInput({
 		Title = "Profile Name",
+		Icon = "pencil",
 		Placeholder = "e.g. default, legit...",
 		Clearable = true,
 	})
@@ -272,6 +365,7 @@ function SettingsTab.Build(window, options)
 
 	local profileDropdown = configSection:AddDropdown({
 		Title = "Saved Profiles",
+		Icon = "folder",
 		Values = initialProfiles,
 		AllowNull = true,
 	})
@@ -327,9 +421,14 @@ function SettingsTab.Build(window, options)
 			keybindListToggle:Set(KeybindList.IsVisible(), true)
 			keybindModeSeg:Set(window._keybindListMode or "ActiveOnly", true)
 			notifDropdown:Set(window._notificationPosition or "BottomRight", true)
+			notifDurationSlider:Set(Notification.GetDefaultDuration(), true)
 			if window._mobileButton then
 				mobileBtnToggle:Set(window._mobileButton:IsEnabled(), true)
 			end
+			if window.IsMobileMode then
+				mobileModeToggle:Set(window:IsMobileMode(), true)
+			end
+			autoSaveToggle:Set(Config.GetAutoSave(), true)
 		end)
 		syncingTheme = false
 	end
@@ -432,6 +531,7 @@ function SettingsTab.Build(window, options)
 
 	local jsonInput = configSection:AddInput({
 		Title = "JSON Import / Export",
+		Icon = "code",
 		Placeholder = "Paste exported JSON payload...",
 		Clearable = true,
 	})
@@ -443,7 +543,7 @@ function SettingsTab.Build(window, options)
 				Icon = "copy",
 				Variant = "Default",
 				Callback = function()
-					local ok, payload = pcall(Config.Export)
+					local ok, payload = pcall(Config.Export, true)
 					if ok and type(payload) == "string" then
 						jsonInput:Set(payload, true)
 						local copied = Util.SetClipboard(payload)
@@ -487,7 +587,7 @@ function SettingsTab.Build(window, options)
 		Side = "Left",
 	})
 
-	local versionText = "v" .. tostring(Assets.Data and Assets.Data.Version or "3")
+	local versionText = "v1.0.0 (Atlas v" .. tostring(Assets.Data and Assets.Data.Version or "4") .. ")"
 	local assetStatus = Assets.Available and "Custom Atlas Loaded" or "Glyph Fallback"
 	local fsStatus = Util.FS.Supported() and "Supported" or "In-Memory Only"
 	local deviceKind = Util.IsTouchDevice() and "Touch / Mobile" or "Desktop"

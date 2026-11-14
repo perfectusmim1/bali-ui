@@ -503,6 +503,216 @@ end
 
 -- ─── CodeBlock ───────────────────────────────────────────────────────────────
 
+local LUAU_KEYWORDS = {
+	["and"] = true, ["break"] = true, ["continue"] = true, ["do"] = true,
+	["else"] = true, ["elseif"] = true, ["end"] = true, ["export"] = true,
+	["for"] = true, ["function"] = true, ["if"] = true, ["in"] = true,
+	["local"] = true, ["not"] = true, ["or"] = true, ["repeat"] = true,
+	["return"] = true, ["then"] = true, ["type"] = true, ["until"] = true,
+	["while"] = true,
+}
+
+local LUAU_LITERALS = {
+	["true"] = true, ["false"] = true, ["nil"] = true, ["self"] = true,
+}
+
+local LUAU_BUILTINS = {
+	require = true, print = true, warn = true, error = true, assert = true,
+	pcall = true, xpcall = true, pairs = true, ipairs = true, next = true,
+	select = true, tostring = true, tonumber = true, typeof = true,
+	setmetatable = true, getmetatable = true, unpack = true,
+	task = true, math = true, string = true, table = true, bit32 = true,
+	game = true, workspace = true, script = true, Enum = true, Instance = true,
+	UDim = true, UDim2 = true, Vector2 = true, Vector3 = true, Color3 = true,
+	CFrame = true, TweenInfo = true, NumberSequence = true, ColorSequence = true,
+}
+
+local GENERIC_KEYWORDS = {
+	["async"] = true, ["await"] = true, ["break"] = true, ["case"] = true,
+	["catch"] = true, ["class"] = true, ["const"] = true, ["continue"] = true,
+	["def"] = true, ["default"] = true, ["elif"] = true, ["else"] = true,
+	["export"] = true, ["finally"] = true, ["for"] = true, ["from"] = true,
+	["function"] = true, ["if"] = true, ["import"] = true, ["in"] = true,
+	["interface"] = true, ["let"] = true, ["return"] = true, ["switch"] = true,
+	["throw"] = true, ["try"] = true, ["type"] = true, ["var"] = true,
+	["while"] = true, ["with"] = true, ["yield"] = true,
+}
+
+local GENERIC_LITERALS = {
+	["true"] = true, ["false"] = true, ["True"] = true, ["False"] = true,
+	["null"] = true, ["None"] = true, ["undefined"] = true, ["this"] = true, ["self"] = true,
+}
+
+local SYNTAX_COLORS = {
+	Keyword = "#C084FC",
+	Literal = "#F472B6",
+	String = "#86EFAC",
+	Number = "#FDBA74",
+	Builtin = "#7DD3FC",
+	Member = "#93C5FD",
+	Key = "#7DD3FC",
+	Comment = "#7A7A94",
+}
+
+local function escapeRichText(str)
+	local s = string.gsub(str, "&", "&amp;")
+	s = string.gsub(s, "<", "&lt;")
+	s = string.gsub(s, ">", "&gt;")
+	return s
+end
+
+local function wrapColor(text, hex)
+	if text == "" then
+		return ""
+	end
+	if not hex then
+		return escapeRichText(text)
+	end
+	return '<font color="' .. hex .. '">' .. escapeRichText(text) .. "</font>"
+end
+
+local function detectCodeLanguage(opts, code)
+	local hint = string.lower(tostring(opts.Language or opts.Lang or ""))
+	if hint == "json" then
+		return "json"
+	elseif hint == "js" or hint == "javascript" or hint == "ts" or hint == "typescript" then
+		return "js"
+	elseif hint == "py" or hint == "python" then
+		return "py"
+	elseif hint == "lua" or hint == "luau" then
+		return "luau"
+	end
+	local titleHint = string.lower(tostring(opts.Title or ""))
+	if string.find(titleHint, "json", 1, true) then
+		return "json"
+	elseif string.find(titleHint, "python", 1, true) then
+		return "py"
+	elseif string.find(titleHint, "typescript", 1, true) or string.find(titleHint, "javascript", 1, true) then
+		return "js"
+	end
+	local trimmed = tostring(code or ""):match("^%s*(.-)%s*$") or ""
+	if trimmed:sub(1, 1) == "{" or trimmed:sub(1, 1) == "[" then
+		if string.find(trimmed, '":', 1, true) then
+			return "json"
+		end
+	end
+	return "luau"
+end
+
+local function highlightCodeLine(line, lang, inBlockComment)
+	if line == "" then
+		return "", inBlockComment
+	end
+
+	local out = {}
+	local n = #line
+	local i = 1
+
+	if inBlockComment then
+		local closeStart, closeEnd = string.find(line, "]]", 1, true)
+		if closeStart then
+			table.insert(out, wrapColor(string.sub(line, 1, closeEnd), SYNTAX_COLORS.Comment))
+			i = closeEnd + 1
+			inBlockComment = false
+		else
+			return wrapColor(line, SYNTAX_COLORS.Comment), true
+		end
+	end
+
+	while i <= n do
+		local ch = string.sub(line, i, i)
+
+		-- Comments
+		if (lang == "luau") and string.sub(line, i, i + 1) == "--" then
+			if string.sub(line, i + 2, i + 3) == "[[" then
+				local closeStart, closeEnd = string.find(line, "]]", i + 4, true)
+				if closeStart then
+					table.insert(out, wrapColor(string.sub(line, i, closeEnd), SYNTAX_COLORS.Comment))
+					i = closeEnd + 1
+				else
+					table.insert(out, wrapColor(string.sub(line, i), SYNTAX_COLORS.Comment))
+					inBlockComment = true
+					break
+				end
+			else
+				table.insert(out, wrapColor(string.sub(line, i), SYNTAX_COLORS.Comment))
+				break
+			end
+		elseif (lang == "js" and string.sub(line, i, i + 1) == "//") or (lang == "py" and ch == "#") then
+			table.insert(out, wrapColor(string.sub(line, i), SYNTAX_COLORS.Comment))
+			break
+		-- Long bracket strings in Luau
+		elseif lang == "luau" and string.sub(line, i, i + 1) == "[[" then
+			local closeStart, closeEnd = string.find(line, "]]", i + 2, true)
+			if closeStart then
+				table.insert(out, wrapColor(string.sub(line, i, closeEnd), SYNTAX_COLORS.String))
+				i = closeEnd + 1
+			else
+				table.insert(out, wrapColor(string.sub(line, i), SYNTAX_COLORS.String))
+				break
+			end
+		-- Quoted strings
+		elseif ch == '"' or ch == "'" or (lang == "js" and ch == "`") then
+			local j = i + 1
+			local escaped = false
+			while j <= n do
+				local c = string.sub(line, j, j)
+				if escaped then
+					escaped = false
+				elseif c == "\\" then
+					escaped = true
+				elseif c == ch then
+					j += 1
+					break
+				end
+				j += 1
+			end
+			local strTok = string.sub(line, i, j - 1)
+			local tokColor = SYNTAX_COLORS.String
+			if lang == "json" and string.match(string.sub(line, j), "^%s*:") then
+				tokColor = SYNTAX_COLORS.Key
+			end
+			table.insert(out, wrapColor(strTok, tokColor))
+			i = j
+		-- Numbers
+		elseif string.match(ch, "%d") then
+			local _, numEnd = string.find(line, "^0[xX][%da-fA-F_]+", i)
+			if not numEnd then
+				_, numEnd = string.find(line, "^%d[%d_]*%.?[%d_]*", i)
+			end
+			numEnd = numEnd or i
+			table.insert(out, wrapColor(string.sub(line, i, numEnd), SYNTAX_COLORS.Number))
+			i = numEnd + 1
+		-- Identifiers / keywords / builtins / members
+		elseif string.match(ch, "[%a_]") then
+			local _, idEnd = string.find(line, "^[%w_]+", i)
+			idEnd = idEnd or i
+			local ident = string.sub(line, i, idEnd)
+			local prevChar = i > 1 and string.sub(line, i - 1, i - 1) or ""
+			local kwMap = (lang == "luau") and LUAU_KEYWORDS or GENERIC_KEYWORDS
+			local litMap = (lang == "luau") and LUAU_LITERALS or GENERIC_LITERALS
+
+			if kwMap[ident] and prevChar ~= "." and prevChar ~= ":" then
+				table.insert(out, wrapColor(ident, SYNTAX_COLORS.Keyword))
+			elseif litMap[ident] and prevChar ~= "." and prevChar ~= ":" then
+				table.insert(out, wrapColor(ident, SYNTAX_COLORS.Literal))
+			elseif prevChar == "." or prevChar == ":" then
+				table.insert(out, wrapColor(ident, SYNTAX_COLORS.Member))
+			elseif lang == "luau" and LUAU_BUILTINS[ident] then
+				table.insert(out, wrapColor(ident, SYNTAX_COLORS.Builtin))
+			else
+				table.insert(out, escapeRichText(ident))
+			end
+			i = idEnd + 1
+		else
+			table.insert(out, escapeRichText(ch))
+			i += 1
+		end
+	end
+
+	return table.concat(out), inBlockComment
+end
+
 local CodeBlock = {}
 function CodeBlock.new(parent, opts, ctx)
 	opts = Util.Options(opts, {}, "Code")
@@ -629,14 +839,15 @@ function CodeBlock.new(parent, opts, ctx)
 		Parent = body,
 	})
 
+	local wrap = (opts.Wrap ~= false)
 	local scroll = Create.New("ScrollingFrame", {
 		Name = "CodeScroll",
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		AutomaticCanvasSize = Enum.AutomaticSize.XY,
+		AutomaticCanvasSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.XY,
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		ScrollBarThickness = 3,
-		ScrollingDirection = Enum.ScrollingDirection.XY,
+		ScrollingDirection = wrap and Enum.ScrollingDirection.Y or Enum.ScrollingDirection.XY,
 		BackgroundTransparency = 1,
 		Theme = { ScrollBarImageColor3 = "Muted" },
 		LayoutOrder = 3,
@@ -647,66 +858,102 @@ function CodeBlock.new(parent, opts, ctx)
 	maxConstraint.MaxSize = Vector2.new(99999, opts.MaxHeight or 180)
 	maxConstraint.Parent = scroll
 
-	local codeRow = Create.New("Frame", {
-		Name = "CodeRow",
-		Size = UDim2.fromOffset(0, 0),
-		AutomaticSize = Enum.AutomaticSize.XY,
+	local codeList = Create.New("Frame", {
+		Name = "CodeList",
+		Size = wrap and UDim2.new(1, 0, 0, 0) or UDim2.fromOffset(0, 0),
+		AutomaticSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
-		Padding = { 10, 12, 10, 12 },
+		Padding = wrap and { 8, 10, 10, 10 } or { 8, 10, 14, 10 },
 		Parent = scroll,
 	})
 
-	Create.List(codeRow, {
-		Direction = Enum.FillDirection.Horizontal,
-		VAlign = Enum.VerticalAlignment.Top,
-		Gap = 10,
+	Create.List(codeList, {
+		Direction = Enum.FillDirection.Vertical,
+		Gap = 2,
 	})
 
 	local showLines = (opts.LineNumbers ~= false)
-	local lineCol = Create.New("TextLabel", {
-		Name = "LineNumbers",
-		Size = UDim2.fromOffset(0, 0),
-		AutomaticSize = Enum.AutomaticSize.XY,
-		BackgroundTransparency = 1,
-		Text = "1",
-		TextSize = 12,
-		FontFace = Theme.Mono("Regular"),
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		Theme = { TextColor3 = "Muted" },
-		LayoutOrder = 1,
-		Visible = showLines,
-		Parent = codeRow,
-	})
+	local codeLang = detectCodeLanguage(opts, currentCode)
 
-	local codeLabel = Create.New("TextLabel", {
-		Name = "Code",
-		Size = UDim2.fromOffset(0, 0),
-		AutomaticSize = Enum.AutomaticSize.XY,
-		BackgroundTransparency = 1,
-		Text = currentCode,
-		TextSize = 12,
-		FontFace = Theme.Mono("Regular"),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		TextWrapped = opts.Wrap == true,
-		RichText = false,
-		Theme = { TextColor3 = "Text" },
-		LayoutOrder = 2,
-		Parent = codeRow,
-	})
+	local function splitLines(src)
+		local out = {}
+		local startIdx = 1
+		while true do
+			local nl = string.find(src, "\n", startIdx, true)
+			if nl then
+				local seg = string.sub(src, startIdx, nl - 1)
+				seg = string.gsub(seg, "\r$", "")
+				table.insert(out, seg)
+				startIdx = nl + 1
+			else
+				local seg = string.sub(src, startIdx)
+				seg = string.gsub(seg, "\r$", "")
+				table.insert(out, seg)
+				break
+			end
+		end
+		return out
+	end
 
 	local function refreshCode(src)
 		currentCode = tostring(src or "")
 		element.Value = currentCode
-		codeLabel.Text = currentCode
-		if showLines then
-			local lineCount = select(2, string.gsub(currentCode, "\n", "")) + 1
-			local nums = table.create(lineCount)
-			for i = 1, lineCount do
-				nums[i] = tostring(i)
+		for _, child in ipairs(codeList:GetChildren()) do
+			if child:IsA("GuiObject") then
+				child:Destroy()
 			end
-			lineCol.Text = table.concat(nums, "\n")
+		end
+
+		local lines = splitLines(currentCode)
+		local gutterW = math.max(18, #tostring(#lines) * 8 + 4)
+		local textOffset = showLines and (gutterW + 10) or 0
+		local inBlockComment = false
+
+		for lineIdx, rawLine in ipairs(lines) do
+			local highlighted
+			highlighted, inBlockComment = highlightCodeLine(rawLine, codeLang, inBlockComment)
+
+			local rowFrame = Create.New("Frame", {
+				Name = "Line_" .. lineIdx,
+				Size = wrap and UDim2.new(1, 0, 0, 0) or UDim2.fromOffset(0, 0),
+				AutomaticSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				LayoutOrder = lineIdx,
+				Parent = codeList,
+			})
+
+			if showLines then
+				Create.New("TextLabel", {
+					Name = "Num",
+					Size = UDim2.fromOffset(gutterW, 16),
+					Position = UDim2.fromOffset(0, 0),
+					BackgroundTransparency = 1,
+					Text = tostring(lineIdx),
+					TextSize = 12,
+					FontFace = Theme.Mono("Regular"),
+					TextXAlignment = Enum.TextXAlignment.Right,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					Theme = { TextColor3 = "Muted" },
+					Parent = rowFrame,
+				})
+			end
+
+			Create.New("TextLabel", {
+				Name = "Code",
+				Position = UDim2.fromOffset(textOffset, 0),
+				Size = wrap and UDim2.new(1, -textOffset, 0, 0) or UDim2.fromOffset(0, 0),
+				AutomaticSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				Text = highlighted ~= "" and highlighted or " ",
+				TextSize = 12,
+				FontFace = Theme.Mono("Regular"),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				TextWrapped = wrap,
+				RichText = true,
+				Theme = { TextColor3 = "Text" },
+				Parent = rowFrame,
+			})
 		end
 	end
 
@@ -775,14 +1022,40 @@ function Image.new(parent, opts, ctx)
 	card.Frame.ClipsDescendants = true
 	Create.List(card.Frame, { Gap = 0 })
 
-	local defaultHeight = opts.Height or 150
-	local imgLabel = Create.New("ImageLabel", {
-		Name = "Picture",
+	local titleText = tostring(opts.Title or "")
+	local captionText = tostring(opts.Caption or opts.Description or opts.Desc or "")
+	local useOverlay = opts.Overlay == true or opts.GradientOverlay == true or opts.Badge ~= nil or opts.Icon ~= nil
+	local cornerRadius = opts.Corner or 10
+	local fullBleed = useOverlay or (titleText == "" and captionText == "")
+
+	local defaultHeight = opts.Height or (opts.Overlay and 148 or 150)
+	local mediaWrap = Create.New("Frame", {
+		Name = "MediaWrap",
 		Size = UDim2.new(1, 0, 0, defaultHeight),
 		BackgroundTransparency = 1,
-		ScaleType = opts.ScaleType or Enum.ScaleType.Crop,
+		ClipsDescendants = true,
 		LayoutOrder = 1,
 		Parent = card.Frame,
+	})
+
+	local picClip = Create.New("CanvasGroup", {
+		Name = "PictureClip",
+		Size = fullBleed and UDim2.fromScale(1, 1) or UDim2.new(1, 0, 1, cornerRadius),
+		Position = UDim2.fromOffset(0, 0),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Corner = cornerRadius,
+		ZIndex = 1,
+		Parent = mediaWrap,
+	})
+
+	local imgLabel = Create.New("ImageLabel", {
+		Name = "Picture",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ScaleType = opts.ScaleType or Enum.ScaleType.Crop,
+		ZIndex = 1,
+		Parent = picClip,
 	})
 
 	local fallbackIcon = Icons.Create("image", {
@@ -791,7 +1064,8 @@ function Image.new(parent, opts, ctx)
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Color = "Muted",
 		Visible = false,
-		Parent = imgLabel,
+		ZIndex = 2,
+		Parent = mediaWrap,
 	})
 
 	local function applyImage(source)
@@ -825,30 +1099,124 @@ function Image.new(parent, opts, ctx)
 		local function updateAspect()
 			local w = card.Frame.AbsoluteSize.X
 			if w > 0 then
-				imgLabel.Size = UDim2.new(1, 0, 0, math.max(48, math.floor(w / ratio)))
+				mediaWrap.Size = UDim2.new(1, 0, 0, math.max(48, math.floor(w / ratio)))
 			end
 		end
 		element.Maid:Give(card.Frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateAspect))
 		task.defer(updateAspect)
 	end
 
-	local titleText = tostring(opts.Title or "")
-	local captionText = tostring(opts.Caption or opts.Description or opts.Desc or "")
+	if opts.Badge ~= nil and opts.Badge ~= "" and opts.Badge ~= false then
+		local badgePill = Create.New("Frame", {
+			Name = "Badge",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -10, 0, 10),
+			Size = UDim2.fromOffset(0, 22),
+			AutomaticSize = Enum.AutomaticSize.X,
+			Corner = 6,
+			BackgroundTransparency = 0.16,
+			Theme = { BackgroundColor3 = "Card" },
+			Padding = { 0, 8, 0, 8 },
+			ZIndex = 5,
+			Parent = mediaWrap,
+		})
+		Create.Stroke(badgePill, {
+			Theme = { Color = "Accent" },
+			Transparency = 0.45,
+		})
+		Create.Text({
+			Text = tostring(opts.Badge),
+			Font = "SemiBold",
+			TextSize = 11,
+			Color = "Text",
+			Size = UDim2.fromScale(0, 1),
+			AutomaticSize = Enum.AutomaticSize.X,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 6,
+			Parent = badgePill,
+		})
+	end
 
-	local scrim = Create.New("Frame", {
-		Name = "CaptionOverlay",
-		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Theme = { BackgroundColor3 = "Tile" },
-		BackgroundTransparency = 0.25,
-		Padding = { 10, 12, 10, 12 },
-		Visible = (titleText ~= "" or captionText ~= ""),
-		LayoutOrder = 2,
-		ZIndex = 3,
-		Parent = card.Frame,
-	})
+	local scrim
+	if useOverlay then
+		scrim = Create.New("Frame", {
+			Name = "CaptionOverlay",
+			AnchorPoint = Vector2.new(0, 1),
+			Position = UDim2.fromScale(0, 1),
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Corner = cornerRadius,
+			BackgroundColor3 = Color3.fromRGB(10, 10, 16),
+			BackgroundTransparency = 0,
+			Padding = { 26, 12, 11, 12 },
+			Visible = (titleText ~= "" or captionText ~= ""),
+			ZIndex = 3,
+			Parent = mediaWrap,
+		})
+		local scrimGrad = Instance.new("UIGradient")
+		scrimGrad.Rotation = -90
+		scrimGrad.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.06),
+			NumberSequenceKeypoint.new(0.55, 0.28),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		scrimGrad.Parent = scrim
+	else
+		scrim = Create.New("Frame", {
+			Name = "CaptionOverlay",
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Theme = { BackgroundColor3 = "Tile" },
+			BackgroundTransparency = 0.25,
+			Padding = { 10, 12, 10, 12 },
+			Visible = (titleText ~= "" or captionText ~= ""),
+			LayoutOrder = 2,
+			ZIndex = 3,
+			Parent = card.Frame,
+		})
+	end
 
-	Create.List(scrim, {
+	local textColParent = scrim
+	if opts.Icon then
+		Create.List(scrim, {
+			Direction = Enum.FillDirection.Horizontal,
+			Gap = 10,
+			VAlign = Enum.VerticalAlignment.Center,
+		})
+		local iconChip = Create.New("Frame", {
+			Name = "IconChip",
+			Size = UDim2.fromOffset(28, 28),
+			Corner = 8,
+			BackgroundTransparency = 0.80,
+			Theme = { BackgroundColor3 = "Accent" },
+			LayoutOrder = 1,
+			ZIndex = 4,
+			Parent = scrim,
+		})
+		Create.Stroke(iconChip, {
+			Theme = { Color = "Accent" },
+			Transparency = 0.55,
+		})
+		Icons.Create(opts.Icon, {
+			Size = UDim2.fromOffset(15, 15),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Color = "Accent",
+			ZIndex = 5,
+			Parent = iconChip,
+		})
+		textColParent = Create.New("Frame", {
+			Name = "TextCol",
+			Size = UDim2.new(1, -38, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			LayoutOrder = 2,
+			ZIndex = 4,
+			Parent = scrim,
+		})
+	end
+
+	Create.List(textColParent, {
 		Direction = Enum.FillDirection.Vertical,
 		Gap = 2,
 	})
@@ -865,7 +1233,7 @@ function Image.new(parent, opts, ctx)
 		LayoutOrder = 1,
 		Visible = titleText ~= "",
 		ZIndex = 4,
-		Parent = scrim,
+		Parent = textColParent,
 	})
 
 	local captionLabel = Create.Text({
@@ -880,7 +1248,7 @@ function Image.new(parent, opts, ctx)
 		LayoutOrder = 2,
 		Visible = captionText ~= "",
 		ZIndex = 4,
-		Parent = scrim,
+		Parent = textColParent,
 	})
 
 	local function refreshScrim()
@@ -1017,7 +1385,7 @@ function ProfileCard.new(parent, opts, ctx)
 		ZIndex = 4,
 		Parent = avatarWrap,
 	})
-	element.Maid:Give(Transition.Pulse(statusDot, "BackgroundTransparency", 0, 0.45, 1.8))
+	element.Maid:Give(Transition.Pulse(statusDot, "BackgroundTransparency", 0, 0.28, 2.4))
 
 	if userId and userId > 0 then
 		task.spawn(function()
@@ -1101,6 +1469,7 @@ function ProfileCard.new(parent, opts, ctx)
 			Name = "ActionButton",
 			Size = UDim2.fromOffset(0, 30),
 			AutomaticSize = Enum.AutomaticSize.X,
+			ClipsDescendants = true,
 			Theme = { BackgroundColor3 = "Field" },
 			Corner = UDim.new(1, 0),
 			Padding = { 0, 12, 0, 12 },
@@ -1153,10 +1522,14 @@ function ProfileCard.new(parent, opts, ctx)
 		end))
 
 		local function syncInfoWidth()
-			local btnW = math.ceil(pillBtn.AbsoluteSize.X)
+			local bodyW = body.AbsoluteSize.X > 0 and body.AbsoluteSize.X or 320
+			local rawBtnW = math.ceil(pillBtn.AbsoluteSize.X)
+			local maxBtnW = math.max(64, math.floor(bodyW * 0.42))
+			local btnW = math.min(rawBtnW > 0 and rawBtnW or 108, maxBtnW)
 			infoCol.Size = UDim2.new(1, -(44 + 12 + btnW + 12), 0, 0)
 		end
 		element.Maid:Give(pillBtn:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncInfoWidth))
+		element.Maid:Give(body:GetPropertyChangedSignal("AbsoluteSize"):Connect(syncInfoWidth))
 		task.defer(syncInfoWidth)
 	end
 

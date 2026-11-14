@@ -47,7 +47,7 @@ function Section.new(parent, options, tab, window, subTab)
 			BackgroundTransparency = "CardTransparency",
 		},
 		Corner = 12,
-		Padding = { 12, 12, 12, 12 },
+		Padding = { 10, 10, 10, 10 },
 		Parent = parent,
 	})
 	maid:Give(card)
@@ -177,7 +177,7 @@ function Section.new(parent, options, tab, window, subTab)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		ClipsDescendants = true,
+		ClipsDescendants = not isOpen,
 		Visible = isOpen,
 		LayoutOrder = 2,
 		Parent = card,
@@ -188,6 +188,7 @@ function Section.new(parent, options, tab, window, subTab)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
+		Padding = { 2, 2, 2, 2 },
 		Parent = contentHolder,
 	})
 	local contentLayout = Create.List(content, { Gap = 8 })
@@ -298,6 +299,7 @@ function Section:SetOpen(open, instant)
 		end
 		holder.AutomaticSize = Enum.AutomaticSize.Y
 		holder.Size = UDim2.new(1, 0, 0, 0)
+		holder.ClipsDescendants = not open
 		holder.Visible = open
 		return
 	end
@@ -307,8 +309,9 @@ function Section:SetOpen(open, instant)
 	end
 
 	if open then
+		holder.ClipsDescendants = true
 		holder.Visible = true
-		local targetHeight = math.max(content.AbsoluteSize.Y, self._contentLayout.AbsoluteContentSize.Y)
+		local targetHeight = math.max(content.AbsoluteSize.Y, self._contentLayout.AbsoluteContentSize.Y + 4)
 		holder.AutomaticSize = Enum.AutomaticSize.None
 		holder.Size = UDim2.new(1, 0, 0, 0)
 		local tween = Tween.Play(holder, { Size = UDim2.new(1, 0, 0, targetHeight) }, Tween.Normal)
@@ -317,9 +320,11 @@ function Section:SetOpen(open, instant)
 			if self.Open then
 				holder.AutomaticSize = Enum.AutomaticSize.Y
 				holder.Size = UDim2.new(1, 0, 0, 0)
+				holder.ClipsDescendants = false
 			end
 		end)
 	else
+		holder.ClipsDescendants = true
 		local currentHeight = math.max(holder.AbsoluteSize.Y, content.AbsoluteSize.Y)
 		holder.AutomaticSize = Enum.AutomaticSize.None
 		holder.Size = UDim2.new(1, 0, 0, currentHeight)

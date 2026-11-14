@@ -30,6 +30,7 @@ function Toggle.new(parent, opts, ctx)
 	end
 
 	local hasKeybind = opts.Keybind ~= nil
+	element._hasKeybind = hasKeybind
 	local row = Base.Row(parent, rowOpts, hasKeybind and 86 or 44)
 	element:BindUI(row)
 
@@ -249,6 +250,7 @@ function Toggle.new(parent, opts, ctx)
 					inputHandle.SetKey(currentKey)
 				end
 				syncChip()
+				element.Changed:Fire(state, currentKey)
 			end)
 		end))
 	end

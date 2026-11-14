@@ -14,7 +14,7 @@ local Base = require("Elements/Base")
 
 local Input = {}
 
-local BULLET = "•"
+local BULLET = "●"
 
 local function splitUtf8(str)
 	local chars = {}

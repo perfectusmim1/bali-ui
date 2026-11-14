@@ -1,6 +1,6 @@
 # Bali UI
 
-**Bali** is an obsidian glassmorphic UI library for Roblox and Luau featuring smooth `Exponential Out` deceleration motion, crisp `BuilderSans` typography, radial glass strokes, a bundled 164-icon Lucide sprite atlas, live theme switching, real-time analytics widgets, desktop & mobile ergonomics, and zero-`loadstring` single-file distribution bundles.
+**Bali** is an obsidian glassmorphic UI library for Roblox and Luau featuring unified `Quint Out` deceleration motion, crisp `BuilderSans` typography, radial glass strokes, a bundled 164-icon `1024x704` Lucide sprite atlas, live theme switching, real-time analytics widgets, desktop & mobile ergonomics, and zero-`loadstring` single-file distribution bundles.
 
 ![Bali Suite Showcase](docs/assets/promo-hero.png)
 
@@ -10,10 +10,10 @@
 
 - **Obsidian Glass Architecture**: Layered depth (`Main`, `HUD`, `Popup`, `Dialog`, `Notify`), directional hairline `UIStroke` highlights, ambient radial blooms, and zero `UIScale` layout jitter on hover or expansion.
 - **7 Curated Themes & Live Overrides**: `Midnight`, `Ocean`, `Graphite`, `Aurora`, `Sunset`, `Emerald`, and `Light`, plus runtime `SetAccent`, `AddTheme`, and `SetFont` (`Builder`, `Gotham`, `Montserrat`, `Ubuntu`, `Nunito`).
-- **164 Bundled Lucide Icons**: Self-contained `832x572` Lucide atlas (`src/Generated/AssetData.lua`) hydrated cleanly via `getcustomasset` / `getsynasset` with monochrome glyph fallbacks in Roblox Studio.
-- **Complete Interactive Suite**: `Button` (with `Confirm` & variants), `ButtonGroup`, `Toggle` (with inline keybinds), `Checkbox`, `Slider`, `RangeSlider`, `Stepper`, `Input` (numeric, integer, password mask, clearable), `Segmented`, `Dropdown` (single, multi, searchable), `Keybind` (`Toggle`, `Hold`, `Always`, mouse binds), `ColorPicker` (HSV square, alpha slider, hex/RGB, presets, rainbow), and nested `Accordion`.
-- **Analytics & Data Widgets**: `StatCard` (animated counters, deltas, sparklines), `Chart` (`Line` / `Bar` with live `:Push()`), `ProgressBar`, `Table` (live filter, selectable checkboxes, badges, inline row actions), `CardGrid`, plus rich typography (`Label`, `Paragraph`, `Divider`, `Header`, `CodeBlock`, `Image`, `ProfileCard`).
-- **System HUD & Lifecycle Safety**: Stackable `Notification` toasts + unread history bell popover, draggable `Watermark`, live `KeybindList`, `CommandPalette` (`Ctrl+K`), `Lighting` `Blur`, viewport-clamped `Tooltip`, `Dialog` modals, `LoadingScreen`, `KeySystem`, JSON `Config` persistence, automatic `_BaliInstance` orphan cleanup on re-execute, and global error boundary (`Util.ErrorHandler`).
+- **164 Bundled Lucide Icons**: Self-contained `1024x704` Lucide atlas (`src/Generated/AssetData.lua`) hydrated cleanly via `getcustomasset` / `getsynasset` with monochrome glyph fallbacks in Roblox Studio.
+- **Complete Interactive Suite**: `Button` (with `Confirm` & variants), `ButtonGroup`, `Toggle` (with inline keybinds), `Checkbox`, `Slider`, `RangeSlider`, `Stepper`, `Input` (numeric, integer, password mask, clearable), `Segmented`, `Dropdown` (single, multi, searchable, input-isolated compact popover), `Keybind` (`Toggle`, `Hold`, `Always`, mouse binds), `ColorPicker` (HSV square, alpha slider, hex/RGB, presets, rainbow), and nested `Accordion`.
+- **Analytics & Data Widgets**: `StatCard` (animated counters, deltas, sparklines), `Chart` (`Line` / `Bar` with live `:Push()`), `ProgressBar`, `Table` (live filter, selectable checkboxes, badges, inline row actions), `CardGrid`, plus rich typography (`Label`, `Paragraph`, `Divider`, `Header`, `CodeBlock` with language-aware `RichText` highlighting, `Image` / `Banner`, `ProfileCard`).
+- **System HUD & Lifecycle Safety**: Stackable `Notification` toasts (with configurable default duration via `SetNotificationDuration`) + unread history bell popover, draggable `Watermark`, live `KeybindList`, window-centered `CommandPalette` (`Ctrl+K`), `Lighting` `Blur`, viewport-clamped `Tooltip`, `Dialog` modals, `LoadingScreen`, `KeySystem`, JSON `Config` & `AutoSave` persistence, automatic `_BaliInstance` orphan cleanup on re-execute, and global error boundary (`Util.ErrorHandler`).
 
 ---
 
@@ -127,7 +127,7 @@ src/
 ├── Bali.lua                 # Main library entry point, safe ScreenGui host, error boundary
 ├── Example.lua                # Full-feature interactive showcase
 ├── Generated/
-│   └── AssetData.lua          # Embedded 832x572 Lucide sprite atlas & textures
+│   └── AssetData.lua          # Embedded 1024x704 Lucide sprite atlas & textures
 ├── Core/
 │   ├── Assets.lua             # Runtime asset hydration & atlas decoding
 │   ├── Create.lua             # Instance builder, corners, padding, glass strokes, theme binding

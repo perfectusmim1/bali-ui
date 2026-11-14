@@ -1333,6 +1333,28 @@ function MockInstance.new(className)
 		return nil
 	end
 
+	function methods:FindFirstAncestor(name)
+		local cur = props.Parent
+		while cur do
+			if cur._props.Name == name then
+				return cur
+			end
+			cur = cur._props.Parent
+		end
+		return nil
+	end
+
+	function methods:FindFirstAncestorOfClass(cls)
+		local cur = props.Parent
+		while cur do
+			if cur._className == cls then
+				return cur
+			end
+			cur = cur._props.Parent
+		end
+		return nil
+	end
+
 	function methods:FindFirstAncestorWhichIsA(cls)
 		local cur = props.Parent
 		while cur do
@@ -2746,11 +2768,218 @@ if okLib and type(Bali2) == "table" then
 	assertTrue(Bali2.Config.Load("studio_mem"), "Studio Config.Load in-memory fallback works")
 	assertEq(win2.Flags["S_Sld"]:Get(), 5, "Studio Config restored S_Sld=5")
 
+	-- V4 Features: AddBanner, Mobile Compact Mode, AutoSave (Named + Unnamed)
+	local v4Tab = win2:AddTab({ Title = "VerifyV4", Icon = "sparkles" })
+	local v4Sec = v4Tab:AddSection({ Title = "V4 Controls", Side = "Left" })
+	local banner = v4Sec:AddBanner({
+		Title = "Bali Obsidian Architecture",
+		Caption = "4K Glassmorphic Backdrop & Vector Icon Atlas",
+		Badge = "v4.0 HD",
+		Icon = "sparkles",
+		Overlay = true,
+		Image = Bali2.Assets.Get("Banner") or "rbxassetid://0",
+		Height = 148,
+	})
+	assertTrue(banner ~= nil, "AddBanner returns element handle")
+	local unnamedTog = v4Sec:AddToggle({ Title = "Unnamed AutoSave Toggle", Default = false })
+	local kbTog = v4Sec:AddToggle({ Title = "Keybind AutoSave", Default = false, Keybind = Enum.KeyCode.F })
+	local v4Grid = v4Sec:AddCardGrid({
+		Cards = {
+			{ Id = "g_a", Title = "Alpha" },
+			{ Id = "g_b", Title = "Beta" },
+		},
+		Default = "g_a",
+	})
+	local lateSeedTog = v4Sec:AddToggle({ Title = "Late Seed", Flag = "LateRestoreFlag", Default = false })
+
+	assertTrue(Bali2.Theme.Resolve("Elevated") ~= nil, "Theme.Resolve('Elevated') returns Color3")
+
+	local origMobile = win2:IsMobileMode()
+	win2:SetMobileMode(true)
+	assertTrue(win2:IsMobileMode(), "SetMobileMode(true) enables mobile mode")
+	win2:SetMobileMode(false)
+	assertTrue(not win2:IsMobileMode(), "SetMobileMode(false) disables mobile mode")
+	win2:SetMobileMode(origMobile)
+
+	Bali2:SetAutoSave(true)
+	assertTrue(Bali2:GetAutoSave(), "GetAutoSave() reflects SetAutoSave(true)")
+	unnamedTog:Set(true)
+	kbTog:Set(true)
+	kbTog:SetKeybind(Enum.KeyCode.G)
+	v4Grid:Set("g_b")
+	lateSeedTog:Set(true)
+	win2.Flags["S_Sld"]:Set(7)
+
+	assertTrue(Bali2.Config.Save("studio_kb_test"), "Config.Save('studio_kb_test') saves named + unnamed ToggleState")
+	local exportedAll = Bali2.Config.Export(true)
+	assertTrue(type(exportedAll) == "string" and #exportedAll > 20, "Config.Export(true) returns JSON string")
+
+	local savedOk = Bali2.Config.SaveAutoSaveNow()
+	assertTrue(savedOk, "Config.SaveAutoSaveNow() succeeds")
+	unnamedTog:Set(false)
+	kbTog:Set(false)
+	kbTog:SetKeybind(Enum.KeyCode.H)
+	v4Grid:Set("g_a")
+	win2.Flags["S_Sld"]:Set(3)
+
+	assertTrue(Bali2.Config.Load("studio_kb_test"), "Config.Load('studio_kb_test') succeeds")
+	assertEq(kbTog:Get(), true, "Config.Load restored inline-keybind Toggle value")
+	assertEq(kbTog:GetKeybind(), Enum.KeyCode.G, "Config.Load restored inline-keybind EnumKey")
+	assertEq(v4Grid:Get(), "g_b", "Config.Load restored CardGrid active id")
+
+	kbTog:Set(false)
+	kbTog:SetKeybind(Enum.KeyCode.J)
+	v4Grid:Set("g_a")
+	assertTrue(Bali2.Config.Import(exportedAll), "Config.Import(exportedAll) restores ToggleState + CardGrid")
+	assertEq(kbTog:Get(), true, "Config.Import restored inline-keybind Toggle value")
+	assertEq(kbTog:GetKeybind(), Enum.KeyCode.G, "Config.Import restored inline-keybind EnumKey")
+	assertEq(v4Grid:Get(), "g_b", "Config.Import restored CardGrid active id")
+
+	unnamedTog:Set(false)
+	kbTog:Set(false)
+	kbTog:SetKeybind(Enum.KeyCode.K)
+	v4Grid:Set("g_a")
+	win2.Flags["S_Sld"]:Set(3)
+	assertTrue(Bali2.Config.LoadAutoSave(), "Config.LoadAutoSave() restores workspace")
+	assertTrue(Bali2.Config.HasLoadedAutoSave(), "Config.HasLoadedAutoSave() is true after LoadAutoSave()")
+	assertEq(unnamedTog:Get(), true, "AutoSave restored unnamed toggle")
+	assertEq(kbTog:Get(), true, "AutoSave restored inline-keybind Toggle value")
+	assertEq(kbTog:GetKeybind(), Enum.KeyCode.G, "AutoSave restored inline-keybind EnumKey")
+	assertEq(v4Grid:Get(), "g_b", "AutoSave restored CardGrid active id")
+	assertEq(win2.Flags["S_Sld"]:Get(), 7, "AutoSave restored named flag S_Sld=7")
+
+	local lateTog = v4Sec:AddToggle({ Title = "Late Flag Toggle", Flag = "LateRestoreFlag", Default = false })
+	assertEq(lateTog:Get(), true, "Container restored late-registered element via TryApplyCachedAutoSave")
+
+	-- Polish & Regression Fix Verifications (Step 8)
+	local origNotifDur = Bali2:GetNotificationDuration()
+	Bali2:SetNotificationDuration(8)
+	assertEq(Bali2:GetNotificationDuration(), 8, "SetNotificationDuration updates default duration")
+	Bali2:SetNotificationDuration(0.1)
+	assertEq(Bali2:GetNotificationDuration(), 1, "SetNotificationDuration clamps lower bound to 1")
+	Bali2:SetNotificationDuration(99)
+	assertEq(Bali2:GetNotificationDuration(), 30, "SetNotificationDuration clamps upper bound to 30")
+	Bali2:SetNotificationDuration(origNotifDur)
+
+	local synCode = v4Sec:AddCodeBlock({
+		Title = "Luau Quickstart",
+		Language = "luau",
+		Code = "local ok = true\nprint(win:GetWidth())",
+	})
+	local codeListInst = synCode.Frame:FindFirstChild("CodeList", true)
+	assertTrue(codeListInst ~= nil, "CodeBlock renders CodeList container")
+	local line1Row = codeListInst and codeListInst:FindFirstChild("Line_1")
+	local line2Row = codeListInst and codeListInst:FindFirstChild("Line_2")
+	assertTrue(line1Row ~= nil and line2Row ~= nil, "CodeBlock renders per-line Line_1 / Line_2 rows")
+	local l1Code = line1Row and line1Row:FindFirstChild("Code")
+	local l1Num = line1Row and line1Row:FindFirstChild("Num")
+	assertTrue(l1Code ~= nil and l1Code.RichText == true and l1Code.TextSize == 12, "CodeBlock Line_1 uses RichText and crisp TextSize=12")
+	assertTrue(l1Num ~= nil and l1Num.TextSize == 12 and l1Num.Text == "1", "CodeBlock Line_1 Num uses TextSize=12")
+	assertTrue(string.find(l1Code.Text, '<font color="#C084FC">local</font>', 1, true) ~= nil, "CodeBlock highlights Luau keyword local")
+	assertTrue(string.find(l1Code.Text, '<font color="#F472B6">true</font>', 1, true) ~= nil, "CodeBlock highlights boolean true")
+	local l2Code = line2Row and line2Row:FindFirstChild("Code")
+	assertTrue(string.find(l2Code.Text, '<font color="#7DD3FC">print</font>', 1, true) ~= nil, "CodeBlock highlights builtin print")
+	assertTrue(string.find(l2Code.Text, '<font color="#93C5FD">GetWidth</font>', 1, true) ~= nil, "CodeBlock highlights member GetWidth")
+
+	local bannerEl = v4Sec:AddBanner({
+		Title = "Banner Corner",
+		Caption = "Clipped inside CanvasGroup",
+		Overlay = true,
+		Image = "sparkles",
+	})
+	local picClip = bannerEl.Frame:FindFirstChild("PictureClip", true)
+	assertTrue(picClip ~= nil and picClip:IsA("CanvasGroup"), "Banner wraps Picture inside CanvasGroup PictureClip")
+	assertTrue(bannerEl.Frame:FindFirstChild("BorderOverlay", true) == nil, "Banner removes duplicate BorderOverlay")
+
+	local snapCard = v4Sec:AddProfileCard({
+		Title = "Dev",
+		Subtitle = "Snapshot test",
+		Button = { Title = "Sync Snapshot" },
+	})
+	local snapBtn = snapCard.Frame:FindFirstChild("ActionButton", true)
+	assertTrue(snapBtn ~= nil, "ProfileCard creates ActionButton")
+	Bali2.Transition.Ripple(snapBtn, nil, "Accent")
+	assertTrue(snapBtn:FindFirstChild("_BaliRippleWash") == nil, "Ripple does not inject _BaliRippleWash inside layout button")
+
+	local ddGate = v4Sec:AddDropdown({ Title = "Gate Drop", Values = { "Alpha", "Beta" }, Default = "Alpha" })
+	local blockedSlider = v4Sec:AddSlider({ Title = "Blocked Slider", Min = 0, Max = 100, Default = 50 })
+	assertEq(Bali2.Transition.IsOverlayBlocking(blockedSlider.Frame), false, "Slider unblocked when no overlay open")
+	ddGate:Open()
+	stepClock(0.05, true)
+	assertEq(Bali2.Transition.IsOverlayBlocking(blockedSlider.Frame), true, "Slider blocked when Dropdown popup is open")
+	local openPopup = nil
+	for _, ch in ipairs(win2.PopupLayer:GetChildren()) do
+		if ch.Name ~= "PopupBackdrop" and ch.Name ~= "BaliCommandPaletteBackdrop" and ch.Visible then
+			openPopup = ch
+		end
+	end
+	assertTrue(openPopup ~= nil and openPopup.Active == true, "Dropdown popup has Active=true")
+	assertTrue(openPopup ~= nil and openPopup:FindFirstChild("InputSink") ~= nil, "Dropdown popup has InputSink")
+	local opt1 = openPopup and openPopup:FindFirstChild("Opt_1", true)
+	assertTrue(opt1 ~= nil and opt1.Size.Y.Offset == 28, "Single-line Dropdown option row uses compact 28px height")
+	assertEq(Bali2.Transition.IsOverlayBlocking(opt1), false, "Dropdown option inside PopupLayer is not blocked by itself")
+	ddGate:Close()
+	stepClock(0.3, true)
+	assertEq(Bali2.Transition.IsOverlayBlocking(blockedSlider.Frame), false, "Slider unblocked after Dropdown closes")
+
+	win2.MainWrapper.Position = MockUDim2.fromOffset(100, 80)
+	stepClock(0.02, true)
+	Bali2.CommandPalette.Open()
+	stepClock(0.05, true)
+	local cpBackdrop = win2.PopupLayer:FindFirstChild("BaliCommandPaletteBackdrop")
+	local cpModal = cpBackdrop and cpBackdrop:FindFirstChild("Modal")
+	assertTrue(cpModal ~= nil and cpModal:FindFirstChild("InputSink") ~= nil, "CommandPalette Modal has InputSink")
+	local expectedCpX = math.floor(100 + win2.MainWrapper.AbsoluteSize.X * 0.5)
+	assertTrue(math.abs(cpModal.Position.X.Offset - expectedCpX) <= 2, "CommandPalette centers horizontally over MainWrapper")
+	Bali2.CommandPalette.Close()
+	stepClock(0.3, true)
+
+	v4Tab:Select()
+	local v4Scroll = v4Tab.Page:FindFirstChildOfClass("ScrollingFrame") or v4Sec.Frame.Parent
+	Bali2.Transition.Cascade(v4Scroll, 0.05, 8)
+	Bali2.Transition.RestoreCascade(v4Scroll)
+	local lateTitleLbl = nil
+	for _, d in ipairs(lateTog.Frame:GetDescendants()) do
+		if d:IsA("TextLabel") and d.Text == "Late Flag Toggle" then
+			lateTitleLbl = d
+			break
+		end
+	end
+	assertTrue(lateTitleLbl ~= nil and lateTitleLbl.TextTransparency < 0.5, "RestoreCascade immediately restores dimmed text transparency")
+
+	local chartHeaderEl = v4Sec:AddChart({ Title = "Hover Test", Values = { 10, 20, 30 }, Labels = { "1h", "2h", "3h" } })
+	local chartRight = chartHeaderEl.Frame:FindFirstChild("PlotArea", true)
+	assertTrue(chartRight ~= nil, "Chart PlotArea created")
+	local tagVisible = false
+	for _, d in ipairs(chartHeaderEl.Frame:GetDescendants()) do
+		if d:IsA("TextLabel") and d.Text == "3h" and d.Visible then
+			tagVisible = true
+		end
+	end
+	assertTrue(tagVisible, "Chart hoverTagLabel remains visible with steady height at idle")
+
 	-- Re-execution test in Studio mode
 	local sg2 = Bali2._screenGui
 	win2:Destroy()
 	stepClock(0.1, true)
 	assertTrue(sg2._destroyed or sg2.Parent == nil, "Studio ScreenGui destroyed cleanly on win2:Destroy()")
+
+	-- CreateWindow with integrated KeySystem gate (non-blocking test)
+	local winKey = Bali2:CreateWindow({
+		Title = "KeyTest",
+		KeySystem = {
+			Title = "Bali Key Gate",
+			Subtitle = "Verification",
+			Keys = { "ValidKey" },
+			SaveKey = false,
+			Yield = false,
+		},
+	})
+	assertTrue(winKey ~= nil, "CreateWindow with KeySystem(Yield=false) returns window/gate handle")
+	if winKey and winKey.Destroy then
+		winKey:Destroy()
+		stepClock(0.1, true)
+	end
 end
 
 -- ══════════════════════════════════════════════════════════════════════════════

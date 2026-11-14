@@ -53,7 +53,7 @@ function Accordion.new(parent, opts, ctx)
 		self.Frame.AutomaticSize = Enum.AutomaticSize.Y
 	end
 
-	cardFrame.ClipsDescendants = true
+	cardFrame.ClipsDescendants = false
 	Create.List(cardFrame, { Gap = 0 })
 
 	local initialExpanded = false
@@ -167,7 +167,7 @@ function Accordion.new(parent, opts, ctx)
 		Name = "BodyClip",
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = expanded and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
-		ClipsDescendants = true,
+		ClipsDescendants = not expanded,
 		BackgroundTransparency = 1,
 		Visible = expanded,
 		LayoutOrder = 3,
@@ -179,7 +179,7 @@ function Accordion.new(parent, opts, ctx)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		Padding = { 8, 10, 10, 10 },
+		Padding = { 8, 12, 10, 12 },
 		Parent = bodyClip,
 	})
 	local innerLayout = Create.List(bodyInner, { Gap = 8 })
@@ -221,6 +221,7 @@ function Accordion.new(parent, opts, ctx)
 
 		if targetExpanded then
 			divider.Visible = true
+			bodyClip.ClipsDescendants = true
 			bodyClip.Visible = true
 			bodyClip.AutomaticSize = Enum.AutomaticSize.None
 			bodyClip.Size = UDim2.new(1, 0, 0, 0)
@@ -235,6 +236,7 @@ function Accordion.new(parent, opts, ctx)
 					if animGen == myGen and expanded then
 						bodyClip.AutomaticSize = Enum.AutomaticSize.Y
 						bodyClip.Size = UDim2.new(1, 0, 0, 0)
+						bodyClip.ClipsDescendants = false
 					end
 				end)
 			end
@@ -245,6 +247,7 @@ function Accordion.new(parent, opts, ctx)
 				task.defer(runExpandTween)
 			end
 		else
+			bodyClip.ClipsDescendants = true
 			local startH = bodyClip.AbsoluteSize.Y
 			if startH <= 0 then
 				startH = innerLayout.AbsoluteContentSize.Y + 18

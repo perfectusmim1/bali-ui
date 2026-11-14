@@ -48,4 +48,4 @@ Roblox Studio sandboxes `writefile` / `readfile`. When filesystem APIs are absen
 
 ### 3. Icons Appear as Unicode Glyphs Instead of Vector Sprites
 
-When an environment blocks `getcustomasset` / `getsynasset` or binary file writes, `Core/Icons` automatically renders crisp vector glyph fallbacks rather than invisible boxes. Ensure `getcustomasset` is enabled if you want the full 164-icon `832x572` Lucide PNG sheet hydrated.
+When an environment blocks `getcustomasset` / `getsynasset` or binary file writes, `Core/Icons` automatically renders crisp vector glyph fallbacks rather than invisible boxes. Ensure `getcustomasset` is enabled if you want the full 164-icon `1024x704` Lucide PNG sheet and custom obsidian banner artwork hydrated.

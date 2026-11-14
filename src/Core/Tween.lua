@@ -49,7 +49,7 @@ end
 
 -- Crisp Apple-style fluid deceleration used for knobs, popovers, pills and panels (no overshoot)
 function Tween.Spring(instance, properties, duration)
-	return Tween.Play(instance, properties, duration or Tween.Normal, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+	return Tween.Play(instance, properties, duration or Tween.Normal, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 end
 
 function Tween.Linear(instance, properties, duration)

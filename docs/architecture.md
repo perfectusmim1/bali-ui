@@ -11,7 +11,7 @@ src/
 ├── Bali.lua                 # Library entrypoint, ScreenGui manager, global lifecycle hooks
 ├── Example.lua              # Interactive showcase workspace
 ├── Generated/
-│   └── AssetData.lua        # Embedded 832x572 Lucide sprite atlas & radial/noise textures
+│   └── AssetData.lua        # Embedded 1024x704 Lucide sprite atlas & UI banner/noise textures
 ├── Core/
 │   ├── Assets.lua           # Runtime PNG/Lua asset decoder and sprite lookup
 │   ├── Create.lua           # Declarative Instance factory (Corner, Padding, GlassStroke, List)
@@ -21,7 +21,7 @@ src/
 │   ├── Signal.lua           # Lightweight typed event signal
 │   ├── Theme.lua            # Live theme engine, preset palettes, accent gradients & typography
 │   ├── Transition.lua       # Position/transparency mount glides, press ripples & hover transitions
-│   ├── Tween.lua            # Centralized exponential/quint curves, speed multiplier & reduce motion
+│   ├── Tween.lua            # Centralized Quint easing curves, speed multiplier & reduce motion
 │   └── Util.lua             # Math, color, SafeCall/ErrorHandler, FS wrappers, device helpers
 ├── Systems/
 │   ├── Blur.lua             # Lighting BlurEffect controller synced to window visibility
@@ -77,15 +77,15 @@ Inside the root `ScreenGui`, Bali isolates depth into dedicated container frames
 
 ### Deceleration Tweens Without Layout Jitter
 
-`Core/Tween` and `Core/Transition` use exponential `Out` deceleration (`Tween.Fast = 0.14s`, `Tween.Normal = 0.22s`, `Tween.Smooth = 0.32s`) rather than elastic overshoot or `UIScale` scaling on interactive cards:
+`Core/Tween` and `Core/Transition` standardize on unified `Quint Out` deceleration (`Tween.Fast = 0.14s`, `Tween.Normal = 0.22s`, `Tween.Smooth = 0.32s`) rather than elastic overshoot or permanent `UIScale` transforms on resting cards:
 
-- **Zero scale stretching**: Hover, mount, tab switch, and button press states animate surfaces, strokes, ripples, and subtle position offsets cleanly — preventing `UIScale` distortion or `UIListLayout` neighbor jitter when controls expand or activate.
-- **Crisp text rasterization**: Default typography uses `BuilderSans` (`Theme.FontFamily = "Builder"`) at clean integer pixel sizes and `1x` surface transforms so labels stay sharp across desktop and high-DPI displays.
+- **Zero scale stretching at rest**: Hover, mount, tab switch, sub-tab cross-slide, minimize/restore morphs, and button press states keep text crisp at native `1x` resolution — automatically cleaning up temporary transition scales and never injecting `Scale(1,1)` washes inside `UIListLayout` or `AutomaticSize` controls.
+- **Modal pointer isolation**: Open popovers (`Dropdown`, `ColorPicker`, `NotificationPopover`), `CommandPalette`, and `Dialog` overlays install active input sinks and `Transition.IsOverlayBlocking` guards so underlying sliders and buttons ignore stray pointer events while overlays are open.
 - **Global speed & accessibility**: Set `Bali.Tween.Speed` or toggle `Bali.Tween.Reduced = true` (also exposed in Settings) to adjust motion speed or skip non-essential transitions.
 
 ### Lucide Icon Atlas (`Core/Icons`)
 
-`Generated/AssetData` embeds **164 vector-crisp Lucide icons** packed into an `832x572` sprite sheet hydrated at startup via `getcustomasset` / `getsynasset` when supported. Every icon slot gracefully degrades to clean monochrome glyphs or supports raw `rbxassetid://` and numeric Roblox asset IDs:
+`Generated/AssetData` embeds **164 vector-crisp Lucide icons** packed into a `1024x704` sprite sheet alongside custom procedural obsidian-glass banner artwork (`v5`), hydrated at startup via `getcustomasset` / `getsynasset` when supported. Every icon slot gracefully degrades to clean monochrome glyphs or supports raw `rbxassetid://` and numeric Roblox asset IDs:
 
 ```lua
 section:AddButton({
