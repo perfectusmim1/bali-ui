@@ -875,6 +875,21 @@ selectionSection:AddDropdown({
 	Flag = "Pickers_Clusters",
 })
 
+selectionSection:AddDropdown({
+	Title = "Execution Profile",
+	Description = "Inline mode expands inside the card and pushes lower controls down.",
+	Icon = "layers",
+	Mode = "Inline",
+	Values = {
+		{ Title = "Standard Worker", Value = "Standard Worker", Icon = "cpu", Badge = "Default" },
+		{ Title = "Turbo Async", Value = "Turbo Async", Icon = "zap", Color = Color3.fromRGB(56, 189, 248), Badge = "Fast" },
+		{ Title = "Memory Guard", Value = "Memory Guard", Icon = "shield", Color = Color3.fromRGB(52, 211, 153), RightText = "Safe" },
+		{ Title = "Headless Batch", Value = "Headless Batch", Icon = "terminal", RightText = "Quiet" },
+	},
+	Default = "Standard Worker",
+	Flag = "Pickers_InlineProfile",
+})
+
 selectionSection:AddSegmented({
 	Title = "Sampling Window",
 	Description = "Spring-animated segmented pill control.",
@@ -1053,13 +1068,22 @@ local win = Bali:CreateWindow({
 	Title = "Bali Suite",
 	Theme = "Midnight",
 	Blur = true,
+	ToggleKey = Enum.KeyCode.RightShift,
 })
 
 local tab = win:AddTab({ Title = "Overview", Icon = "dashboard" })
-local sec = tab:AddSection({ Title = "Controls" })
-sec:AddToggle({ Title = "Enabled", Default = true })]],
+local sec = tab:AddSection({ Title = "Controls", Side = "Left" })
+
+sec:AddToggle({ Title = "Enabled", Default = true })
+sec:AddDropdown({
+	Title = "Mode",
+	Mode = "Inline",
+	Values = { "Balanced", "Fast", "Safe" },
+	Default = "Balanced",
+})
+win:Notify({ Title = "Ready", Content = "Bali initialized.", Type = "Success" })]],
 	LineNumbers = true,
-	MaxHeight = 220,
+	MaxHeight = 180,
 })
 
 mediaSection:AddBanner({

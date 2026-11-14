@@ -257,6 +257,32 @@ function Paragraph.new(parent, opts, ctx)
 		Parent = header,
 	})
 
+	local maxContentH = tonumber(opts.Height or opts.MaxHeight)
+	local contentScroll = nil
+	local contentParent = body
+	if maxContentH and maxContentH > 0 then
+		contentScroll = Create.New("ScrollingFrame", {
+			Name = "ParagraphScroll",
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.None,
+			AutomaticCanvasSize = Enum.AutomaticSize.None,
+			CanvasSize = UDim2.new(0, 0, 0, 0),
+			ScrollBarThickness = 4,
+			ScrollBarImageTransparency = 0.25,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			Active = true,
+			ScrollingEnabled = true,
+			ClipsDescendants = true,
+			BackgroundTransparency = 1,
+			Theme = { ScrollBarImageColor3 = "Muted" },
+			LayoutOrder = 2,
+			Visible = contentText ~= "",
+			Parent = body,
+		})
+		Create.Padding(contentScroll, { 0, 10, 0, 0 })
+		contentParent = contentScroll
+	end
+
 	local contentLabel = Create.Text({
 		Name = "Content",
 		Text = contentText,
@@ -268,8 +294,38 @@ function Paragraph.new(parent, opts, ctx)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 2,
 		Visible = contentText ~= "",
-		Parent = body,
+		Parent = contentParent,
 	})
+
+	local function updateParagraphScrollBounds()
+		if not contentScroll then
+			return
+		end
+		local hasContent = contentLabel.Text ~= ""
+		contentScroll.Visible = hasContent
+		if not hasContent then
+			contentScroll.Size = UDim2.new(1, 0, 0, 0)
+			contentScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+			return
+		end
+		local textH = math.ceil(contentLabel.AbsoluteSize.Y)
+		if textH <= 0 then
+			local approxLines = 1
+			for _ in string.gmatch(contentLabel.Text, "\n") do
+				approxLines += 1
+			end
+			textH = math.max(16, approxLines * 16)
+		end
+		local fixedH = tonumber(opts.Height)
+		local visibleH = fixedH or math.min(textH, maxContentH)
+		contentScroll.Size = UDim2.new(1, 0, 0, visibleH)
+		contentScroll.CanvasSize = UDim2.fromOffset(0, textH)
+	end
+
+	if contentScroll then
+		element.Maid:Give(contentLabel:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateParagraphScrollBounds))
+		updateParagraphScrollBounds()
+	end
 
 	local tagsRow = Create.New("Frame", {
 		Name = "Tags",
@@ -328,6 +384,9 @@ function Paragraph.new(parent, opts, ctx)
 		local txt = tostring(s or "")
 		contentLabel.Text = txt
 		contentLabel.Visible = (txt ~= "")
+		if contentScroll then
+			updateParagraphScrollBounds()
+		end
 	end
 
 	element:BindUI(card)
@@ -846,34 +905,58 @@ function CodeBlock.new(parent, opts, ctx)
 	local scroll = Create.New("ScrollingFrame", {
 		Name = "CodeScroll",
 		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		AutomaticCanvasSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.XY,
+		AutomaticSize = Enum.AutomaticSize.None,
+		AutomaticCanvasSize = Enum.AutomaticSize.None,
 		CanvasSize = UDim2.new(0, 0, 0, 0),
-		ScrollBarThickness = 3,
+		ScrollBarThickness = 4,
+		ScrollBarImageTransparency = 0.25,
 		ScrollingDirection = wrap and Enum.ScrollingDirection.Y or Enum.ScrollingDirection.XY,
+		Active = true,
+		ScrollingEnabled = true,
+		ClipsDescendants = true,
 		BackgroundTransparency = 1,
 		Theme = { ScrollBarImageColor3 = "Muted" },
 		LayoutOrder = 3,
 		Parent = body,
 	})
 
-	local maxConstraint = Instance.new("UISizeConstraint")
-	maxConstraint.MaxSize = Vector2.new(99999, opts.MaxHeight or 180)
-	maxConstraint.Parent = scroll
+	local padTop = 8
+	local padBottom = wrap and 10 or 14
+	local padLeft = 10
+	local padRight = 14
 
 	local codeList = Create.New("Frame", {
 		Name = "CodeList",
 		Size = wrap and UDim2.new(1, 0, 0, 0) or UDim2.fromOffset(0, 0),
 		AutomaticSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
-		Padding = wrap and { 8, 10, 10, 10 } or { 8, 10, 14, 10 },
+		Padding = { padTop, padRight, padBottom, padLeft },
 		Parent = scroll,
 	})
 
-	Create.List(codeList, {
+	local codeLayout = Create.List(codeList, {
 		Direction = Enum.FillDirection.Vertical,
 		Gap = 2,
 	})
+
+	local lastLineCount = 1
+	local function updateCodeScrollBounds(lineCount)
+		lastLineCount = math.max(1, tonumber(lineCount) or lastLineCount or 1)
+		local layoutSize = codeLayout.AbsoluteContentSize
+		local fallbackH = lastLineCount * 18 - 2
+		local innerH = (layoutSize.Y > 0) and layoutSize.Y or fallbackH
+		local contentH = math.max(innerH + padTop + padBottom, 34)
+		local fixedH = tonumber(opts.Height)
+		local maxH = fixedH or tonumber(opts.MaxHeight) or 180
+		local visibleH = fixedH or math.min(contentH, maxH)
+		local contentW = (not wrap and layoutSize.X > 0) and (layoutSize.X + padLeft + padRight) or 0
+		scroll.Size = UDim2.new(1, 0, 0, visibleH)
+		scroll.CanvasSize = UDim2.fromOffset(contentW, contentH)
+	end
+
+	element.Maid:Give(codeLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		updateCodeScrollBounds(lastLineCount)
+	end))
 
 	local showLines = (opts.LineNumbers ~= false)
 	local codeLang = detectCodeLanguage(opts, currentCode)
@@ -958,6 +1041,8 @@ function CodeBlock.new(parent, opts, ctx)
 				Parent = rowFrame,
 			})
 		end
+
+		updateCodeScrollBounds(#lines)
 	end
 
 	refreshCode(currentCode)

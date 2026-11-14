@@ -1759,7 +1759,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 		mainTween = Tween.Play(frame, { Position = targetPos }, dur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 
-	local bgDur = math.max(dur * 0.85, 0.16)
+	local bgDur = math.min(dur, math.max(dur * 0.85, 0.06))
 	for _, entry in ipairs(entries) do
 		local inst = entry.Inst
 		if inst and inst.Parent then
@@ -1771,7 +1771,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
-			if not mainTween then
+			if entry.IsContent or not mainTween then
 				mainTween = t
 			end
 		end
@@ -1846,6 +1846,9 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 				for _, entry in ipairs(entries) do
 					if entry.Inst and entry.Inst.Parent then
 						entry.Inst[entry.Prop] = entry.Target
+						if not Tween.Reduced then
+							Tween.Play(entry.Inst, { [entry.Prop] = entry.Target }, Tween.Instant)
+						end
 					end
 				end
 				activeFadeEntries[frame] = nil
@@ -1870,7 +1873,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 		}, dur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 
-	local contentDur = math.max(dur * 0.82, 0.14)
+	local contentDur = math.min(dur, math.max(dur * 0.82, 0.06))
 	for _, entry in ipairs(entries) do
 		local inst = entry.Inst
 		if inst and inst.Parent then
@@ -7186,6 +7189,7 @@ function Tooltip.Show(text, anchorGui, side)
 	currentHeight = height
 	card.Size = UDim2.fromOffset(width, 0)
 	label.Text = str
+	label:SetAttribute("_BaliRestTxt", 0)
 
 	local wasVisible = visible
 	visible = true
@@ -7197,6 +7201,9 @@ function Tooltip.Show(text, anchorGui, side)
 
 	updatePosition(activeAnchor, activeSide)
 	if not wasVisible then
+		if not card:GetAttribute("_BaliFading") then
+			label.TextTransparency = 0
+		end
 		if shadow then
 			shadow.Visible = true
 			shadow.ImageTransparency = 1
@@ -7205,6 +7212,10 @@ function Tooltip.Show(text, anchorGui, side)
 		Transition.Mount(card, 0.96, { NoPositionTween = true, Duration = 0.14 })
 	else
 		card.Visible = true
+		label.TextTransparency = 0
+		if not Tween.Reduced then
+			Tween.Play(label, { TextTransparency = 0 }, Tween.Fast)
+		end
 		syncShadow()
 	end
 end
@@ -12938,6 +12949,21 @@ local function isDisabledOrLocked(self)
 	return self.Disabled == true or self.Locked == true or self._disabled == true or self._locked == true
 end
 
+local function resolveDropdownMode(opts)
+	if opts.Inline == true then
+		return "Inline"
+	elseif opts.Inline == false then
+		return "Popup"
+	end
+	if type(opts.Mode) == "string" then
+		local lower = string.lower(opts.Mode)
+		if lower == "inline" or lower == "expand" or lower == "push" then
+			return "Inline"
+		end
+	end
+	return "Popup"
+end
+
 function Dropdown.new(parent, opts, ctx)
 	opts = Util.Options(opts, {
 		Title = "Dropdown",
@@ -12948,6 +12974,8 @@ function Dropdown.new(parent, opts, ctx)
 		Searchable = true,
 		AllowNull = false,
 		MaxVisible = 7,
+		Mode = nil,
+		Inline = nil,
 		Callback = nil,
 		Flag = nil,
 		Tooltip = nil,
@@ -12974,6 +13002,45 @@ function Dropdown.new(parent, opts, ctx)
 		self.Frame.AutomaticSize = Enum.AutomaticSize.Y
 	end
 
+	-- Host trigger row + optional InlineClip inside CardContent so LockOverlay stays full-bleed
+	local cardContent = Create.New("Frame", {
+		Name = "CardContent",
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		ZIndex = 2,
+		Parent = row.Frame,
+	})
+	Create.List(cardContent, {
+		Direction = Enum.FillDirection.Vertical,
+		Gap = 0,
+	})
+	row.Body.LayoutOrder = 1
+	row.Body.Parent = cardContent
+
+	local inlineClip = Create.New("Frame", {
+		Name = "InlineClip",
+		Size = UDim2.new(1, 0, 0, 0),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Visible = false,
+		LayoutOrder = 2,
+		ZIndex = 3,
+		Parent = cardContent,
+	})
+
+	local inlineDivider = Create.New("Frame", {
+		Name = "InlineDivider",
+		Size = UDim2.new(1, -24, 0, 1),
+		Position = UDim2.fromOffset(12, 0),
+		Theme = {
+			BackgroundColor3 = "Divider",
+			BackgroundTransparency = "DividerTransparency",
+		},
+		ZIndex = 4,
+		Parent = inlineClip,
+	})
+
 	if self.BindUI then
 		self:BindUI(row)
 	end
@@ -12994,6 +13061,8 @@ function Dropdown.new(parent, opts, ctx)
 	local allowNull = opts.AllowNull == true
 	local searchable = opts.Searchable ~= false
 	local maxVisible = math.max(1, tonumber(opts.MaxVisible) or 7)
+	local mode = resolveDropdownMode(opts)
+	self.Mode = mode
 
 	local selectedSingle = nil
 	local selectedMap = {} -- [item] = true (keyed by item reference for exact identity)
@@ -13002,6 +13071,23 @@ function Dropdown.new(parent, opts, ctx)
 	local popupId = "Dropdown_" .. Util.RandomString(8)
 	local optionRows = {} -- { { Item, Button, CheckIcon, TitleLabel, DescLabel } }
 	local openGen = 0
+	local inlineTween = nil
+	local dividerTween = nil
+
+	local function cancelInlineTween()
+		if inlineTween then
+			pcall(function()
+				inlineTween:Cancel()
+			end)
+			inlineTween = nil
+		end
+		if dividerTween then
+			pcall(function()
+				dividerTween:Cancel()
+			end)
+			dividerTween = nil
+		end
+	end
 
 	-- Right-side trigger pill
 	local trigger = Create.New("TextButton", {
@@ -13255,7 +13341,8 @@ function Dropdown.new(parent, opts, ctx)
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		CanvasSize = UDim2.new(0, 0, 0, 0),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		AutomaticCanvasSize = Enum.AutomaticSize.None,
+		Active = true,
 		ScrollBarThickness = 3,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		LayoutOrder = 2,
@@ -13437,7 +13524,7 @@ function Dropdown.new(parent, opts, ctx)
 		end
 	end
 
-	local function resizePopup(preserveFlip)
+	local function resizePopup(preserveFlip, animateInline)
 		local searchH = searchable and 38 or 0
 		local visibleCount = 0
 		local hasDesc = false
@@ -13454,6 +13541,9 @@ function Dropdown.new(parent, opts, ctx)
 		local contentH = scrollLayout.AbsoluteContentSize.Y
 		local estPerRow = hasDesc and 44 or 28
 		local maxListH = maxVisible * estPerRow + math.max(0, maxVisible - 1) * 3 + padV
+		local estAllH = visibleCount * estPerRow + math.max(0, visibleCount - 1) * 3 + padV
+		local fullContentH = (contentH > 0) and (contentH + padV) or estAllH
+
 		local listH
 		if visibleCount == 0 then
 			listH = 36
@@ -13462,6 +13552,24 @@ function Dropdown.new(parent, opts, ctx)
 		else
 			local shown = math.min(visibleCount, maxVisible)
 			listH = shown * estPerRow + math.max(0, shown - 1) * 3 + padV
+		end
+
+		local needsScroll = (visibleCount > maxVisible) or (fullContentH > listH)
+		scroll.ScrollingEnabled = needsScroll
+		scroll.ScrollBarThickness = needsScroll and 3 or 0
+		scroll.CanvasSize = UDim2.fromOffset(0, needsScroll and fullContentH or 0)
+
+		if mode == "Inline" then
+			local inlineTotalH = 16 + searchH + listH
+			local inlineClipH = inlineTotalH + 1
+			scroll.Size = UDim2.new(1, 0, 0, listH)
+			popupInner.Position = UDim2.fromOffset(0, 1)
+			popupInner.Size = UDim2.new(1, 0, 0, inlineTotalH)
+			if isOpen and animateInline then
+				cancelInlineTween()
+				inlineTween = Tween.Play(inlineClip, { Size = UDim2.new(1, 0, 0, inlineClipH) }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			end
+			return inlineClipH
 		end
 
 		local layerH = (ctx.PopupLayer and ctx.PopupLayer.AbsoluteSize.Y > 0) and ctx.PopupLayer.AbsoluteSize.Y or 680
@@ -13474,10 +13582,13 @@ function Dropdown.new(parent, opts, ctx)
 		local anchorTop = trigger.AbsolutePosition.Y
 		local wasFlipped = preserveFlip == true and isOpen and popup.Parent ~= nil and prevBottom <= anchorTop + 4
 
-		local needsScroll = (visibleCount > maxVisible) or (contentH > 0 and contentH + padV > listH)
+		needsScroll = (visibleCount > maxVisible) or (fullContentH > listH)
 		scroll.ScrollingEnabled = needsScroll
 		scroll.ScrollBarThickness = needsScroll and 3 or 0
+		scroll.CanvasSize = UDim2.fromOffset(0, needsScroll and fullContentH or 0)
 		scroll.Size = UDim2.new(1, 0, 0, listH)
+		popupInner.Position = UDim2.fromOffset(0, 0)
+		popupInner.Size = UDim2.fromScale(1, 1)
 		popup.Size = UDim2.fromOffset(width, totalH)
 
 		-- Keep bottom anchored if popup flipped above trigger and search shrank height
@@ -13485,11 +13596,13 @@ function Dropdown.new(parent, opts, ctx)
 			local newY = anchorTop - totalH - 6
 			popup.Position = UDim2.fromOffset(popup.Position.X.Offset, math.max(8, newY))
 		end
+
+		return totalH
 	end
 
 	self.Maid:Give(scrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		if isOpen then
-			resizePopup(true)
+			resizePopup(true, mode == "Inline")
 		end
 	end))
 
@@ -13508,8 +13621,8 @@ function Dropdown.new(parent, opts, ctx)
 			clearSearchBtn.Visible = searchQuery ~= ""
 		end
 		task.defer(function()
-			if popup.Parent then
-				resizePopup(preserveFlip)
+			if isOpen and ((mode == "Inline" and inlineClip.Parent) or popup.Parent) then
+				resizePopup(preserveFlip, mode == "Inline")
 			end
 		end)
 	end
@@ -13852,6 +13965,24 @@ function Dropdown.new(parent, opts, ctx)
 			fallbackOutsideConn:Disconnect()
 			fallbackOutsideConn = nil
 		end
+		if mode == "Inline" then
+			cancelInlineTween()
+			local currentH = inlineClip.AbsoluteSize.Y
+			if currentH <= 0 then
+				currentH = inlineClip.Size.Y.Offset
+			end
+			if currentH > 0 then
+				inlineClip.Size = UDim2.new(1, 0, 0, currentH)
+			end
+			dividerTween = Tween.Play(inlineDivider, { BackgroundTransparency = 1 }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			inlineTween = Tween.Play(inlineClip, { Size = UDim2.new(1, 0, 0, 0) }, 0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			Tween.Then(inlineTween, function()
+				if openGen == myGen and not isOpen then
+					inlineClip.Visible = false
+				end
+			end)
+			return
+		end
 		Transition.Unmount(popup, 0.94, function()
 			if openGen == myGen and not isOpen then
 				popup.Visible = false
@@ -13875,12 +14006,33 @@ function Dropdown.new(parent, opts, ctx)
 			applyFilter()
 		end
 		updateOptionVisuals(false)
-		resizePopup()
-		popup.Visible = true
 
 		if chevron then
 			Tween.Play(chevron, { Rotation = chevronBaseRot + 180 }, Tween.Fast)
 		end
+
+		if mode == "Inline" then
+			cancelInlineTween()
+			popup.Visible = false
+			popupInner.Parent = inlineClip
+			local targetClipH = resizePopup(false, false)
+			local tNow = Theme.Current
+			Theme.Bind(inlineDivider, {
+				BackgroundColor3 = "Divider",
+				BackgroundTransparency = "DividerTransparency",
+			})
+			inlineDivider.BackgroundTransparency = tNow and tNow.DividerTransparency or 0.85
+			inlineClip.Size = UDim2.new(1, 0, 0, 0)
+			inlineClip.Visible = true
+			inlineTween = Tween.Play(inlineClip, { Size = UDim2.new(1, 0, 0, targetClipH) }, Tween.Normal, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			return
+		end
+
+		inlineClip.Visible = false
+		inlineClip.Size = UDim2.new(1, 0, 0, 0)
+		popupInner.Parent = popup
+		resizePopup()
+		popup.Visible = true
 
 		if ctx.OpenPopup then
 			if ctx.PopupLayer then
@@ -13912,10 +14064,52 @@ function Dropdown.new(parent, opts, ctx)
 		if not isOpen then
 			return
 		end
+		local wasPopup = (mode == "Popup")
 		handleClosedState()
-		if ctx.ClosePopup then
+		if wasPopup and ctx.ClosePopup then
 			ctx.ClosePopup(popupId)
 		end
+	end
+
+	function self:SetMode(newMode)
+		local resolved
+		if newMode == true then
+			resolved = "Inline"
+		elseif newMode == false then
+			resolved = "Popup"
+		elseif type(newMode) == "string" then
+			local lower = string.lower(newMode)
+			if lower == "inline" or lower == "expand" or lower == "push" then
+				resolved = "Inline"
+			else
+				resolved = "Popup"
+			end
+		else
+			resolved = "Popup"
+		end
+		if resolved == mode then
+			return
+		end
+		if isOpen then
+			self:Close()
+		end
+		cancelInlineTween()
+		mode = resolved
+		self.Mode = mode
+		if mode == "Inline" then
+			popup.Visible = false
+			inlineClip.Size = UDim2.new(1, 0, 0, 0)
+			inlineClip.Visible = false
+			popupInner.Parent = inlineClip
+		else
+			inlineClip.Visible = false
+			inlineClip.Size = UDim2.new(1, 0, 0, 0)
+			popupInner.Parent = popup
+		end
+	end
+
+	function self:GetMode()
+		return mode
 	end
 
 	function self:Set(val, silent)
@@ -14046,12 +14240,18 @@ function Dropdown.new(parent, opts, ctx)
 
 	self.Maid:Give(function()
 		self:Close()
+		cancelInlineTween()
 		if fallbackOutsideConn then
 			fallbackOutsideConn:Disconnect()
 			fallbackOutsideConn = nil
 		end
 		popup:Destroy()
 	end)
+
+	if mode == "Inline" then
+		popupInner.Parent = inlineClip
+		popupInner.Position = UDim2.fromOffset(0, 1)
+	end
 
 	rebuildOptions()
 	if opts.Default ~= nil then
@@ -17095,6 +17295,32 @@ function Paragraph.new(parent, opts, ctx)
 		Parent = header,
 	})
 
+	local maxContentH = tonumber(opts.Height or opts.MaxHeight)
+	local contentScroll = nil
+	local contentParent = body
+	if maxContentH and maxContentH > 0 then
+		contentScroll = Create.New("ScrollingFrame", {
+			Name = "ParagraphScroll",
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.None,
+			AutomaticCanvasSize = Enum.AutomaticSize.None,
+			CanvasSize = UDim2.new(0, 0, 0, 0),
+			ScrollBarThickness = 4,
+			ScrollBarImageTransparency = 0.25,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			Active = true,
+			ScrollingEnabled = true,
+			ClipsDescendants = true,
+			BackgroundTransparency = 1,
+			Theme = { ScrollBarImageColor3 = "Muted" },
+			LayoutOrder = 2,
+			Visible = contentText ~= "",
+			Parent = body,
+		})
+		Create.Padding(contentScroll, { 0, 10, 0, 0 })
+		contentParent = contentScroll
+	end
+
 	local contentLabel = Create.Text({
 		Name = "Content",
 		Text = contentText,
@@ -17106,8 +17332,38 @@ function Paragraph.new(parent, opts, ctx)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 2,
 		Visible = contentText ~= "",
-		Parent = body,
+		Parent = contentParent,
 	})
+
+	local function updateParagraphScrollBounds()
+		if not contentScroll then
+			return
+		end
+		local hasContent = contentLabel.Text ~= ""
+		contentScroll.Visible = hasContent
+		if not hasContent then
+			contentScroll.Size = UDim2.new(1, 0, 0, 0)
+			contentScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+			return
+		end
+		local textH = math.ceil(contentLabel.AbsoluteSize.Y)
+		if textH <= 0 then
+			local approxLines = 1
+			for _ in string.gmatch(contentLabel.Text, "\n") do
+				approxLines += 1
+			end
+			textH = math.max(16, approxLines * 16)
+		end
+		local fixedH = tonumber(opts.Height)
+		local visibleH = fixedH or math.min(textH, maxContentH)
+		contentScroll.Size = UDim2.new(1, 0, 0, visibleH)
+		contentScroll.CanvasSize = UDim2.fromOffset(0, textH)
+	end
+
+	if contentScroll then
+		element.Maid:Give(contentLabel:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateParagraphScrollBounds))
+		updateParagraphScrollBounds()
+	end
 
 	local tagsRow = Create.New("Frame", {
 		Name = "Tags",
@@ -17166,6 +17422,9 @@ function Paragraph.new(parent, opts, ctx)
 		local txt = tostring(s or "")
 		contentLabel.Text = txt
 		contentLabel.Visible = (txt ~= "")
+		if contentScroll then
+			updateParagraphScrollBounds()
+		end
 	end
 
 	element:BindUI(card)
@@ -17684,34 +17943,58 @@ function CodeBlock.new(parent, opts, ctx)
 	local scroll = Create.New("ScrollingFrame", {
 		Name = "CodeScroll",
 		Size = UDim2.new(1, 0, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		AutomaticCanvasSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.XY,
+		AutomaticSize = Enum.AutomaticSize.None,
+		AutomaticCanvasSize = Enum.AutomaticSize.None,
 		CanvasSize = UDim2.new(0, 0, 0, 0),
-		ScrollBarThickness = 3,
+		ScrollBarThickness = 4,
+		ScrollBarImageTransparency = 0.25,
 		ScrollingDirection = wrap and Enum.ScrollingDirection.Y or Enum.ScrollingDirection.XY,
+		Active = true,
+		ScrollingEnabled = true,
+		ClipsDescendants = true,
 		BackgroundTransparency = 1,
 		Theme = { ScrollBarImageColor3 = "Muted" },
 		LayoutOrder = 3,
 		Parent = body,
 	})
 
-	local maxConstraint = Instance.new("UISizeConstraint")
-	maxConstraint.MaxSize = Vector2.new(99999, opts.MaxHeight or 180)
-	maxConstraint.Parent = scroll
+	local padTop = 8
+	local padBottom = wrap and 10 or 14
+	local padLeft = 10
+	local padRight = 14
 
 	local codeList = Create.New("Frame", {
 		Name = "CodeList",
 		Size = wrap and UDim2.new(1, 0, 0, 0) or UDim2.fromOffset(0, 0),
 		AutomaticSize = wrap and Enum.AutomaticSize.Y or Enum.AutomaticSize.XY,
 		BackgroundTransparency = 1,
-		Padding = wrap and { 8, 10, 10, 10 } or { 8, 10, 14, 10 },
+		Padding = { padTop, padRight, padBottom, padLeft },
 		Parent = scroll,
 	})
 
-	Create.List(codeList, {
+	local codeLayout = Create.List(codeList, {
 		Direction = Enum.FillDirection.Vertical,
 		Gap = 2,
 	})
+
+	local lastLineCount = 1
+	local function updateCodeScrollBounds(lineCount)
+		lastLineCount = math.max(1, tonumber(lineCount) or lastLineCount or 1)
+		local layoutSize = codeLayout.AbsoluteContentSize
+		local fallbackH = lastLineCount * 18 - 2
+		local innerH = (layoutSize.Y > 0) and layoutSize.Y or fallbackH
+		local contentH = math.max(innerH + padTop + padBottom, 34)
+		local fixedH = tonumber(opts.Height)
+		local maxH = fixedH or tonumber(opts.MaxHeight) or 180
+		local visibleH = fixedH or math.min(contentH, maxH)
+		local contentW = (not wrap and layoutSize.X > 0) and (layoutSize.X + padLeft + padRight) or 0
+		scroll.Size = UDim2.new(1, 0, 0, visibleH)
+		scroll.CanvasSize = UDim2.fromOffset(contentW, contentH)
+	end
+
+	element.Maid:Give(codeLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		updateCodeScrollBounds(lastLineCount)
+	end))
 
 	local showLines = (opts.LineNumbers ~= false)
 	local codeLang = detectCodeLanguage(opts, currentCode)
@@ -17796,6 +18079,8 @@ function CodeBlock.new(parent, opts, ctx)
 				Parent = rowFrame,
 			})
 		end
+
+		updateCodeScrollBounds(#lines)
 	end
 
 	refreshCode(currentCode)

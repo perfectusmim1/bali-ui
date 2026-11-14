@@ -2998,24 +2998,86 @@ if okLib and type(Bali2) == "table" then
 	assertTrue(dashSecBgT < 0.5, "Dash Section card background restored cleanly (T=" .. tostring(dashSecBgT) .. ")")
 
 	-- Regression: Tooltip Side='Right' on collapsed sidebar & zero horizontal teleport on AbsoluteSize update
-	win2:ToggleSidebar(true)
-	stepClock(0.3, true)
-	Bali2.Tooltip.Show("Controls", regCtrlTab._button, "Right")
-	local ttCard = win2.PopupLayer:FindFirstChild("BaliTooltip")
-	assertTrue(ttCard ~= nil and ttCard.Visible, "BaliTooltip displayed for collapsed sidebar tab")
-	local expectedMinX = regCtrlTab._button.AbsolutePosition.X + regCtrlTab._button.AbsoluteSize.X
-	assertTrue(
-		ttCard.AbsolutePosition.X >= expectedMinX,
-		string.format("Collapsed sidebar tooltip placed to right of icon (ttX=%g >= btnRight=%g)", ttCard.AbsolutePosition.X, expectedMinX)
-	)
-	local posBefore = ttCard.Position
-	ttCard.Size = MockUDim2.fromOffset(ttCard.Size.X.Offset, 30)
-	ttCard:GetPropertyChangedSignal("AbsoluteSize"):Fire()
-	assertEq(ttCard.Position.X.Offset, posBefore.X.Offset, "Tooltip X position stays stable on AbsoluteSize update")
-	Bali2.Tooltip.Hide()
-	stepClock(0.2, true)
-	win2:ToggleSidebar(false)
-	stepClock(0.3, true)
+	do
+		win2:ToggleSidebar(true)
+		stepClock(0.3, true)
+		Bali2.Tooltip.Show("Controls", regCtrlTab._button, "Right")
+		local ttCard = win2.PopupLayer:FindFirstChild("BaliTooltip")
+		assertTrue(ttCard ~= nil and ttCard.Visible, "BaliTooltip displayed for collapsed sidebar tab")
+		local expectedMinX = regCtrlTab._button.AbsolutePosition.X + regCtrlTab._button.AbsoluteSize.X
+		assertTrue(
+			ttCard.AbsolutePosition.X >= expectedMinX,
+			string.format("Collapsed sidebar tooltip placed to right of icon (ttX=%g >= btnRight=%g)", ttCard.AbsolutePosition.X, expectedMinX)
+		)
+		local posBefore = ttCard.Position
+		ttCard.Size = MockUDim2.fromOffset(ttCard.Size.X.Offset, 30)
+		ttCard:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+		assertEq(ttCard.Position.X.Offset, posBefore.X.Offset, "Tooltip X position stays stable on AbsoluteSize update")
+		Bali2.Tooltip.Hide()
+		stepClock(0.2, true)
+		-- Regression: re-showing tooltip after Hide() (duration 0.12s < 0.14s floor) must keep TextTransparency == 0
+		Bali2.Tooltip.Show("Dashboard", regDashTab._button, "Right")
+		stepClock(0.2, true)
+		local ttLabel = ttCard and ttCard:FindFirstChild("Text")
+		assertTrue(ttLabel ~= nil and ttLabel.Text == "Dashboard", "Re-shown tooltip updates Text")
+		assertTrue(ttLabel ~= nil and ttLabel.TextTransparency < 0.05, "Re-shown tooltip text remains fully visible (T=" .. tostring(ttLabel and ttLabel.TextTransparency) .. ")")
+		Bali2.Tooltip.Hide()
+		stepClock(0.2, true)
+		win2:ToggleSidebar(false)
+		stepClock(0.3, true)
+	end
+
+	-- Regression: Dropdown Mode='Inline' vs 'Popup' + CodeBlock & Paragraph explicit scrolling
+	do
+		local inlineDd = v4Sec:AddDropdown({
+			Title = "Inline Mode Menu",
+			Mode = "Inline",
+			Values = { "Alpha", "Beta", "Gamma", "Delta" },
+			Default = "Alpha",
+		})
+		assertEq(inlineDd:GetMode(), "Inline", "Dropdown Mode='Inline' reports GetMode() == 'Inline'")
+		inlineDd:Open()
+		stepClock(0.3, true)
+		local inlineClip = inlineDd.Frame:FindFirstChild("InlineClip", true)
+		assertTrue(inlineClip ~= nil and inlineClip.Visible and inlineClip.Size.Y.Offset > 0, "Inline Dropdown expands InlineClip downward inside card")
+		assertEq(Bali2.Transition.IsOverlayBlocking(blockedSlider.Frame), false, "Inline Dropdown does not block sibling elements as overlay")
+		inlineDd:Close()
+		stepClock(0.3, true)
+		assertTrue(inlineClip ~= nil and not inlineClip.Visible and inlineClip.Size.Y.Offset == 0, "Inline Dropdown collapses InlineClip back to 0 height on Close")
+
+		inlineDd:SetMode("Popup")
+		assertEq(inlineDd:GetMode(), "Popup", "Dropdown SetMode('Popup') switches back to floating Popup mode")
+		inlineDd:Open()
+		stepClock(0.1, true)
+		assertEq(Bali2.Transition.IsOverlayBlocking(blockedSlider.Frame), true, "Dropdown switched to Popup opens in PopupLayer overlay")
+		inlineDd:Close()
+		stepClock(0.3, true)
+
+		local longCodeLines = {}
+		for i = 1, 16 do
+			table.insert(longCodeLines, string.format("local line%d = %d", i, i))
+		end
+		local scrollCode = v4Sec:AddCodeBlock({
+			Title = "Long Scrollable Code",
+			Language = "luau",
+			Code = table.concat(longCodeLines, "\n"),
+			MaxHeight = 120,
+		})
+		local codeScroll = scrollCode.Frame:FindFirstChild("CodeScroll", true)
+		assertTrue(codeScroll ~= nil and codeScroll:IsA("ScrollingFrame"), "CodeBlock creates CodeScroll ScrollingFrame")
+		assertTrue(codeScroll.Size.Y.Offset == 120, "CodeScroll clamps explicit visible height to MaxHeight=120 (got " .. tostring(codeScroll.Size.Y.Offset) .. ")")
+		assertTrue(codeScroll.CanvasSize.Y.Offset > codeScroll.Size.Y.Offset, "CodeScroll sets explicit CanvasSize.Y.Offset > Size.Y.Offset for vertical scrolling (canvas=" .. tostring(codeScroll.CanvasSize.Y.Offset) .. ")")
+		assertEq(codeScroll.AutomaticCanvasSize, Enum.AutomaticSize.None, "CodeScroll uses explicit CanvasSize rather than AutomaticCanvasSize")
+
+		local scrollPara = v4Sec:AddParagraph({
+			Title = "Long Scrollable Paragraph",
+			Content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8",
+			MaxHeight = 64,
+		})
+		local paraScroll = scrollPara.Frame:FindFirstChild("ParagraphScroll", true)
+		assertTrue(paraScroll ~= nil and paraScroll:IsA("ScrollingFrame"), "Paragraph with MaxHeight creates ParagraphScroll ScrollingFrame")
+		assertTrue(paraScroll.Size.Y.Offset <= 64 and paraScroll.CanvasSize.Y.Offset > paraScroll.Size.Y.Offset, "ParagraphScroll configures scrollable bounds when text exceeds MaxHeight")
+	end
 
 	-- Re-execution test in Studio mode
 	local sg2 = Bali2._screenGui

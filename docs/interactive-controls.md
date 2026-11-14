@@ -155,12 +155,17 @@ section:AddSegmented({
 
 ## `AddDropdown`
 
-Viewport-aware popover dropdown mounted in `BaliPopupLayer` with compact `28px` single-line option rows, active modal input blocking so sliders underneath cannot react while browsing options, live search filtering, single or multi selection, per-option icons/thumbnails/badges/colors, and dynamic option updates.
+Supports two open modes:
+- **`Mode = "Popup"` (default)** — Viewport-aware floating popover mounted in `BaliPopupLayer` with active modal input blocking so sliders underneath cannot react while browsing options.
+- **`Mode = "Inline"` (or `Inline = true`)** — Expands downward directly inside the card and smoothly pushes sibling controls below it downward without floating overlays.
+
+Both modes share compact `28px` single-line option rows, live search filtering, single or multi selection, per-option icons/thumbnails/badges/colors, and dynamic option updates.
 
 ```lua
 local strategy = section:AddDropdown({
 	Title = "Balancing Strategy",
 	Description = "Single-select searchable menu with custom colors, badges, images & locks.",
+	Mode = "Popup", -- "Popup" | "Inline" (or Inline = true)
 	Values = {
 		{ Label = "Balanced", Icon = "gauge", Badge = "Auto" },
 		{ Label = "Low Latency", Icon = "zap", Color = Color3.fromRGB(96, 165, 250), Badge = "Fast", BadgeColor = Color3.fromRGB(59, 130, 246) },
@@ -189,7 +194,7 @@ Plain string values and rich option tables can be mixed freely:
 - `RightText` / `Hint` — Secondary right-aligned hint text.
 - `Disabled` — Grays out and locks an option against selection.
 
-- **Methods**: `:Open()`, `:Close()`, `:Set(valueOrTable, silent?)`, `:Get()`, `:SetValues(list)`.
+- **Methods**: `:Open()`, `:Close()`, `:Set(valueOrTable, silent?)`, `:Get()`, `:SetValues(list)`, `:SetMode("Popup" | "Inline")`, `:GetMode()`.
 
 ---
 

@@ -329,7 +329,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 		mainTween = Tween.Play(frame, { Position = targetPos }, dur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 
-	local bgDur = math.max(dur * 0.85, 0.16)
+	local bgDur = math.min(dur, math.max(dur * 0.85, 0.06))
 	for _, entry in ipairs(entries) do
 		local inst = entry.Inst
 		if inst and inst.Parent then
@@ -341,7 +341,7 @@ function Transition.Mount(frame, _scaleFrom, opts)
 				Enum.EasingStyle.Quint,
 				Enum.EasingDirection.Out
 			)
-			if not mainTween then
+			if entry.IsContent or not mainTween then
 				mainTween = t
 			end
 		end
@@ -416,6 +416,9 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 				for _, entry in ipairs(entries) do
 					if entry.Inst and entry.Inst.Parent then
 						entry.Inst[entry.Prop] = entry.Target
+						if not Tween.Reduced then
+							Tween.Play(entry.Inst, { [entry.Prop] = entry.Target }, Tween.Instant)
+						end
 					end
 				end
 				activeFadeEntries[frame] = nil
@@ -440,7 +443,7 @@ function Transition.Unmount(frame, _scaleTo, onDone, opts)
 		}, dur, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	end
 
-	local contentDur = math.max(dur * 0.82, 0.14)
+	local contentDur = math.min(dur, math.max(dur * 0.82, 0.06))
 	for _, entry in ipairs(entries) do
 		local inst = entry.Inst
 		if inst and inst.Parent then

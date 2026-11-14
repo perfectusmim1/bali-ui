@@ -108,6 +108,21 @@ local function isDisabledOrLocked(self)
 	return self.Disabled == true or self.Locked == true or self._disabled == true or self._locked == true
 end
 
+local function resolveDropdownMode(opts)
+	if opts.Inline == true then
+		return "Inline"
+	elseif opts.Inline == false then
+		return "Popup"
+	end
+	if type(opts.Mode) == "string" then
+		local lower = string.lower(opts.Mode)
+		if lower == "inline" or lower == "expand" or lower == "push" then
+			return "Inline"
+		end
+	end
+	return "Popup"
+end
+
 function Dropdown.new(parent, opts, ctx)
 	opts = Util.Options(opts, {
 		Title = "Dropdown",
@@ -118,6 +133,8 @@ function Dropdown.new(parent, opts, ctx)
 		Searchable = true,
 		AllowNull = false,
 		MaxVisible = 7,
+		Mode = nil,
+		Inline = nil,
 		Callback = nil,
 		Flag = nil,
 		Tooltip = nil,
@@ -144,6 +161,45 @@ function Dropdown.new(parent, opts, ctx)
 		self.Frame.AutomaticSize = Enum.AutomaticSize.Y
 	end
 
+	-- Host trigger row + optional InlineClip inside CardContent so LockOverlay stays full-bleed
+	local cardContent = Create.New("Frame", {
+		Name = "CardContent",
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		ZIndex = 2,
+		Parent = row.Frame,
+	})
+	Create.List(cardContent, {
+		Direction = Enum.FillDirection.Vertical,
+		Gap = 0,
+	})
+	row.Body.LayoutOrder = 1
+	row.Body.Parent = cardContent
+
+	local inlineClip = Create.New("Frame", {
+		Name = "InlineClip",
+		Size = UDim2.new(1, 0, 0, 0),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		Visible = false,
+		LayoutOrder = 2,
+		ZIndex = 3,
+		Parent = cardContent,
+	})
+
+	local inlineDivider = Create.New("Frame", {
+		Name = "InlineDivider",
+		Size = UDim2.new(1, -24, 0, 1),
+		Position = UDim2.fromOffset(12, 0),
+		Theme = {
+			BackgroundColor3 = "Divider",
+			BackgroundTransparency = "DividerTransparency",
+		},
+		ZIndex = 4,
+		Parent = inlineClip,
+	})
+
 	if self.BindUI then
 		self:BindUI(row)
 	end
@@ -164,6 +220,8 @@ function Dropdown.new(parent, opts, ctx)
 	local allowNull = opts.AllowNull == true
 	local searchable = opts.Searchable ~= false
 	local maxVisible = math.max(1, tonumber(opts.MaxVisible) or 7)
+	local mode = resolveDropdownMode(opts)
+	self.Mode = mode
 
 	local selectedSingle = nil
 	local selectedMap = {} -- [item] = true (keyed by item reference for exact identity)
@@ -172,6 +230,23 @@ function Dropdown.new(parent, opts, ctx)
 	local popupId = "Dropdown_" .. Util.RandomString(8)
 	local optionRows = {} -- { { Item, Button, CheckIcon, TitleLabel, DescLabel } }
 	local openGen = 0
+	local inlineTween = nil
+	local dividerTween = nil
+
+	local function cancelInlineTween()
+		if inlineTween then
+			pcall(function()
+				inlineTween:Cancel()
+			end)
+			inlineTween = nil
+		end
+		if dividerTween then
+			pcall(function()
+				dividerTween:Cancel()
+			end)
+			dividerTween = nil
+		end
+	end
 
 	-- Right-side trigger pill
 	local trigger = Create.New("TextButton", {
@@ -425,7 +500,8 @@ function Dropdown.new(parent, opts, ctx)
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		CanvasSize = UDim2.new(0, 0, 0, 0),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		AutomaticCanvasSize = Enum.AutomaticSize.None,
+		Active = true,
 		ScrollBarThickness = 3,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		LayoutOrder = 2,
@@ -607,7 +683,7 @@ function Dropdown.new(parent, opts, ctx)
 		end
 	end
 
-	local function resizePopup(preserveFlip)
+	local function resizePopup(preserveFlip, animateInline)
 		local searchH = searchable and 38 or 0
 		local visibleCount = 0
 		local hasDesc = false
@@ -624,6 +700,9 @@ function Dropdown.new(parent, opts, ctx)
 		local contentH = scrollLayout.AbsoluteContentSize.Y
 		local estPerRow = hasDesc and 44 or 28
 		local maxListH = maxVisible * estPerRow + math.max(0, maxVisible - 1) * 3 + padV
+		local estAllH = visibleCount * estPerRow + math.max(0, visibleCount - 1) * 3 + padV
+		local fullContentH = (contentH > 0) and (contentH + padV) or estAllH
+
 		local listH
 		if visibleCount == 0 then
 			listH = 36
@@ -632,6 +711,24 @@ function Dropdown.new(parent, opts, ctx)
 		else
 			local shown = math.min(visibleCount, maxVisible)
 			listH = shown * estPerRow + math.max(0, shown - 1) * 3 + padV
+		end
+
+		local needsScroll = (visibleCount > maxVisible) or (fullContentH > listH)
+		scroll.ScrollingEnabled = needsScroll
+		scroll.ScrollBarThickness = needsScroll and 3 or 0
+		scroll.CanvasSize = UDim2.fromOffset(0, needsScroll and fullContentH or 0)
+
+		if mode == "Inline" then
+			local inlineTotalH = 16 + searchH + listH
+			local inlineClipH = inlineTotalH + 1
+			scroll.Size = UDim2.new(1, 0, 0, listH)
+			popupInner.Position = UDim2.fromOffset(0, 1)
+			popupInner.Size = UDim2.new(1, 0, 0, inlineTotalH)
+			if isOpen and animateInline then
+				cancelInlineTween()
+				inlineTween = Tween.Play(inlineClip, { Size = UDim2.new(1, 0, 0, inlineClipH) }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			end
+			return inlineClipH
 		end
 
 		local layerH = (ctx.PopupLayer and ctx.PopupLayer.AbsoluteSize.Y > 0) and ctx.PopupLayer.AbsoluteSize.Y or 680
@@ -644,10 +741,13 @@ function Dropdown.new(parent, opts, ctx)
 		local anchorTop = trigger.AbsolutePosition.Y
 		local wasFlipped = preserveFlip == true and isOpen and popup.Parent ~= nil and prevBottom <= anchorTop + 4
 
-		local needsScroll = (visibleCount > maxVisible) or (contentH > 0 and contentH + padV > listH)
+		needsScroll = (visibleCount > maxVisible) or (fullContentH > listH)
 		scroll.ScrollingEnabled = needsScroll
 		scroll.ScrollBarThickness = needsScroll and 3 or 0
+		scroll.CanvasSize = UDim2.fromOffset(0, needsScroll and fullContentH or 0)
 		scroll.Size = UDim2.new(1, 0, 0, listH)
+		popupInner.Position = UDim2.fromOffset(0, 0)
+		popupInner.Size = UDim2.fromScale(1, 1)
 		popup.Size = UDim2.fromOffset(width, totalH)
 
 		-- Keep bottom anchored if popup flipped above trigger and search shrank height
@@ -655,11 +755,13 @@ function Dropdown.new(parent, opts, ctx)
 			local newY = anchorTop - totalH - 6
 			popup.Position = UDim2.fromOffset(popup.Position.X.Offset, math.max(8, newY))
 		end
+
+		return totalH
 	end
 
 	self.Maid:Give(scrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		if isOpen then
-			resizePopup(true)
+			resizePopup(true, mode == "Inline")
 		end
 	end))
 
@@ -678,8 +780,8 @@ function Dropdown.new(parent, opts, ctx)
 			clearSearchBtn.Visible = searchQuery ~= ""
 		end
 		task.defer(function()
-			if popup.Parent then
-				resizePopup(preserveFlip)
+			if isOpen and ((mode == "Inline" and inlineClip.Parent) or popup.Parent) then
+				resizePopup(preserveFlip, mode == "Inline")
 			end
 		end)
 	end
@@ -1022,6 +1124,24 @@ function Dropdown.new(parent, opts, ctx)
 			fallbackOutsideConn:Disconnect()
 			fallbackOutsideConn = nil
 		end
+		if mode == "Inline" then
+			cancelInlineTween()
+			local currentH = inlineClip.AbsoluteSize.Y
+			if currentH <= 0 then
+				currentH = inlineClip.Size.Y.Offset
+			end
+			if currentH > 0 then
+				inlineClip.Size = UDim2.new(1, 0, 0, currentH)
+			end
+			dividerTween = Tween.Play(inlineDivider, { BackgroundTransparency = 1 }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			inlineTween = Tween.Play(inlineClip, { Size = UDim2.new(1, 0, 0, 0) }, 0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			Tween.Then(inlineTween, function()
+				if openGen == myGen and not isOpen then
+					inlineClip.Visible = false
+				end
+			end)
+			return
+		end
 		Transition.Unmount(popup, 0.94, function()
 			if openGen == myGen and not isOpen then
 				popup.Visible = false
@@ -1045,12 +1165,33 @@ function Dropdown.new(parent, opts, ctx)
 			applyFilter()
 		end
 		updateOptionVisuals(false)
-		resizePopup()
-		popup.Visible = true
 
 		if chevron then
 			Tween.Play(chevron, { Rotation = chevronBaseRot + 180 }, Tween.Fast)
 		end
+
+		if mode == "Inline" then
+			cancelInlineTween()
+			popup.Visible = false
+			popupInner.Parent = inlineClip
+			local targetClipH = resizePopup(false, false)
+			local tNow = Theme.Current
+			Theme.Bind(inlineDivider, {
+				BackgroundColor3 = "Divider",
+				BackgroundTransparency = "DividerTransparency",
+			})
+			inlineDivider.BackgroundTransparency = tNow and tNow.DividerTransparency or 0.85
+			inlineClip.Size = UDim2.new(1, 0, 0, 0)
+			inlineClip.Visible = true
+			inlineTween = Tween.Play(inlineClip, { Size = UDim2.new(1, 0, 0, targetClipH) }, Tween.Normal, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			return
+		end
+
+		inlineClip.Visible = false
+		inlineClip.Size = UDim2.new(1, 0, 0, 0)
+		popupInner.Parent = popup
+		resizePopup()
+		popup.Visible = true
 
 		if ctx.OpenPopup then
 			if ctx.PopupLayer then
@@ -1082,10 +1223,52 @@ function Dropdown.new(parent, opts, ctx)
 		if not isOpen then
 			return
 		end
+		local wasPopup = (mode == "Popup")
 		handleClosedState()
-		if ctx.ClosePopup then
+		if wasPopup and ctx.ClosePopup then
 			ctx.ClosePopup(popupId)
 		end
+	end
+
+	function self:SetMode(newMode)
+		local resolved
+		if newMode == true then
+			resolved = "Inline"
+		elseif newMode == false then
+			resolved = "Popup"
+		elseif type(newMode) == "string" then
+			local lower = string.lower(newMode)
+			if lower == "inline" or lower == "expand" or lower == "push" then
+				resolved = "Inline"
+			else
+				resolved = "Popup"
+			end
+		else
+			resolved = "Popup"
+		end
+		if resolved == mode then
+			return
+		end
+		if isOpen then
+			self:Close()
+		end
+		cancelInlineTween()
+		mode = resolved
+		self.Mode = mode
+		if mode == "Inline" then
+			popup.Visible = false
+			inlineClip.Size = UDim2.new(1, 0, 0, 0)
+			inlineClip.Visible = false
+			popupInner.Parent = inlineClip
+		else
+			inlineClip.Visible = false
+			inlineClip.Size = UDim2.new(1, 0, 0, 0)
+			popupInner.Parent = popup
+		end
+	end
+
+	function self:GetMode()
+		return mode
 	end
 
 	function self:Set(val, silent)
@@ -1216,12 +1399,18 @@ function Dropdown.new(parent, opts, ctx)
 
 	self.Maid:Give(function()
 		self:Close()
+		cancelInlineTween()
 		if fallbackOutsideConn then
 			fallbackOutsideConn:Disconnect()
 			fallbackOutsideConn = nil
 		end
 		popup:Destroy()
 	end)
+
+	if mode == "Inline" then
+		popupInner.Parent = inlineClip
+		popupInner.Position = UDim2.fromOffset(0, 1)
+	end
 
 	rebuildOptions()
 	if opts.Default ~= nil then

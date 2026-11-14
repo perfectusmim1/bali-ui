@@ -140,9 +140,9 @@ local grid = section:AddCardGrid({
 | Constructor | Highlights | Methods |
 | :--- | :--- | :--- |
 | `AddLabel` | Key/value row with optional copy button (`Copyable = true`) & status `Badge` | `:SetText(s)`, `:SetValue(v)`, `:Get()`, `:SetBadge(text, colorKey?)` |
-| `AddParagraph` | Descriptive card with optional leading accent bar (`AccentBar`), tags & icon | `:SetTitle(s)`, `:SetDesc(s)`, `:SetContent(s)`, `:SetTags(list)` |
+| `AddParagraph` | Descriptive card with optional leading accent bar (`AccentBar`), tags, icon & scrollable `MaxHeight`/`Height` | `:SetTitle(s)`, `:SetDesc(s)`, `:SetContent(s)`, `:SetTags(list)` |
 | `AddDivider` | Clean centered hairline divider with optional centered label | `—` |
 | `AddHeader` | Uppercase category micro-heading with optional trailing badge | `—` |
-| `AddCodeBlock` | Language-aware `RichText` syntax-highlighted monospaced snippet viewer (`Luau`/`Lua`/`JSON`/`Python`/`JS`) with per-line gutter alignment and copy button | `:SetCode(src)`, `:Get()` |
+| `AddCodeBlock` | Language-aware `RichText` syntax-highlighted monospaced snippet viewer (`Luau`/`Lua`/`JSON`/`Python`/`JS`) with vertical/horizontal scroll (`MaxHeight`, `Height`, `Wrap`), line numbers & copy button | `:SetCode(src)`, `:Get()` |
 | `AddImage` / `AddBanner` | Aspect-preserving `CanvasGroup` rounded image & banner card (`Overlay`, `Badge`, `ScaleType`, `Corner`, `Height`) | `:SetImage(src)`, `:SetCaption(s)` |
 | `AddProfileCard` | Displays `LocalPlayer` (or custom `UserId`) avatar headshot, status pill & workspace meta | `:SetTitle(s)`, `:SetDesc(s)`, `:SetStatus(text, colorKey?)` |

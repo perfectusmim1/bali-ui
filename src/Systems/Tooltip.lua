@@ -311,6 +311,7 @@ function Tooltip.Show(text, anchorGui, side)
 	currentHeight = height
 	card.Size = UDim2.fromOffset(width, 0)
 	label.Text = str
+	label:SetAttribute("_BaliRestTxt", 0)
 
 	local wasVisible = visible
 	visible = true
@@ -322,6 +323,9 @@ function Tooltip.Show(text, anchorGui, side)
 
 	updatePosition(activeAnchor, activeSide)
 	if not wasVisible then
+		if not card:GetAttribute("_BaliFading") then
+			label.TextTransparency = 0
+		end
 		if shadow then
 			shadow.Visible = true
 			shadow.ImageTransparency = 1
@@ -330,6 +334,10 @@ function Tooltip.Show(text, anchorGui, side)
 		Transition.Mount(card, 0.96, { NoPositionTween = true, Duration = 0.14 })
 	else
 		card.Visible = true
+		label.TextTransparency = 0
+		if not Tween.Reduced then
+			Tween.Play(label, { TextTransparency = 0 }, Tween.Fast)
+		end
 		syncShadow()
 	end
 end
