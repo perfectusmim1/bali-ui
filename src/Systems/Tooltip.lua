@@ -27,6 +27,11 @@ local shadow = nil
 local label = nil
 local visible = false
 local activeOwner = nil
+local activeAnchor = nil
+local activeSide = nil
+local openCursorX = nil
+local currentWidth = 120
+local currentHeight = 28
 local pendingThread = nil
 local boundCleanups = {} -- [GuiObject] = cleanupFn
 
@@ -68,13 +73,15 @@ local function syncShadow()
 	local shadowInfo = Assets.Shadow()
 	local inset = shadowInfo.Inset or 24
 	local size = card.AbsoluteSize
+	local w = (card.Size.X.Offset > 0 and card.Size.X.Offset) or (size.X > 0 and size.X) or currentWidth
+	local h = (size.Y > 0 and size.Y) or currentHeight
 	local pos = card.Position
 	shadow.Visible = true
 	shadow.Position = UDim2.new(pos.X.Scale, pos.X.Offset - inset, pos.Y.Scale, pos.Y.Offset - inset)
-	shadow.Size = UDim2.fromOffset(size.X + inset * 2, size.Y + inset * 2)
+	shadow.Size = UDim2.fromOffset(w + inset * 2, h + inset * 2)
 end
 
-local function measureWidth(text)
+local function measureSize(text)
 	local font = Theme.Font("Medium")
 	local ok, bounds = pcall(function()
 		local params = Instance.new("GetTextBoundsParams")
@@ -85,9 +92,9 @@ local function measureWidth(text)
 		return Services.TextService:GetTextBoundsAsync(params)
 	end)
 	if ok and bounds then
-		return Util.Clamp(math.ceil(bounds.X) + 22, MIN_WIDTH, MAX_WIDTH)
+		return Util.Clamp(math.ceil(bounds.X) + 22, MIN_WIDTH, MAX_WIDTH), math.max(math.ceil(bounds.Y) + 14, 28)
 	end
-	return Util.Clamp(#text * 7 + 22, MIN_WIDTH, MAX_WIDTH)
+	return Util.Clamp(#text * 7 + 22, MIN_WIDTH, MAX_WIDTH), 28
 end
 
 local function placeNearCursor(w, h)
@@ -137,7 +144,7 @@ local function placeNearCursor(w, h)
 	return math.round(x), math.round(y)
 end
 
-local function placeNearAnchor(anchorGui, w, h)
+local function placeNearAnchor(anchorGui, w, h, preferredSide)
 	local origin, vp = getViewportBounds()
 	local absPos = anchorGui.AbsolutePosition
 	local absSize = anchorGui.AbsoluteSize
@@ -147,13 +154,38 @@ local function placeNearAnchor(anchorGui, w, h)
 	local maxX = math.max(minX, origin.X + vp.X - w - EDGE_PAD)
 	local maxY = math.max(minY, origin.Y + vp.Y - h - EDGE_PAD)
 
-	local x = absPos.X + (absSize.X - w) * 0.5
-	local y = absPos.Y + absSize.Y + gap
-
-	if y + h + EDGE_PAD > origin.Y + vp.Y then
-		local aboveY = absPos.Y - h - gap
-		if aboveY >= minY then
-			y = aboveY
+	local x, y
+	if preferredSide == "Right" then
+		x = absPos.X + absSize.X + 10
+		y = absPos.Y + (absSize.Y - h) * 0.5
+		if x + w + EDGE_PAD > origin.X + vp.X then
+			x = absPos.X - w - 10
+		end
+	elseif preferredSide == "Left" then
+		x = absPos.X - w - 10
+		y = absPos.Y + (absSize.Y - h) * 0.5
+		if x < minX then
+			x = absPos.X + absSize.X + 10
+		end
+	else
+		if absSize.X > 260 and openCursorX ~= nil then
+			x = Util.Clamp(openCursorX - w * 0.5, absPos.X, math.max(absPos.X, absPos.X + absSize.X - w))
+		else
+			x = absPos.X + (absSize.X - w) * 0.5
+		end
+		if preferredSide == "Top" then
+			y = absPos.Y - h - gap
+			if y < minY then
+				y = absPos.Y + absSize.Y + gap
+			end
+		else
+			y = absPos.Y + absSize.Y + gap
+			if y + h + EDGE_PAD > origin.Y + vp.Y then
+				local aboveY = absPos.Y - h - gap
+				if aboveY >= minY then
+					y = aboveY
+				end
+			end
 		end
 	end
 
@@ -163,17 +195,17 @@ local function placeNearAnchor(anchorGui, w, h)
 	return math.round(x), math.round(y)
 end
 
-local function updatePosition(anchorGui)
+local function updatePosition(anchorGui, preferredSide)
 	if not card then
 		return
 	end
 	local size = card.AbsoluteSize
-	local w = size.X > 0 and size.X or card.Size.X.Offset
-	local h = size.Y > 0 and size.Y or 28
+	local w = (card.Size.X.Offset > 0 and card.Size.X.Offset) or currentWidth
+	local h = (card.Visible and size.Y > 0 and size.Y) or currentHeight
 
 	local x, y
 	if anchorGui and typeof(anchorGui) == "Instance" and anchorGui:IsA("GuiObject") and anchorGui.Parent then
-		x, y = placeNearAnchor(anchorGui, w, h)
+		x, y = placeNearAnchor(anchorGui, w, h, preferredSide)
 	else
 		x, y = placeNearCursor(w, h)
 	end
@@ -196,6 +228,7 @@ local function ensureBuilt()
 		Name = "BaliTooltipShadow",
 		Parent = layer,
 		Visible = false,
+		Active = false,
 		Image = shadowInfo.Image,
 		ScaleType = Enum.ScaleType.Slice,
 		SliceCenter = shadowInfo.Slice,
@@ -208,6 +241,7 @@ local function ensureBuilt()
 		Name = "BaliTooltip",
 		Parent = layer,
 		Visible = false,
+		Active = false,
 		Size = UDim2.fromOffset(120, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Corner = 8,
@@ -225,6 +259,7 @@ local function ensureBuilt()
 	label = Create.Text({
 		Name = "Text",
 		Parent = card,
+		Active = false,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		TextWrapped = true,
@@ -236,7 +271,7 @@ local function ensureBuilt()
 
 	rootMaid:Give(card:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 		if visible then
-			updatePosition(activeOwner and typeof(activeOwner) == "Instance" and activeOwner or nil)
+			updatePosition(activeAnchor, activeSide)
 		end
 	end))
 
@@ -261,7 +296,7 @@ function Tooltip.Init(popupLayer)
 	return Tooltip
 end
 
-function Tooltip.Show(text, anchorGui)
+function Tooltip.Show(text, anchorGui, side)
 	if text == nil or text == "" then
 		Tooltip.Hide()
 		return
@@ -271,26 +306,28 @@ function Tooltip.Show(text, anchorGui)
 	end
 
 	local str = tostring(text)
-	local width = measureWidth(str)
+	local width, height = measureSize(str)
+	currentWidth = width
+	currentHeight = height
 	card.Size = UDim2.fromOffset(width, 0)
 	label.Text = str
 
 	local wasVisible = visible
 	visible = true
-	if anchorGui and typeof(anchorGui) == "Instance" then
-		activeOwner = anchorGui
-	elseif not activeOwner then
-		activeOwner = nil
+	activeAnchor = (anchorGui and typeof(anchorGui) == "Instance" and anchorGui:IsA("GuiObject")) and anchorGui or nil
+	activeSide = side
+	if activeAnchor and not activeOwner then
+		activeOwner = activeAnchor
 	end
 
-	updatePosition(anchorGui)
+	updatePosition(activeAnchor, activeSide)
 	if not wasVisible then
 		if shadow then
 			shadow.Visible = true
 			shadow.ImageTransparency = 1
 			Tween.Play(shadow, { ImageTransparency = Theme.Current.ShadowTransparency }, Tween.Fast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 		end
-		Transition.Mount(card, 0.96, { NoPositionTween = true })
+		Transition.Mount(card, 0.96, { NoPositionTween = true, Duration = 0.14 })
 	else
 		card.Visible = true
 		syncShadow()
@@ -300,6 +337,9 @@ end
 function Tooltip.Hide()
 	cancelPending()
 	activeOwner = nil
+	activeAnchor = nil
+	activeSide = nil
+	openCursorX = nil
 	if not visible or not card then
 		visible = false
 		if shadow then
@@ -320,7 +360,7 @@ function Tooltip.Hide()
 				shadow.Visible = false
 			end
 		end
-	end, { NoPositionTween = true })
+	end, { NoPositionTween = true, Duration = 0.12 })
 end
 
 function Tooltip.Bind(guiObj, textOrFn, opts)
@@ -334,7 +374,8 @@ function Tooltip.Bind(guiObj, textOrFn, opts)
 
 	opts = opts or {}
 	local delayTime = opts.Delay ~= nil and opts.Delay or DEFAULT_DELAY
-	local anchorMode = opts.Anchor or (Util.IsTouchDevice() and "Element" or "Cursor")
+	local anchorMode = opts.Anchor or "Element"
+	local preferredSide = opts.Side or "Auto"
 	local bindMaid = Maid.new()
 	local hovering = false
 	local cleaned = false
@@ -356,8 +397,9 @@ function Tooltip.Bind(guiObj, textOrFn, opts)
 			return
 		end
 		activeOwner = guiObj
+		openCursorX = getCursorPosition().X
 		local anchor = anchorMode == "Element" and guiObj or nil
-		Tooltip.Show(content, anchor)
+		Tooltip.Show(content, anchor, anchor and preferredSide or nil)
 	end
 
 	bindMaid:Give(guiObj.MouseEnter:Connect(function()
@@ -372,14 +414,16 @@ function Tooltip.Bind(guiObj, textOrFn, opts)
 		end)
 	end))
 
-	bindMaid:Give(guiObj.MouseMoved:Connect(function()
-		if cleaned or not hovering then
-			return
-		end
-		if visible and activeOwner == guiObj and anchorMode ~= "Element" then
-			updatePosition(nil)
-		end
-	end))
+	if anchorMode == "Cursor" then
+		bindMaid:Give(guiObj.MouseMoved:Connect(function()
+			if cleaned or not hovering then
+				return
+			end
+			if visible and activeOwner == guiObj and not activeAnchor then
+				updatePosition(nil, nil)
+			end
+		end))
+	end
 
 	local function cancelHover()
 		hovering = false
@@ -457,6 +501,9 @@ function Tooltip.Destroy()
 	layer = nil
 	label = nil
 	activeOwner = nil
+	activeAnchor = nil
+	activeSide = nil
+	openCursorX = nil
 	visible = false
 end
 

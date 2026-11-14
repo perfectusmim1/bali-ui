@@ -2997,6 +2997,26 @@ if okLib and type(Bali2) == "table" then
 	assertTrue(dashLblT ~= nil and dashLblT < 0.5, "Dash Action text restored cleanly after switching during minimize (T=" .. tostring(dashLblT) .. ")")
 	assertTrue(dashSecBgT < 0.5, "Dash Section card background restored cleanly (T=" .. tostring(dashSecBgT) .. ")")
 
+	-- Regression: Tooltip Side='Right' on collapsed sidebar & zero horizontal teleport on AbsoluteSize update
+	win2:ToggleSidebar(true)
+	stepClock(0.3, true)
+	Bali2.Tooltip.Show("Controls", regCtrlTab._button, "Right")
+	local ttCard = win2.PopupLayer:FindFirstChild("BaliTooltip")
+	assertTrue(ttCard ~= nil and ttCard.Visible, "BaliTooltip displayed for collapsed sidebar tab")
+	local expectedMinX = regCtrlTab._button.AbsolutePosition.X + regCtrlTab._button.AbsoluteSize.X
+	assertTrue(
+		ttCard.AbsolutePosition.X >= expectedMinX,
+		string.format("Collapsed sidebar tooltip placed to right of icon (ttX=%g >= btnRight=%g)", ttCard.AbsolutePosition.X, expectedMinX)
+	)
+	local posBefore = ttCard.Position
+	ttCard.Size = MockUDim2.fromOffset(ttCard.Size.X.Offset, 30)
+	ttCard:GetPropertyChangedSignal("AbsoluteSize"):Fire()
+	assertEq(ttCard.Position.X.Offset, posBefore.X.Offset, "Tooltip X position stays stable on AbsoluteSize update")
+	Bali2.Tooltip.Hide()
+	stepClock(0.2, true)
+	win2:ToggleSidebar(false)
+	stepClock(0.3, true)
+
 	-- Re-execution test in Studio mode
 	local sg2 = Bali2._screenGui
 	win2:Destroy()

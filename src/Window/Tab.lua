@@ -531,7 +531,7 @@ function Tab.new(window, options)
 			return self.Title
 		end
 		return ""
-	end)
+	end, { Side = "Right" })
 
 	return self
 end

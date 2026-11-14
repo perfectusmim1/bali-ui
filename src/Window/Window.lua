@@ -847,7 +847,7 @@ function Window.new(screenGui, options)
 		Parent = expandBtn,
 	})
 	maid:Give(Transition.Hover(expandBtn, expandBtn, "Tile", "TileHover", expandStroke))
-	maid:Give(Tooltip.Bind(expandBtn, "Expand Sidebar"))
+	maid:Give(Tooltip.Bind(expandBtn, "Expand Sidebar", { Side = "Right" }))
 
 	Icons.Create("home", {
 		Size = UDim2.fromOffset(14, 14),
@@ -896,7 +896,7 @@ function Window.new(screenGui, options)
 		Color = "Muted",
 		Parent = resizeGrip,
 	})
-	maid:Give(Tooltip.Bind(resizeGrip, "Drag to resize"))
+	maid:Give(Tooltip.Bind(resizeGrip, "Drag to resize", { Side = "Top" }))
 
 	-- ─── Window Instance Table ───────────────────────────────────────────────
 	local registry = {}
