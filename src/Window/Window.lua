@@ -384,10 +384,14 @@ function Window.new(screenGui, options)
 		Parent = sidebarTop,
 	})
 
-	local customBrandIcon = options.Icon and options.Icon ~= "bali-logo" and options.Icon ~= "bali"
+	local brandIconOpt = options.Icon
+	if type(brandIconOpt) == "string" and string.lower(brandIconOpt) == "panel-left" then
+		brandIconOpt = "bali-logo"
+	end
+	local customBrandIcon = brandIconOpt and brandIconOpt ~= "bali-logo" and brandIconOpt ~= "bali"
 	local brandBadge = Create.New("TextButton", {
 		Name = "BrandBadge",
-		Position = UDim2.fromOffset(2, 2),
+		Position = UDim2.fromOffset(isCollapsed and 3 or 2, 2),
 		Size = UDim2.fromOffset(32, 32),
 		Text = "",
 		AutoButtonColor = false,
@@ -409,13 +413,13 @@ function Window.new(screenGui, options)
 		Visible = isCollapsed,
 		Parent = brandBadge,
 	})
-	local brandLogoIcon = Icons.Create(options.Icon or "bali-logo", {
+	local brandLogoIcon = Icons.Create(brandIconOpt or "bali-logo", {
 		Name = "BrandLogoIcon",
 		Size = UDim2.fromOffset(customBrandIcon and 18 or 22, customBrandIcon and 18 or 22),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = customBrandIcon and "Accent" or Color3.fromRGB(255, 255, 255),
-		Visible = true,
+		Visible = not isCollapsed,
 		Parent = brandBadge,
 	})
 	local brandExpandIcon = Icons.Create("panel-left", {
@@ -423,25 +427,30 @@ function Window.new(screenGui, options)
 		Size = UDim2.fromOffset(16, 16),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "Text",
-		Visible = false,
+		Color = "SubText",
+		Visible = isCollapsed,
 		Parent = brandBadge,
 	})
 	local brandBadgeHovered = false
 	local function applyBrandBadgeSurface(theme, animate)
 		local t = theme or Theme.Current
-		local showExpand = (brandCollapsedFlag and brandCollapsedFlag.Visible == true) and brandBadgeHovered
+		local collapsedNow = (brandCollapsedFlag and brandCollapsedFlag.Visible == true)
 		if brandLogoIcon then
-			brandLogoIcon.Visible = not showExpand
+			brandLogoIcon.Visible = not collapsedNow
 		end
 		if brandExpandIcon then
-			brandExpandIcon.Visible = showExpand
+			brandExpandIcon.Visible = collapsedNow
+			if collapsedNow then
+				Icons.SetColor(brandExpandIcon, brandBadgeHovered and "Text" or "SubText")
+			end
 		end
-		local collapsedNow = showExpand
+		brandBadge.Position = UDim2.fromOffset(collapsedNow and 3 or 2, 2)
 		local lightModeLogo = (t and t.Dark == false) and not customBrandIcon and not collapsedNow
 		local targetBgColor = lightModeLogo and Color3.fromRGB(24, 24, 32) or ((t and t.TileHover) or Color3.fromRGB(37, 37, 46))
-		local targetBgTrans = lightModeLogo and (brandBadgeHovered and 0.04 or 0.12) or (brandBadgeHovered and 0.86 or 1)
-		local targetStrTrans = lightModeLogo and (brandBadgeHovered and 0.45 or 0.65) or (brandBadgeHovered and 0.62 or 1)
+		local targetBgTrans = lightModeLogo and (brandBadgeHovered and 0.04 or 0.12)
+			or (collapsedNow and (brandBadgeHovered and 0.80 or 0.88) or (brandBadgeHovered and 0.86 or 1))
+		local targetStrTrans = lightModeLogo and (brandBadgeHovered and 0.45 or 0.65)
+			or (collapsedNow and (brandBadgeHovered and 0.50 or 0.72) or (brandBadgeHovered and 0.62 or 1))
 
 		if animate and not Tween.Reduced then
 			Tween.Play(brandBadge, {
@@ -472,6 +481,9 @@ function Window.new(screenGui, options)
 		brandBadgeHovered = false
 		applyBrandBadgeSurface(Theme.Current, true)
 	end))
+	maid:Give(Tooltip.Bind(brandBadge, function()
+		return (brandCollapsedFlag and brandCollapsedFlag.Visible) and "Expand Sidebar" or nil
+	end, { Side = "Right" }))
 
 	local brandText = Create.New("Frame", {
 		Name = "BrandText",
@@ -845,37 +857,10 @@ function Window.new(screenGui, options)
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 
-	local expandBtn = Create.New("TextButton", {
-		Name = "ExpandSidebarBtn",
-		Size = UDim2.fromOffset(28, 28),
-		Text = "",
-		AutoButtonColor = false,
-		Corner = 8,
-		Theme = {
-			BackgroundColor3 = "Tile",
-			BackgroundTransparency = "TileTransparency",
-		},
-		Visible = isCollapsed,
-		LayoutOrder = 1,
-		Parent = breadcrumbWrap,
-	})
-	local expandStroke = Create.Stroke(expandBtn, {
-		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
-	})
-	Icons.Create("panel-left", {
-		Size = UDim2.fromOffset(14, 14),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "SubText",
-		Parent = expandBtn,
-	})
-	maid:Give(Transition.Hover(expandBtn, expandBtn, "Tile", "TileHover", expandStroke))
-	maid:Give(Tooltip.Bind(expandBtn, "Expand Sidebar", { Side = "Right" }))
-
 	Icons.Create("home", {
 		Size = UDim2.fromOffset(14, 14),
 		Color = "Muted",
-		LayoutOrder = 2,
+		LayoutOrder = 1,
 		Parent = breadcrumbWrap,
 	})
 
@@ -888,7 +873,7 @@ function Window.new(screenGui, options)
 		Size = UDim2.new(1, -26, 0, 20),
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		RichText = true,
-		LayoutOrder = 3,
+		LayoutOrder = 2,
 		Parent = breadcrumbWrap,
 	})
 
@@ -986,7 +971,6 @@ function Window.new(screenGui, options)
 		_brandExpandIcon = brandExpandIcon,
 		_syncBrandBadge = applyBrandBadgeSurface,
 		_collapseBtn = collapseBtn,
-		_expandBtn = expandBtn,
 		_welcomeCard = welcomeCard,
 		_searchPill = searchPill,
 		_searchIcon = searchIcon,
@@ -1188,9 +1172,6 @@ function Window.new(screenGui, options)
 	-- ─── Topbar & Sidebar Actions ────────────────────────────────────────────
 	maid:Give(collapseBtn.Activated:Connect(function()
 		self:ToggleSidebar(true)
-	end))
-	maid:Give(expandBtn.Activated:Connect(function()
-		self:ToggleSidebar(false)
 	end))
 	maid:Give(brandBadge.Activated:Connect(function(input)
 		if self._sidebarCollapsed then
@@ -1764,21 +1745,8 @@ function Window:ToggleSidebar(collapsed)
 	if collapsedFlag then
 		collapsedFlag.Visible = collapsed
 	end
-	if self._brandLogoIcon then
-		self._brandLogoIcon.Visible = true
-	end
-	if self._brandExpandIcon then
-		self._brandExpandIcon.Visible = false
-	end
 	if self._syncBrandBadge then
-		task.defer(function()
-			if not self._destroyed then
-				self._syncBrandBadge(Theme.Current, true)
-			end
-		end)
-	end
-	if self._expandBtn then
-		self._expandBtn.Visible = collapsed
+		self._syncBrandBadge(Theme.Current, false)
 	end
 	if self._searchPill then
 		self._searchPill.Visible = true

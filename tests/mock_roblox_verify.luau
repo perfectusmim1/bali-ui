@@ -2727,12 +2727,33 @@ stepClock(0.15, true)
 
 regFlags["Pickers_Clusters"]:Open()
 stepClock(0.15, true)
-local optionsScroll = popupLayer and popupLayer:FindFirstChild("OptionsScroll", true)
+local clustersPopup = window._activePopup and window._activePopup.Frame
+local optionsScroll = clustersPopup and clustersPopup:FindFirstChild("OptionsScroll", true)
 local scrollListLayout = optionsScroll and optionsScroll:FindFirstChildOfClass("UIListLayout")
 assertTrue(
 	optionsScroll ~= nil and scrollListLayout ~= nil and optionsScroll.Size.Y.Offset >= scrollListLayout.AbsoluteContentSize.Y + 6,
 	"Edge Clusters Dropdown fits full content without clipping (size=" .. tostring(optionsScroll and optionsScroll.Size.Y.Offset) .. ", content=" .. tostring(scrollListLayout and scrollListLayout.AbsoluteContentSize.Y) .. ")"
 )
+local actionBar = clustersPopup and clustersPopup:FindFirstChild("ActionBar", true)
+local selectAllBtn = actionBar and actionBar:FindFirstChild("SelectAll")
+local clearActionBtn = actionBar and actionBar:FindFirstChild("Clear")
+assertTrue(actionBar ~= nil and actionBar.Visible, "Multi-select Dropdown renders visible ActionBar")
+assertTrue(selectAllBtn ~= nil and selectAllBtn.Visible and clearActionBtn ~= nil and clearActionBtn.Visible, "ActionBar displays SelectAll and Clear buttons")
+if selectAllBtn and selectAllBtn.Activated then
+	selectAllBtn.Activated:Fire()
+	stepClock(0.05, true)
+	assertEq(#regFlags["Pickers_Clusters"]:Get(), 6, "Dropdown SelectAll button selects all 6 Edge Clusters")
+end
+if clearActionBtn and clearActionBtn.Activated then
+	clearActionBtn.Activated:Fire()
+	stepClock(0.05, true)
+	assertEq(#regFlags["Pickers_Clusters"]:Get(), 0, "Dropdown Clear button clears all Edge Clusters")
+end
+regFlags["Pickers_Clusters"]:SelectAll(true)
+assertEq(#regFlags["Pickers_Clusters"]:Get(), 6, "Dropdown:SelectAll(silent) selects all 6 items programmatically")
+regFlags["Pickers_Clusters"]:Clear(true)
+assertEq(#regFlags["Pickers_Clusters"]:Get(), 0, "Dropdown:Clear(silent) clears selection programmatically")
+regFlags["Pickers_Clusters"]:Set({ "US-East (Virginia)", "EU-Central (Frankfurt)" }, true)
 regFlags["Pickers_Clusters"]:Close()
 stepClock(0.15, true)
 
@@ -3128,10 +3149,17 @@ if okLib and type(Bali2) == "table" then
 	assertTrue(dashLblT ~= nil and dashLblT < 0.5, "Dash Action text restored cleanly after switching during minimize (T=" .. tostring(dashLblT) .. ")")
 	assertTrue(dashSecBgT < 0.5, "Dash Section card background restored cleanly (T=" .. tostring(dashSecBgT) .. ")")
 
-	-- Regression: Tooltip Side='Right' on collapsed sidebar & zero horizontal teleport on AbsoluteSize update
+	-- Regression: Tooltip Side='Right' on collapsed sidebar & single sidebar toggle button
 	do
+		assertTrue(win2.ScreenGui:FindFirstChild("ExpandSidebarBtn", true) == nil, "Duplicate ExpandSidebarBtn is not rendered in topbar breadcrumb")
 		win2:ToggleSidebar(true)
 		stepClock(0.3, true)
+		local collapseBtnInst = win2.Sidebar:FindFirstChild("CollapseButton", true)
+		local brandLogoInst = win2.Sidebar:FindFirstChild("BrandLogoIcon", true)
+		local brandExpandInst = win2.Sidebar:FindFirstChild("BrandExpandIcon", true)
+		assertTrue(collapseBtnInst ~= nil and not collapseBtnInst.Visible, "CollapseButton is hidden when sidebar is collapsed")
+		assertTrue(brandLogoInst ~= nil and not brandLogoInst.Visible, "BrandLogoIcon is hidden when sidebar is collapsed")
+		assertTrue(brandExpandInst ~= nil and brandExpandInst.Visible, "Single BrandExpandIcon is shown when sidebar is collapsed")
 		Bali2.Tooltip.Show("Controls", regCtrlTab._button, "Right")
 		local ttCard = win2.PopupLayer:FindFirstChild("BaliTooltip")
 		assertTrue(ttCard ~= nil and ttCard.Visible, "BaliTooltip displayed for collapsed sidebar tab")
@@ -3156,6 +3184,9 @@ if okLib and type(Bali2) == "table" then
 		stepClock(0.2, true)
 		win2:ToggleSidebar(false)
 		stepClock(0.3, true)
+		assertTrue(collapseBtnInst ~= nil and collapseBtnInst.Visible, "CollapseButton is visible when sidebar is expanded")
+		assertTrue(brandLogoInst ~= nil and brandLogoInst.Visible, "BrandLogoIcon is visible when sidebar is expanded")
+		assertTrue(brandExpandInst ~= nil and not brandExpandInst.Visible, "BrandExpandIcon is hidden when sidebar is expanded")
 	end
 
 	-- Regression: Dropdown Mode='Inline' vs 'Popup' + CodeBlock & Paragraph explicit scrolling

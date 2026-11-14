@@ -132,6 +132,8 @@ function Dropdown.new(parent, opts, ctx)
 		Multi = false,
 		Searchable = true,
 		AllowNull = false,
+		ActionButtons = nil,
+		ShowActions = nil,
 		MaxVisible = 7,
 		Mode = nil,
 		Inline = nil,
@@ -219,6 +221,11 @@ function Dropdown.new(parent, opts, ctx)
 	local multi = opts.Multi == true
 	local allowNull = opts.AllowNull == true
 	local searchable = opts.Searchable ~= false
+	local actionOpt = opts.ActionButtons
+	if actionOpt == nil then
+		actionOpt = opts.ShowActions
+	end
+	local showActions = (actionOpt ~= false) and (multi or (actionOpt == true and allowNull))
 	local maxVisible = math.max(1, tonumber(opts.MaxVisible) or 7)
 	local mode = resolveDropdownMode(opts)
 	self.Mode = mode
@@ -562,6 +569,134 @@ function Dropdown.new(parent, opts, ctx)
 		end)
 	end
 
+	local actionBar = Create.New("Frame", {
+		Name = "ActionBar",
+		Size = UDim2.new(1, 0, 0, 24),
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+		Visible = showActions,
+		ZIndex = 112,
+		Parent = popupInner,
+	})
+	Create.List(actionBar, {
+		Direction = Enum.FillDirection.Horizontal,
+		Gap = 6,
+		VAlign = Enum.VerticalAlignment.Center,
+	})
+
+	local function createActionPill(btnName, iconName, labelText, layoutOrder, sizeUDim, accentHover, onClick)
+		local pill = Create.New("TextButton", {
+			Name = btnName,
+			Size = sizeUDim,
+			Text = "",
+			AutoButtonColor = false,
+			Corner = 6,
+			LayoutOrder = layoutOrder,
+			ZIndex = 113,
+			BackgroundTransparency = 0.25,
+			Theme = { BackgroundColor3 = "Elevated" },
+			Parent = actionBar,
+		})
+		local pillStroke = Create.Stroke(pill, {
+			Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+			Thickness = 1,
+		})
+		local pillContent = Create.New("Frame", {
+			Name = "Content",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			ZIndex = 114,
+			Parent = pill,
+		})
+		Create.List(pillContent, {
+			Direction = Enum.FillDirection.Horizontal,
+			Gap = 5,
+			HAlign = Enum.HorizontalAlignment.Center,
+			VAlign = Enum.VerticalAlignment.Center,
+		})
+		local pillIcon = Icons.Create(iconName, {
+			Size = UDim2.fromOffset(12, 12),
+			Color = "SubText",
+			LayoutOrder = 1,
+			ZIndex = 114,
+			Parent = pillContent,
+		})
+		local pillLabel = Create.Text({
+			Text = labelText,
+			Font = "SemiBold",
+			TextSize = 11,
+			Color = "SubText",
+			Size = UDim2.fromOffset(0, 14),
+			AutomaticSize = Enum.AutomaticSize.X,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			LayoutOrder = 2,
+			ZIndex = 114,
+			Parent = pillContent,
+		})
+
+		local function setPillHover(hovered)
+			if hovered then
+				Tween.Play(pill, { BackgroundTransparency = 0.08 }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				Theme.Bind(pillStroke, {
+					Color = accentHover and "Accent" or "Stroke",
+					Transparency = function()
+						return 0.35
+					end,
+				})
+				Icons.SetColor(pillIcon, accentHover and "Accent" or "Text")
+				Theme.Bind(pillLabel, { TextColor3 = "Text" })
+			else
+				Tween.Play(pill, { BackgroundTransparency = 0.25 }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				Theme.Bind(pillStroke, { Color = "Stroke", Transparency = "StrokeTransparency" })
+				Icons.SetColor(pillIcon, "SubText")
+				Theme.Bind(pillLabel, { TextColor3 = "SubText" })
+			end
+		end
+
+		pill.MouseEnter:Connect(function()
+			if isDisabledOrLocked(self) or Transition.IsOverlayBlocking(pill) then
+				return
+			end
+			setPillHover(true)
+		end)
+		pill.MouseLeave:Connect(function()
+			setPillHover(false)
+		end)
+		pill.Activated:Connect(function()
+			if isDisabledOrLocked(self) or Transition.IsOverlayBlocking(pill) then
+				return
+			end
+			Transition.Ripple(pill, nil, accentHover and "Accent" or "SubText")
+			onClick()
+		end)
+		return pill
+	end
+
+	local selectAllBtn = createActionPill(
+		"SelectAll",
+		"check",
+		"Select All",
+		1,
+		UDim2.new(0.5, -3, 1, 0),
+		true,
+		function()
+			self:SelectAll(false)
+		end
+	)
+	selectAllBtn.Visible = multi
+
+	createActionPill(
+		"Clear",
+		"x",
+		"Clear",
+		2,
+		multi and UDim2.new(0.5, -3, 1, 0) or UDim2.new(1, 0, 1, 0),
+		false,
+		function()
+			self:Clear(false)
+		end
+	)
+
 	local scroll = Create.New("ScrollingFrame", {
 		Name = "OptionsScroll",
 		Size = UDim2.new(1, 0, 0, 40),
@@ -572,7 +707,7 @@ function Dropdown.new(parent, opts, ctx)
 		Active = true,
 		ScrollBarThickness = 3,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
-		LayoutOrder = 2,
+		LayoutOrder = 3,
 		ZIndex = 112,
 		Theme = { ScrollBarImageColor3 = "Muted" },
 		Parent = popupInner,
@@ -846,6 +981,7 @@ function Dropdown.new(parent, opts, ctx)
 
 	local function resizePopup(preserveFlip, animateInline)
 		local searchH = searchable and 38 or 0
+		local actionH = (actionBar and actionBar.Visible) and 30 or 0
 		local visibleCount = 0
 		local hasDesc = false
 		for _, entry in ipairs(optionRows) do
@@ -880,7 +1016,7 @@ function Dropdown.new(parent, opts, ctx)
 		scroll.CanvasSize = UDim2.fromOffset(0, needsScroll and fullContentH or 0)
 
 		if mode == "Inline" then
-			local inlineTotalH = 16 + searchH + listH
+			local inlineTotalH = 16 + searchH + actionH + listH
 			local inlineClipH = inlineTotalH + 1
 			scroll.Size = UDim2.new(1, 0, 0, listH)
 			popupInner.Position = UDim2.fromOffset(0, 1)
@@ -895,8 +1031,8 @@ function Dropdown.new(parent, opts, ctx)
 		local layerH = (ctx.PopupLayer and ctx.PopupLayer.AbsoluteSize.Y > 0) and ctx.PopupLayer.AbsoluteSize.Y or 680
 		local anchorW = (trigger.AbsoluteSize.X > 0) and trigger.AbsoluteSize.X or 168
 		local width = (anchorW >= 180) and anchorW or Util.Clamp(math.max(anchorW + 40, 200), 200, 252)
-		local totalH = math.min(16 + searchH + listH, math.max(120, layerH - 16))
-		listH = math.max(36, totalH - 16 - searchH)
+		local totalH = math.min(16 + searchH + actionH + listH, math.max(120, layerH - 16))
+		listH = math.max(36, totalH - 16 - searchH - actionH)
 
 		local prevBottom = popup.AbsolutePosition.Y + popup.AbsoluteSize.Y
 		local anchorTop = trigger.AbsolutePosition.Y
@@ -1471,6 +1607,31 @@ function Dropdown.new(parent, opts, ctx)
 
 	function self:Get()
 		return getSelectedValues()
+	end
+
+	function self:SelectAll(silent)
+		if not multi then
+			return
+		end
+		local hasFilter = searchQuery ~= ""
+		for i, item in ipairs(items) do
+			if not item.Disabled then
+				local entry = optionRows[i]
+				if not hasFilter or not entry or entry.Button.Visible ~= false then
+					selectedMap[item] = true
+				end
+			end
+		end
+		fireSelection(silent == true)
+	end
+
+	function self:Clear(silent)
+		if multi then
+			table.clear(selectedMap)
+		else
+			selectedSingle = nil
+		end
+		fireSelection(silent == true)
 	end
 
 	function self:SetValues(list)

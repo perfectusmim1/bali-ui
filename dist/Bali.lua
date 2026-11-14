@@ -13848,6 +13848,8 @@ function Dropdown.new(parent, opts, ctx)
 		Multi = false,
 		Searchable = true,
 		AllowNull = false,
+		ActionButtons = nil,
+		ShowActions = nil,
 		MaxVisible = 7,
 		Mode = nil,
 		Inline = nil,
@@ -13935,6 +13937,11 @@ function Dropdown.new(parent, opts, ctx)
 	local multi = opts.Multi == true
 	local allowNull = opts.AllowNull == true
 	local searchable = opts.Searchable ~= false
+	local actionOpt = opts.ActionButtons
+	if actionOpt == nil then
+		actionOpt = opts.ShowActions
+	end
+	local showActions = (actionOpt ~= false) and (multi or (actionOpt == true and allowNull))
 	local maxVisible = math.max(1, tonumber(opts.MaxVisible) or 7)
 	local mode = resolveDropdownMode(opts)
 	self.Mode = mode
@@ -14278,6 +14285,134 @@ function Dropdown.new(parent, opts, ctx)
 		end)
 	end
 
+	local actionBar = Create.New("Frame", {
+		Name = "ActionBar",
+		Size = UDim2.new(1, 0, 0, 24),
+		BackgroundTransparency = 1,
+		LayoutOrder = 2,
+		Visible = showActions,
+		ZIndex = 112,
+		Parent = popupInner,
+	})
+	Create.List(actionBar, {
+		Direction = Enum.FillDirection.Horizontal,
+		Gap = 6,
+		VAlign = Enum.VerticalAlignment.Center,
+	})
+
+	local function createActionPill(btnName, iconName, labelText, layoutOrder, sizeUDim, accentHover, onClick)
+		local pill = Create.New("TextButton", {
+			Name = btnName,
+			Size = sizeUDim,
+			Text = "",
+			AutoButtonColor = false,
+			Corner = 6,
+			LayoutOrder = layoutOrder,
+			ZIndex = 113,
+			BackgroundTransparency = 0.25,
+			Theme = { BackgroundColor3 = "Elevated" },
+			Parent = actionBar,
+		})
+		local pillStroke = Create.Stroke(pill, {
+			Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
+			Thickness = 1,
+		})
+		local pillContent = Create.New("Frame", {
+			Name = "Content",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			ZIndex = 114,
+			Parent = pill,
+		})
+		Create.List(pillContent, {
+			Direction = Enum.FillDirection.Horizontal,
+			Gap = 5,
+			HAlign = Enum.HorizontalAlignment.Center,
+			VAlign = Enum.VerticalAlignment.Center,
+		})
+		local pillIcon = Icons.Create(iconName, {
+			Size = UDim2.fromOffset(12, 12),
+			Color = "SubText",
+			LayoutOrder = 1,
+			ZIndex = 114,
+			Parent = pillContent,
+		})
+		local pillLabel = Create.Text({
+			Text = labelText,
+			Font = "SemiBold",
+			TextSize = 11,
+			Color = "SubText",
+			Size = UDim2.fromOffset(0, 14),
+			AutomaticSize = Enum.AutomaticSize.X,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			LayoutOrder = 2,
+			ZIndex = 114,
+			Parent = pillContent,
+		})
+
+		local function setPillHover(hovered)
+			if hovered then
+				Tween.Play(pill, { BackgroundTransparency = 0.08 }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				Theme.Bind(pillStroke, {
+					Color = accentHover and "Accent" or "Stroke",
+					Transparency = function()
+						return 0.35
+					end,
+				})
+				Icons.SetColor(pillIcon, accentHover and "Accent" or "Text")
+				Theme.Bind(pillLabel, { TextColor3 = "Text" })
+			else
+				Tween.Play(pill, { BackgroundTransparency = 0.25 }, Tween.Fast, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				Theme.Bind(pillStroke, { Color = "Stroke", Transparency = "StrokeTransparency" })
+				Icons.SetColor(pillIcon, "SubText")
+				Theme.Bind(pillLabel, { TextColor3 = "SubText" })
+			end
+		end
+
+		pill.MouseEnter:Connect(function()
+			if isDisabledOrLocked(self) or Transition.IsOverlayBlocking(pill) then
+				return
+			end
+			setPillHover(true)
+		end)
+		pill.MouseLeave:Connect(function()
+			setPillHover(false)
+		end)
+		pill.Activated:Connect(function()
+			if isDisabledOrLocked(self) or Transition.IsOverlayBlocking(pill) then
+				return
+			end
+			Transition.Ripple(pill, nil, accentHover and "Accent" or "SubText")
+			onClick()
+		end)
+		return pill
+	end
+
+	local selectAllBtn = createActionPill(
+		"SelectAll",
+		"check",
+		"Select All",
+		1,
+		UDim2.new(0.5, -3, 1, 0),
+		true,
+		function()
+			self:SelectAll(false)
+		end
+	)
+	selectAllBtn.Visible = multi
+
+	createActionPill(
+		"Clear",
+		"x",
+		"Clear",
+		2,
+		multi and UDim2.new(0.5, -3, 1, 0) or UDim2.new(1, 0, 1, 0),
+		false,
+		function()
+			self:Clear(false)
+		end
+	)
+
 	local scroll = Create.New("ScrollingFrame", {
 		Name = "OptionsScroll",
 		Size = UDim2.new(1, 0, 0, 40),
@@ -14288,7 +14423,7 @@ function Dropdown.new(parent, opts, ctx)
 		Active = true,
 		ScrollBarThickness = 3,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
-		LayoutOrder = 2,
+		LayoutOrder = 3,
 		ZIndex = 112,
 		Theme = { ScrollBarImageColor3 = "Muted" },
 		Parent = popupInner,
@@ -14562,6 +14697,7 @@ function Dropdown.new(parent, opts, ctx)
 
 	local function resizePopup(preserveFlip, animateInline)
 		local searchH = searchable and 38 or 0
+		local actionH = (actionBar and actionBar.Visible) and 30 or 0
 		local visibleCount = 0
 		local hasDesc = false
 		for _, entry in ipairs(optionRows) do
@@ -14596,7 +14732,7 @@ function Dropdown.new(parent, opts, ctx)
 		scroll.CanvasSize = UDim2.fromOffset(0, needsScroll and fullContentH or 0)
 
 		if mode == "Inline" then
-			local inlineTotalH = 16 + searchH + listH
+			local inlineTotalH = 16 + searchH + actionH + listH
 			local inlineClipH = inlineTotalH + 1
 			scroll.Size = UDim2.new(1, 0, 0, listH)
 			popupInner.Position = UDim2.fromOffset(0, 1)
@@ -14611,8 +14747,8 @@ function Dropdown.new(parent, opts, ctx)
 		local layerH = (ctx.PopupLayer and ctx.PopupLayer.AbsoluteSize.Y > 0) and ctx.PopupLayer.AbsoluteSize.Y or 680
 		local anchorW = (trigger.AbsoluteSize.X > 0) and trigger.AbsoluteSize.X or 168
 		local width = (anchorW >= 180) and anchorW or Util.Clamp(math.max(anchorW + 40, 200), 200, 252)
-		local totalH = math.min(16 + searchH + listH, math.max(120, layerH - 16))
-		listH = math.max(36, totalH - 16 - searchH)
+		local totalH = math.min(16 + searchH + actionH + listH, math.max(120, layerH - 16))
+		listH = math.max(36, totalH - 16 - searchH - actionH)
 
 		local prevBottom = popup.AbsolutePosition.Y + popup.AbsoluteSize.Y
 		local anchorTop = trigger.AbsolutePosition.Y
@@ -15187,6 +15323,31 @@ function Dropdown.new(parent, opts, ctx)
 
 	function self:Get()
 		return getSelectedValues()
+	end
+
+	function self:SelectAll(silent)
+		if not multi then
+			return
+		end
+		local hasFilter = searchQuery ~= ""
+		for i, item in ipairs(items) do
+			if not item.Disabled then
+				local entry = optionRows[i]
+				if not hasFilter or not entry or entry.Button.Visible ~= false then
+					selectedMap[item] = true
+				end
+			end
+		end
+		fireSelection(silent == true)
+	end
+
+	function self:Clear(silent)
+		if multi then
+			table.clear(selectedMap)
+		else
+			selectedSingle = nil
+		end
+		fireSelection(silent == true)
 	end
 
 	function self:SetValues(list)
@@ -25366,10 +25527,14 @@ function Window.new(screenGui, options)
 		Parent = sidebarTop,
 	})
 
-	local customBrandIcon = options.Icon and options.Icon ~= "bali-logo" and options.Icon ~= "bali"
+	local brandIconOpt = options.Icon
+	if type(brandIconOpt) == "string" and string.lower(brandIconOpt) == "panel-left" then
+		brandIconOpt = "bali-logo"
+	end
+	local customBrandIcon = brandIconOpt and brandIconOpt ~= "bali-logo" and brandIconOpt ~= "bali"
 	local brandBadge = Create.New("TextButton", {
 		Name = "BrandBadge",
-		Position = UDim2.fromOffset(2, 2),
+		Position = UDim2.fromOffset(isCollapsed and 3 or 2, 2),
 		Size = UDim2.fromOffset(32, 32),
 		Text = "",
 		AutoButtonColor = false,
@@ -25391,13 +25556,13 @@ function Window.new(screenGui, options)
 		Visible = isCollapsed,
 		Parent = brandBadge,
 	})
-	local brandLogoIcon = Icons.Create(options.Icon or "bali-logo", {
+	local brandLogoIcon = Icons.Create(brandIconOpt or "bali-logo", {
 		Name = "BrandLogoIcon",
 		Size = UDim2.fromOffset(customBrandIcon and 18 or 22, customBrandIcon and 18 or 22),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = customBrandIcon and "Accent" or Color3.fromRGB(255, 255, 255),
-		Visible = true,
+		Visible = not isCollapsed,
 		Parent = brandBadge,
 	})
 	local brandExpandIcon = Icons.Create("panel-left", {
@@ -25405,25 +25570,30 @@ function Window.new(screenGui, options)
 		Size = UDim2.fromOffset(16, 16),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "Text",
-		Visible = false,
+		Color = "SubText",
+		Visible = isCollapsed,
 		Parent = brandBadge,
 	})
 	local brandBadgeHovered = false
 	local function applyBrandBadgeSurface(theme, animate)
 		local t = theme or Theme.Current
-		local showExpand = (brandCollapsedFlag and brandCollapsedFlag.Visible == true) and brandBadgeHovered
+		local collapsedNow = (brandCollapsedFlag and brandCollapsedFlag.Visible == true)
 		if brandLogoIcon then
-			brandLogoIcon.Visible = not showExpand
+			brandLogoIcon.Visible = not collapsedNow
 		end
 		if brandExpandIcon then
-			brandExpandIcon.Visible = showExpand
+			brandExpandIcon.Visible = collapsedNow
+			if collapsedNow then
+				Icons.SetColor(brandExpandIcon, brandBadgeHovered and "Text" or "SubText")
+			end
 		end
-		local collapsedNow = showExpand
+		brandBadge.Position = UDim2.fromOffset(collapsedNow and 3 or 2, 2)
 		local lightModeLogo = (t and t.Dark == false) and not customBrandIcon and not collapsedNow
 		local targetBgColor = lightModeLogo and Color3.fromRGB(24, 24, 32) or ((t and t.TileHover) or Color3.fromRGB(37, 37, 46))
-		local targetBgTrans = lightModeLogo and (brandBadgeHovered and 0.04 or 0.12) or (brandBadgeHovered and 0.86 or 1)
-		local targetStrTrans = lightModeLogo and (brandBadgeHovered and 0.45 or 0.65) or (brandBadgeHovered and 0.62 or 1)
+		local targetBgTrans = lightModeLogo and (brandBadgeHovered and 0.04 or 0.12)
+			or (collapsedNow and (brandBadgeHovered and 0.80 or 0.88) or (brandBadgeHovered and 0.86 or 1))
+		local targetStrTrans = lightModeLogo and (brandBadgeHovered and 0.45 or 0.65)
+			or (collapsedNow and (brandBadgeHovered and 0.50 or 0.72) or (brandBadgeHovered and 0.62 or 1))
 
 		if animate and not Tween.Reduced then
 			Tween.Play(brandBadge, {
@@ -25454,6 +25624,9 @@ function Window.new(screenGui, options)
 		brandBadgeHovered = false
 		applyBrandBadgeSurface(Theme.Current, true)
 	end))
+	maid:Give(Tooltip.Bind(brandBadge, function()
+		return (brandCollapsedFlag and brandCollapsedFlag.Visible) and "Expand Sidebar" or nil
+	end, { Side = "Right" }))
 
 	local brandText = Create.New("Frame", {
 		Name = "BrandText",
@@ -25827,37 +26000,10 @@ function Window.new(screenGui, options)
 		VAlign = Enum.VerticalAlignment.Center,
 	})
 
-	local expandBtn = Create.New("TextButton", {
-		Name = "ExpandSidebarBtn",
-		Size = UDim2.fromOffset(28, 28),
-		Text = "",
-		AutoButtonColor = false,
-		Corner = 8,
-		Theme = {
-			BackgroundColor3 = "Tile",
-			BackgroundTransparency = "TileTransparency",
-		},
-		Visible = isCollapsed,
-		LayoutOrder = 1,
-		Parent = breadcrumbWrap,
-	})
-	local expandStroke = Create.Stroke(expandBtn, {
-		Theme = { Color = "Stroke", Transparency = "StrokeTransparency" },
-	})
-	Icons.Create("panel-left", {
-		Size = UDim2.fromOffset(14, 14),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Color = "SubText",
-		Parent = expandBtn,
-	})
-	maid:Give(Transition.Hover(expandBtn, expandBtn, "Tile", "TileHover", expandStroke))
-	maid:Give(Tooltip.Bind(expandBtn, "Expand Sidebar", { Side = "Right" }))
-
 	Icons.Create("home", {
 		Size = UDim2.fromOffset(14, 14),
 		Color = "Muted",
-		LayoutOrder = 2,
+		LayoutOrder = 1,
 		Parent = breadcrumbWrap,
 	})
 
@@ -25870,7 +26016,7 @@ function Window.new(screenGui, options)
 		Size = UDim2.new(1, -26, 0, 20),
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		RichText = true,
-		LayoutOrder = 3,
+		LayoutOrder = 2,
 		Parent = breadcrumbWrap,
 	})
 
@@ -25968,7 +26114,6 @@ function Window.new(screenGui, options)
 		_brandExpandIcon = brandExpandIcon,
 		_syncBrandBadge = applyBrandBadgeSurface,
 		_collapseBtn = collapseBtn,
-		_expandBtn = expandBtn,
 		_welcomeCard = welcomeCard,
 		_searchPill = searchPill,
 		_searchIcon = searchIcon,
@@ -26170,9 +26315,6 @@ function Window.new(screenGui, options)
 	-- ─── Topbar & Sidebar Actions ────────────────────────────────────────────
 	maid:Give(collapseBtn.Activated:Connect(function()
 		self:ToggleSidebar(true)
-	end))
-	maid:Give(expandBtn.Activated:Connect(function()
-		self:ToggleSidebar(false)
 	end))
 	maid:Give(brandBadge.Activated:Connect(function(input)
 		if self._sidebarCollapsed then
@@ -26746,21 +26888,8 @@ function Window:ToggleSidebar(collapsed)
 	if collapsedFlag then
 		collapsedFlag.Visible = collapsed
 	end
-	if self._brandLogoIcon then
-		self._brandLogoIcon.Visible = true
-	end
-	if self._brandExpandIcon then
-		self._brandExpandIcon.Visible = false
-	end
 	if self._syncBrandBadge then
-		task.defer(function()
-			if not self._destroyed then
-				self._syncBrandBadge(Theme.Current, true)
-			end
-		end)
-	end
-	if self._expandBtn then
-		self._expandBtn.Visible = collapsed
+		self._syncBrandBadge(Theme.Current, false)
 	end
 	if self._searchPill then
 		self._searchPill.Visible = true
