@@ -1245,10 +1245,10 @@ Theme.Presets = {
 		NoiseTransparency = 0.98,
 	}),
 }
-Theme.Order = { "Midnight", "Ocean", "Graphite", "Aurora", "Sunset", "Emerald", "Light" }
+Theme.Order = { "Graphite", "Midnight", "Ocean", "Aurora", "Sunset", "Emerald", "Light" }
 
-Theme.Name = "Midnight"
-Theme.Current = table.clone(Theme.Presets.Midnight)
+Theme.Name = "Graphite"
+Theme.Current = table.clone(Theme.Presets.Graphite)
 Theme.AccentOverride = nil
 Theme.Overrides = {}
 Theme.Changed = Signal.new()
@@ -23220,7 +23220,7 @@ function Tab.new(window, options)
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		AutomaticCanvasSize = Enum.AutomaticSize.X,
+		AutomaticCanvasSize = Enum.AutomaticSize.None,
 		CanvasSize = UDim2.new(),
 		ScrollBarThickness = 0,
 		ScrollingDirection = Enum.ScrollingDirection.X,
@@ -23229,46 +23229,43 @@ function Tab.new(window, options)
 
 	local subTabIndicator = Create.New("Frame", {
 		Name = "ActivePill",
-		Position = UDim2.fromOffset(0, 2),
+		Position = UDim2.fromOffset(2, 2),
 		Size = UDim2.new(0, 0, 1, -4),
-		Corner = 8,
-		Theme = { BackgroundColor3 = "Accent" },
-		BackgroundTransparency = 0.78,
+		Corner = 7,
+		Theme = { BackgroundColor3 = "Elevated" },
+		BackgroundTransparency = 0.14,
 		Visible = false,
 		ZIndex = 1,
 		Parent = subTabScroll,
 	})
-	local pillGradient = Create.New("UIGradient", {
-		Color = Theme.AccentSequence(),
-		Rotation = 20,
+	Create.New("UIGradient", {
+		Color = ColorSequence.new(Color3.new(1, 1, 1)),
+		Rotation = 90,
 		Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 0.05),
-			NumberSequenceKeypoint.new(1, 0.35),
+			NumberSequenceKeypoint.new(1, 0.28),
 		}),
 		Parent = subTabIndicator,
 	})
-	maid:Give(Theme.Changed:Connect(function(theme)
-		pillGradient.Color = Theme.AccentSequence(theme)
-	end))
-	Create.Stroke(subTabIndicator, {
-		Theme = { Color = "Accent" },
-		Transparency = 0.35,
-		Thickness = 1,
-	})
+	Create.GlassStroke(subTabIndicator, 0.05)
 
 	local subTabButtons = Create.New("Frame", {
 		Name = "Buttons",
+		Position = UDim2.fromOffset(2, 0),
 		Size = UDim2.new(0, 0, 1, 0),
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundTransparency = 1,
 		ZIndex = 2,
 		Parent = subTabScroll,
 	})
-	Create.List(subTabButtons, {
+	local subTabLayout = Create.List(subTabButtons, {
 		Direction = Enum.FillDirection.Horizontal,
 		Gap = 4,
 		VAlign = Enum.VerticalAlignment.Center,
 	})
+	maid:Give(subTabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		subTabScroll.CanvasSize = UDim2.fromOffset(subTabLayout.AbsoluteContentSize.X + 4, 0)
+	end))
 
 	local subPageHolder = Create.New("Frame", {
 		Name = "SubPages",
@@ -23488,7 +23485,7 @@ function Tab:_syncSubTabIndicator(instant)
 			return
 		end
 		self._subTabIndicator.Visible = true
-		local targetPos = UDim2.fromOffset(x, 2)
+		local targetPos = UDim2.fromOffset(x + 2, 2)
 		local targetSize = UDim2.new(0, w, 1, -4)
 		if instant then
 			self._subTabIndicator.Position = targetPos

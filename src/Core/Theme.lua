@@ -195,10 +195,10 @@ Theme.Presets = {
 		NoiseTransparency = 0.98,
 	}),
 }
-Theme.Order = { "Midnight", "Ocean", "Graphite", "Aurora", "Sunset", "Emerald", "Light" }
+Theme.Order = { "Graphite", "Midnight", "Ocean", "Aurora", "Sunset", "Emerald", "Light" }
 
-Theme.Name = "Midnight"
-Theme.Current = table.clone(Theme.Presets.Midnight)
+Theme.Name = "Graphite"
+Theme.Current = table.clone(Theme.Presets.Graphite)
 Theme.AccentOverride = nil
 Theme.Overrides = {}
 Theme.Changed = Signal.new()

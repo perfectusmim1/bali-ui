@@ -6,13 +6,13 @@ Bali supports instant live re-theming without rebuilding UI trees, alongside bui
 
 ## Built-in Themes (`Theme.Presets`)
 
-Seven curated palettes ship out of the box (`Midnight` is default):
+Seven curated palettes ship out of the box (`Graphite` is default):
 
 | Theme Preset | Surface Aesthetic | Primary Accent |
 | :--- | :--- | :--- |
-| **`Midnight`** *(Default)* | Deep obsidian slate (`#0B0B0E`) | Electric Violet (`#D640EC`) |
+| **`Graphite`** *(Default)* | Matte charcoal titanium (`#111113`) | Sapphire (`#0A84FF`) |
+| **`Midnight`** | Deep obsidian slate (`#0B0B0E`) | Electric Violet (`#D640EC`) |
 | **`Ocean`** | Midnight navy obsidian (`#090C15`) | Cobalt Blue (`#3B82F6`) |
-| **`Graphite`** | Matte charcoal titanium (`#111113`) | Sapphire (`#0A84FF`) |
 | **`Aurora`** | Deep teal void (`#080E0F`) | Luminous Cyan (`#2DD4BF`) |
 | **`Sunset`** | Obsidian plum (`#0F0B0C`) | Warm Coral (`#FB7185`) |
 | **`Emerald`** | Pine dark glass (`#090D0B`) | Emerald Mint (`#34D399`) |

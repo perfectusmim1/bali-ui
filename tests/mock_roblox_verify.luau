@@ -2168,6 +2168,7 @@ assertEq(window._configFolder, "BaliShowcase", "Window._configFolder preserved f
 assertEq(Bali.Blur.IsEnabled(), true, "Blur auto-enabled from CreateWindow opts")
 assertEq(Bali.Blur.GetIntensity(), 12, "BlurIntensity=12 preserved from CreateWindow opts")
 assertEq(Bali.Watermark.IsVisible(), true, "Watermark auto-enabled from CreateWindow opts")
+assertEq(Bali.Theme.Name, "Graphite", "Default Theme.Name is Graphite")
 
 -- Sidebar collapse / expand cycle
 window:ToggleSidebar(true)
@@ -2699,6 +2700,7 @@ end, debug.traceback)
 assertTrue(okLib and type(Bali2) == "table", "dist/Bali.lua loaded in Studio mode: " .. tostring(Bali2))
 
 if okLib and type(Bali2) == "table" then
+	assertEq(Bali2.Theme.Name, "Graphite", "Default Theme.Name is Graphite in Studio mode")
 	local win2 = Bali2:CreateWindow({
 		Title = "Studio Fallback Test",
 		Subtitle = "No Executor Globals",
@@ -2710,6 +2712,14 @@ if okLib and type(Bali2) == "table" then
 
 	local tab = win2:AddTab({ Title = "All Elements", Icon = "layers" })
 	local sub = tab:AddSubTab({ Title = "Core", Icon = "sliders" })
+	do
+		stepClock(0.05, true)
+		local activePill = tab._subTabIndicator
+		assertTrue(activePill ~= nil and activePill.Visible, "SubTabBar ActivePill is visible for first SubTab")
+		assertTrue(activePill.Position.X.Offset >= 2, "SubTabBar ActivePill Position.X.Offset >= 2 prevents left stroke clipping (got " .. tostring(activePill.Position.X.Offset) .. ")")
+		local pillStroke = activePill:FindFirstChildOfClass("UIStroke")
+		assertTrue(pillStroke ~= nil and pillStroke:FindFirstChildOfClass("UIGradient") ~= nil, "SubTabBar ActivePill uses glass UIStroke with UIGradient")
+	end
 	local sec = sub:AddSection({ Title = "Controls", Side = "Full", Collapsible = true })
 
 	sec:AddHeader({ Title = "Header" })
