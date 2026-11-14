@@ -415,12 +415,18 @@ function Checkbox.new(parent, opts, ctx)
 		local targetSize = state and UDim2.fromOffset(13, 13) or UDim2.fromOffset(6, 6)
 		local targetStrokeColor = state and Theme.Current.Accent or Theme.Current.Stroke
 		local targetStrokeTrans = state and 0.25 or Theme.Current.StrokeTransparency
-		local iconTransProp = checkIcon and Icons.TransparencyProperty(checkIcon) or "ImageTransparency"
+		local iconTarget = checkIcon and Icons.TransparencyTarget(checkIcon) or nil
+		local iconTransProp = iconTarget and Icons.TransparencyProperty(iconTarget) or "ImageTransparency"
 
 		if animate then
 			Tween.Play(accentFill, { BackgroundTransparency = targetAlpha }, Tween.Fast, Enum.EasingStyle.Quad)
-			if checkIcon then
-				Tween.Play(checkIcon, { [iconTransProp] = targetAlpha, Size = targetSize }, Tween.Fast, Enum.EasingStyle.Exponential)
+			if checkIcon and iconTarget then
+				if iconTarget == checkIcon then
+					Tween.Play(checkIcon, { [iconTransProp] = targetAlpha, Size = targetSize }, Tween.Fast, Enum.EasingStyle.Exponential)
+				else
+					Tween.Play(iconTarget, { [iconTransProp] = targetAlpha }, Tween.Fast, Enum.EasingStyle.Exponential)
+					Tween.Play(checkIcon, { Size = targetSize }, Tween.Fast, Enum.EasingStyle.Exponential)
+				end
 			end
 			Tween.Play(boxStroke, {
 				Color = targetStrokeColor,

@@ -27,6 +27,8 @@ local glyphs = {
 	["circle-help"] = "?",
 	ellipsis = "•••",
 	circle = "●",
+	["bali-logo"] = "B",
+	bali = "B",
 }
 local glyphRotation = { ["chevron-down"] = 90, ["chevron-up"] = -90 }
 
@@ -53,6 +55,9 @@ function Icons.Resolve(icon)
 		return { Kind = "Asset", Image = icon }
 	end
 	local key = string.lower(icon)
+	if (key == "bali-logo" or key == "bali") and Assets.Available and Assets.Images.Logo then
+		return { Kind = "Asset", Image = Assets.Images.Logo }
+	end
 	local cell = Assets.Data.Icons[key]
 	if cell and Assets.Available and Assets.Images.Atlas then
 		local size = Assets.Data.Atlas.Cell
@@ -218,13 +223,29 @@ function Icons.ColorProperty(instance)
 	return colorProperty(instance)
 end
 
+function Icons.TransparencyTarget(instance)
+	if not instance then
+		return nil
+	end
+	return instance:FindFirstChild("MinusBar") or instance
+end
+
 function Icons.TransparencyProperty(instance)
-	if instance:IsA("TextLabel") then
+	local target = Icons.TransparencyTarget(instance) or instance
+	if target:IsA("TextLabel") then
 		return "TextTransparency"
-	elseif instance:IsA("Frame") then
+	elseif target:IsA("Frame") then
 		return "BackgroundTransparency"
 	end
 	return "ImageTransparency"
+end
+
+function Icons.SetTransparency(instance, alpha)
+	local target = Icons.TransparencyTarget(instance)
+	if not target then
+		return
+	end
+	target[Icons.TransparencyProperty(target)] = alpha
 end
 
 return Icons

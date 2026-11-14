@@ -23,7 +23,7 @@ function MobileButton.new(parentLayer, window, options)
 	options = Util.Options(options, {
 		Title = "Bali",
 		Subtitle = "Tap to show",
-		Icon = "sparkles",
+		Icon = "bali-logo",
 		Enabled = true,
 		AlwaysShow = false,
 		Centered = true,
@@ -117,8 +117,8 @@ function MobileButton.new(parentLayer, window, options)
 		badgeGrad.Color = Theme.AccentSequence(theme)
 	end))
 
-	Icons.Create(options.Icon or "sparkles", {
-		Size = UDim2.fromOffset(13, 13),
+	Icons.Create(options.Icon or "bali-logo", {
+		Size = UDim2.fromOffset(14, 14),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = "AccentText",

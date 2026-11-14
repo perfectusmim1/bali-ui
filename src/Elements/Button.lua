@@ -507,7 +507,7 @@ function ButtonGroup.new(parent, opts, ctx)
 			local dim = (element.Disabled or itemDisabled) and 0.48 or 0
 			lbl.TextTransparency = dim
 			if iconObj then
-				iconObj[Icons.TransparencyProperty(iconObj)] = dim
+				Icons.SetTransparency(iconObj, dim)
 			end
 
 			applyStateTransition(btn, stroke, bVariant, isHovered, isPressed, false, animate)

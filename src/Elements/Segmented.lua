@@ -396,7 +396,7 @@ function Segmented.new(parent, opts, ctx)
 			seg.Button.Active = not disabled
 			seg.Label.TextTransparency = disabled and 0.48 or 0
 			if seg.Icon then
-				seg.Icon[Icons.TransparencyProperty(seg.Icon)] = disabled and 0.48 or 0
+				Icons.SetTransparency(seg.Icon, disabled and 0.48 or 0)
 			end
 		end
 	end

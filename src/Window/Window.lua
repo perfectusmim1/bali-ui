@@ -113,7 +113,7 @@ function Window.new(screenGui, options)
 		Title = "Bali",
 		Subtitle = nil,
 		Version = nil,
-		Icon = "sparkles",
+		Icon = "bali-logo",
 		WelcomeSubtitle = nil,
 		ShowUser = false,
 		Size = UDim2.fromOffset(820, 540),
@@ -383,8 +383,8 @@ function Window.new(screenGui, options)
 		brandGrad.Color = Theme.AccentSequence(theme)
 	end))
 
-	Icons.Create(options.Icon or "sparkles", {
-		Size = UDim2.fromOffset(17, 17),
+	Icons.Create(options.Icon or "bali-logo", {
+		Size = UDim2.fromOffset(18, 18),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Color = "AccentText",
@@ -835,7 +835,7 @@ function Window.new(screenGui, options)
 	local self = setmetatable({
 		Title = tostring(options.Title or "Bali"),
 		Subtitle = subtitleText and tostring(subtitleText) or "",
-		Icon = options.Icon or "sparkles",
+		Icon = options.Icon or "bali-logo",
 		ScreenGui = screenGui,
 		MainLayer = mainLayer,
 		HUDLayer = hudLayer,

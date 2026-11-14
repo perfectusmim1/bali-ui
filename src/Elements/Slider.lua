@@ -979,11 +979,11 @@ function Stepper.new(parent, opts, ctx)
 		end
 		if minusIcon then
 			local atMin = (currentVal <= minVal) or element.Disabled
-			minusIcon[Icons.TransparencyProperty(minusIcon)] = atMin and 0.65 or 0
+			Icons.SetTransparency(minusIcon, atMin and 0.65 or 0)
 		end
 		if plusIcon then
 			local atMax = (currentVal >= maxVal) or element.Disabled
-			plusIcon[Icons.TransparencyProperty(plusIcon)] = atMax and 0.65 or 0
+			Icons.SetTransparency(plusIcon, atMax and 0.65 or 0)
 		end
 	end
 

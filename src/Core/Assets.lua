@@ -136,6 +136,7 @@ function Assets.Load()
 			Noise = Data.Noise,
 			Glass = Data.Glass,
 			Banner = Data.Banner,
+			Logo = Data.Logo,
 		}
 		for name, payload in pairs(sources) do
 			local path = string.format("%s/%s_v%s.png", Assets.Folder, name, Data.Version)

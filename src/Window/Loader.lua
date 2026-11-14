@@ -161,7 +161,7 @@ function Loader.LoadingScreen(parentGui, options)
 	options = Util.Options(options, {
 		Title = "Bali",
 		Subtitle = "Preparing workspace...",
-		Icon = "sparkles",
+		Icon = "bali-logo",
 		Duration = 1.6,
 		Steps = nil,
 		AutoClose = true,
@@ -204,7 +204,7 @@ function Loader.LoadingScreen(parentGui, options)
 		badgeGrad.Color = Theme.AccentSequence(theme)
 	end))
 
-	local badgeIcon = Icons.Create(options.Icon or "sparkles", {
+	local badgeIcon = Icons.Create(options.Icon or "bali-logo", {
 		Size = UDim2.fromOffset(20, 20),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -213,7 +213,8 @@ function Loader.LoadingScreen(parentGui, options)
 	})
 	local stopPulse = nil
 	if badgeIcon then
-		stopPulse = Transition.Pulse(badgeIcon, Icons.TransparencyProperty(badgeIcon), 0, 0.45, 0.9)
+		local pulseTarget = Icons.TransparencyTarget(badgeIcon) or badgeIcon
+		stopPulse = Transition.Pulse(pulseTarget, Icons.TransparencyProperty(pulseTarget), 0, 0.45, 0.9)
 		maid:Give(stopPulse)
 	end
 

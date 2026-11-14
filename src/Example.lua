@@ -28,7 +28,7 @@ Bali:Notify({
 local window = Bali:CreateWindow({
 	Title = "Bali Suite",
 	Subtitle = "v" .. Bali.Version,
-	Icon = "sparkles",
+	Icon = "bali-logo",
 	ShowUser = true,
 	Size = UDim2.fromOffset(860, 570),
 	ToggleKey = Enum.KeyCode.RightShift,
@@ -1217,7 +1217,7 @@ modalsSection:AddButton({
 		Bali:LoadingScreen({
 			Title = "Bali Suite",
 			Subtitle = "Synchronizing glassmorphic telemetry...",
-			Icon = "sparkles",
+			Icon = "bali-logo",
 			Duration = 2.0,
 			Steps = {
 				"Loading vector atlas...",

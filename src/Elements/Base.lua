@@ -606,7 +606,7 @@ function Base.Row(parent, options, rightWidth)
 		titleLabel.TextTransparency = targetTextTrans
 		descLabel.TextTransparency = targetTextTrans
 		if iconObj then
-			iconObj[Icons.TransparencyProperty(iconObj)] = row._disabled and 0.48 or 0
+			Icons.SetTransparency(iconObj, row._disabled and 0.48 or 0)
 		end
 		if iconBadge then
 			iconBadge.Frame.BackgroundTransparency = row._disabled and 0.92 or 0.84
